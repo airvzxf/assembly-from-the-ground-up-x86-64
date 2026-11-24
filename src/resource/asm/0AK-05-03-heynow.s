@@ -1,12 +1,16 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
     # PURPOSE:
     #     Solution to Chapter 5, "Use the Concepts":
     #     create the file `heynow.txt` and write
     #     "Hey diddle diddle!" into it.
     #
-    .include "006-01-linux.s"
-        .equ O_CREAT_WRONLY_TRUNC, 03101
+    .section .note.GNU-stack,"",@progbits
+
+        .equ SYS_WRITE,            1
+        .equ SYS_CLOSE,            3
+        .equ SYS_EXIT,             60
+        .equ SYS_OPENAT,           257
+        .equ AT_FDCWD,             -100
+        .equ O_CREAT_WRONLY_TRUNC, 01101
 
     .section .data
         file_name:
@@ -20,23 +24,24 @@
         .globl _start
 
 _start:
-    movl  $SYS_OPEN, %eax
-    movl  $file_name, %ebx
-    movl  $O_CREAT_WRONLY_TRUNC, %ecx
-    movl  $0666, %edx        # Permissions.
-    int   $LINUX_SYSCALL
-    movl  %eax, %esi         # File descriptor.
+    movq  $SYS_OPENAT, %rax
+    movq  $AT_FDCWD, %rdi
+    leaq  file_name(%rip), %rsi
+    movq  $O_CREAT_WRONLY_TRUNC, %rdx
+    movq  $0666, %r10        # Permissions.
+    syscall
+    movq  %rax, %rbx         # File descriptor.
 
-    movl  $SYS_WRITE, %eax
-    movl  %esi, %ebx
-    movl  $text, %ecx
-    movl  $TEXT_LENGTH, %edx
-    int   $LINUX_SYSCALL
+    movq  $SYS_WRITE, %rax
+    movq  %rbx, %rdi
+    leaq  text(%rip), %rsi
+    movq  $TEXT_LENGTH, %rdx
+    syscall
 
-    movl  $SYS_CLOSE, %eax
-    movl  %esi, %ebx
-    int   $LINUX_SYSCALL
+    movq  $SYS_CLOSE, %rax
+    movq  %rbx, %rdi
+    syscall
 
-    movl  $SYS_EXIT, %eax
-    movl  $0, %ebx
-    int   $LINUX_SYSCALL
+    movq  $SYS_EXIT, %rax
+    movq  $0, %rdi
+    syscall

@@ -577,12 +577,12 @@ Chapter 5. Dealing with Files {#chapter-5.-dealing-with-files}
 ### Know the Concepts {#know-the-concepts-14}
 
 -   **Describe the lifecycle of a file descriptor.** The program asks
-    Linux to open a file with the `open` system call, and Linux returns
-    a file descriptor, a small number that identifies the open file.
-    The program uses that number with `read` and `write` as many times
-    as it needs, and finally gives it back with `close`. After that,
-    the number is no longer valid and may be reused by the next
-    `open`.
+    Linux to open a file with the `openat` system call, and Linux
+    returns a file descriptor, a small number that identifies the open
+    file. The program uses that number with `read` and `write` as many
+    times as it needs, and finally gives it back with `close`. After
+    that, the number is no longer valid and may be reused by the next
+    `openat`.
 
 -   **What are the standard file descriptors and what are they used
     for?** Every program starts with three open file descriptors:
@@ -602,11 +602,17 @@ Chapter 5. Dealing with Files {#chapter-5.-dealing-with-files}
     `.bss`, so they don\'t make the executable bigger.
 
 -   **What are the system calls related to reading and writing
-    files?** `open` (5), `read` (3), `write` (4) and `close` (6).
+    files?** `openat` (257), `read` (0), `write` (1) and `close` (3).
+
+-   **Where does a program find its command-line arguments when it
+    starts?** On the stack. `(%rsp)` holds the number of arguments
+    (`argc`), `8(%rsp)` the address of the program name, and
+    `16(%rsp)`, `24(%rsp)`, \... the addresses of the arguments (the
+    `argv` list). Each one is a null-terminated string.
 
 ### Use the Concepts {#use-the-concepts-14}
 
-All these programs use the `_convert_to_upper` function of
+All these programs use the `convert_to_upper` function of
 `005-01-toupper`, moved to its own file, `0AK-05-00-convert-to-upper.s`,
 so each one can link it:
 
@@ -627,16 +633,18 @@ It prints `HEY, DIDDLE 123!`.
 
 **Change the size of the buffer** and **use storage in the `.bss`
 section to store the file descriptors.** This version keeps the file
-descriptors in `.bss` with `.lcomm`, and uses a buffer of only 16
-bytes. The result is the same; only the number of `read` and `write`
-calls changes:
+descriptors in `.bss` with `.lcomm` (8 bytes each), reaches them
+relative to _%rip_, and uses a buffer of only 16 bytes. The result is
+the same; only the number of `read` and `write` calls changes:
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-05-02-toupper-bss.s}
 ```
 
 **Create a file called `heynow.txt` with the words "Hey diddle
-diddle!".** `open` with the flags `03101` creates the file (or empties
-it if it already exists):
+diddle!".** `openat` with the flags `01101` creates the file (or
+empties it if it already exists). The length of the text is computed by
+the assembler, as the distance between the labels `text` and
+`text_end`:
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-05-03-heynow.s}
 ```
@@ -648,14 +656,14 @@ it if it already exists):
     compared with normal instructions, so the program runs faster, up
     to a point (a few kilobytes is usually enough). The cost is memory.
     A buffer of 1 byte works, but makes one `read` and one `write`
-    for every character.
+    for every character. You can count the calls with `strace -c`.
 
 -   **What error results can be returned by each of these system
     calls?** On failure, the system calls return a negative number,
     the error code with a minus sign. Some common ones (see
-    `man 2 open`, `man 2 read`, \...):
+    `man 2 openat`, `man 2 read`, \...):
 
-    -   `open`: `ENOENT` (2, the file doesn\'t exist), `EACCES` (13,
+    -   `openat`: `ENOENT` (2, the file doesn\'t exist), `EACCES` (13,
         no permission), `EISDIR` (21, it is a directory), `EMFILE`
         (24, too many open files), `ENOSPC` (28, the disk is full).
     -   `read`: `EBADF` (9, bad file descriptor), `EFAULT` (14, the
@@ -665,10 +673,32 @@ it if it already exists):
         end of the pipe was closed).
     -   `close`: `EBADF`, `EIO`.
 
+    This is what `strace` shows when `005-01-toupper` gets an input
+    file that doesn\'t exist (Ubuntu 24.04, `strace` 6.8):
+
+    ```
+    execve("./005-01-toupper", ["./005-01-toupper", "missing.txt", "output2.txt"], 0x7fff156b1b60 /* 7 vars */) = 0
+    openat(AT_FDCWD, "missing.txt", O_RDONLY) = -1 ENOENT (No such file or directory)
+    openat(AT_FDCWD, "output2.txt", O_WRONLY|O_CREAT|O_TRUNC, 0666) = 3
+    read(-2, 0x402000, 500)                 = -1 EBADF (Bad file descriptor)
+    close(3)                                = 0
+    close(-2)                               = -1 EBADF (Bad file descriptor)
+    exit(0)                                 = ?
+    +++ exited with 0 +++
+    ```
+
+    The first `openat` fails with `ENOENT`, so _%rax_ gets -2. The
+    program doesn\'t check it and stores -2 as the input file
+    descriptor, so the `read` and the last `close` fail with `EBADF`.
+    The program still creates an empty `output2.txt` and exits with
+    status 0, as if everything had worked. That is why every system
+    call should be checked.
+
 -   **Use the command-line arguments or STDIN and STDOUT, based on
     ARGC,** and **check the result of each system call.** This program
     does both. The messages go to `STDERR` instead of `STDOUT`, so that
-    they are never mixed with the converted text:
+    they are never mixed with the converted text, and each message is
+    followed by a label so the assembler can compute its length:
 
     ```{.gnuassembler .numberLines include=resource/asm/0AK-05-04-toupper-checked.s}
     ```

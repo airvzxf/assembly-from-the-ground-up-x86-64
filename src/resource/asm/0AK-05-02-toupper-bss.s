@@ -1,4 +1,3 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
     # Link with `0AK-05-00-convert-to-upper.o`.
     #
     # PURPOSE:
@@ -12,68 +11,77 @@
     # USAGE:
     #     ./0AK-05-02-toupper-bss input.txt output.txt
     #
-    .include "006-01-linux.s"
+    .section .note.GNU-stack,"",@progbits
+
+        .equ SYS_READ,             0
+        .equ SYS_WRITE,            1
+        .equ SYS_CLOSE,            3
+        .equ SYS_EXIT,             60
+        .equ SYS_OPENAT,           257
+        .equ AT_FDCWD,             -100
         .equ O_RDONLY,             0
-        .equ O_CREAT_WRONLY_TRUNC, 03101
-        .equ ST_ARGV_1,            8
-        .equ ST_ARGV_2,            12
+        .equ O_CREAT_WRONLY_TRUNC, 01101
+        .equ END_OF_FILE,          0
+        .equ ST_ARGV_1,            16
+        .equ ST_ARGV_2,            24
 
     .section .bss
         .equ   BUFFER_SIZE, 16
         .lcomm BUFFER_DATA, BUFFER_SIZE
-        .lcomm FD_IN,  4     # File descriptors.
-        .lcomm FD_OUT, 4
+        .lcomm FD_IN,  8     # File descriptors.
+        .lcomm FD_OUT, 8
 
     .section .text
         .globl _start
 
 _start:
-    movl  %esp, %ebp
+    movq  %rsp, %rbp
 
-    movl  $SYS_OPEN, %eax    # Open the input file.
-    movl  ST_ARGV_1(%ebp), %ebx
-    movl  $O_RDONLY, %ecx
-    movl  $0666, %edx
-    int   $LINUX_SYSCALL
-    movl  %eax, FD_IN
+    movq  $SYS_OPENAT, %rax  # Open the input file.
+    movq  $AT_FDCWD, %rdi
+    movq  ST_ARGV_1(%rbp), %rsi
+    movq  $O_RDONLY, %rdx
+    movq  $0666, %r10
+    syscall
+    movq  %rax, FD_IN(%rip)
 
-    movl  $SYS_OPEN, %eax    # Open the output file.
-    movl  ST_ARGV_2(%ebp), %ebx
-    movl  $O_CREAT_WRONLY_TRUNC, %ecx
-    movl  $0666, %edx
-    int   $LINUX_SYSCALL
-    movl  %eax, FD_OUT
+    movq  $SYS_OPENAT, %rax  # Open the output file.
+    movq  $AT_FDCWD, %rdi
+    movq  ST_ARGV_2(%rbp), %rsi
+    movq  $O_CREAT_WRONLY_TRUNC, %rdx
+    movq  $0666, %r10
+    syscall
+    movq  %rax, FD_OUT(%rip)
 
-_read_loop:
-    movl  $SYS_READ, %eax
-    movl  FD_IN, %ebx
-    movl  $BUFFER_DATA, %ecx
-    movl  $BUFFER_SIZE, %edx
-    int   $LINUX_SYSCALL
-    cmpl  $END_OF_FILE, %eax
-    jle   _close_files
+read_loop:
+    movq  $SYS_READ, %rax
+    movq  FD_IN(%rip), %rdi
+    leaq  BUFFER_DATA(%rip), %rsi
+    movq  $BUFFER_SIZE, %rdx
+    syscall
+    cmpq  $END_OF_FILE, %rax
+    jle   close_files
 
-    movl  %eax, %esi         # Bytes read.
-    pushl $BUFFER_DATA
-    pushl %esi
-    call  _convert_to_upper
-    addl  $8, %esp
+    movq  %rax, %rbx         # Bytes read.
+    leaq  BUFFER_DATA(%rip), %rdi
+    movq  %rbx, %rsi
+    call  convert_to_upper
 
-    movl  $SYS_WRITE, %eax
-    movl  FD_OUT, %ebx
-    movl  $BUFFER_DATA, %ecx
-    movl  %esi, %edx
-    int   $LINUX_SYSCALL
-    jmp   _read_loop
+    movq  $SYS_WRITE, %rax
+    movq  FD_OUT(%rip), %rdi
+    leaq  BUFFER_DATA(%rip), %rsi
+    movq  %rbx, %rdx
+    syscall
+    jmp   read_loop
 
-_close_files:
-    movl  $SYS_CLOSE, %eax
-    movl  FD_OUT, %ebx
-    int   $LINUX_SYSCALL
-    movl  $SYS_CLOSE, %eax
-    movl  FD_IN, %ebx
-    int   $LINUX_SYSCALL
+close_files:
+    movq  $SYS_CLOSE, %rax
+    movq  FD_OUT(%rip), %rdi
+    syscall
+    movq  $SYS_CLOSE, %rax
+    movq  FD_IN(%rip), %rdi
+    syscall
 
-    movl  $SYS_EXIT, %eax
-    movl  $0, %ebx
-    int   $LINUX_SYSCALL
+    movq  $SYS_EXIT, %rax
+    movq  $0, %rdi
+    syscall

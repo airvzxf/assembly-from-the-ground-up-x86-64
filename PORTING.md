@@ -77,13 +77,15 @@ material. This file records the decisions and tracks the work, one block
   for Chapters 2 and 3. Programs: exit, maximum; 6 solutions.
 - [x] **3. Chapter 4** (System V convention, frames, alignment, recursion),
   solutions. Programs: power, factorial; 4 solutions.
-- [ ] **4. Chapter 5** (files, argv, buffers), solutions. Programs: toupper;
+- [x] **4. Chapter 5** (files, argv, buffers), solutions. Programs: toupper;
   5 solutions.
 - [ ] **5. Chapters 6 and 7** (records of 328 bytes, robust programs),
   solutions. Programs: the record library, add-year, error-exit;
   9 solutions.
 - [ ] **6. Chapter 8** (libc, shared libraries, PIC, calling assembly from
-  Rust and Python), solutions. Adds pinned Rust to the build.
+  Rust and Python), solutions. Adds pinned Rust to the build, and
+  deletes `src/resource/asm/legacy32/` (a temporary 32-bit copy of
+  `convert_to_upper` used by `0AK-08-03-toupper-libc`).
 - [ ] **7. Chapter 9** (64-bit memory map, ASLR, `brk` and `mmap`, the
   memory manager with 16-byte headers), solutions.
 - [ ] **8. Chapter 10** (64-bit integers, `divq`/`cqto`, SSE2 floating

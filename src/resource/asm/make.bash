@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
 # Clean up previous files
-rm -f ./*.o
+rm -f ./*.o legacy32/*.o
 rm -f ./*-bin
 rm -f ./*.so .gdb_history heynow.txt
 
@@ -113,11 +113,27 @@ assemble64 004-01-power 004-02-factorial
 link64 004-01-power 004-01-power.o
 link64 004-02-factorial 004-02-factorial.o
 
+# ----- Chapter 5 -----
+assemble64 005-01-toupper
+link64 005-01-toupper 005-01-toupper.o
+
 # ----- Appendix K, Chapters 3 and 4 -----
 for SOURCE in 0AK-03-*.s 0AK-04-*.s; do
   assemble64 "${SOURCE%.s}"
   link64 "${SOURCE%.s}" "${SOURCE%.s}.o"
 done
+
+# ----- Appendix K, Chapter 5 -----
+for SOURCE in 0AK-05-*.s; do
+  assemble64 "${SOURCE%.s}"
+done
+link64 0AK-05-01-toupper-stdio 0AK-05-01-toupper-stdio.o \
+  0AK-05-00-convert-to-upper.o
+link64 0AK-05-02-toupper-bss 0AK-05-02-toupper-bss.o \
+  0AK-05-00-convert-to-upper.o
+link64 0AK-05-03-heynow 0AK-05-03-heynow.o
+link64 0AK-05-04-toupper-checked 0AK-05-04-toupper-checked.o \
+  0AK-05-00-convert-to-upper.o
 
 echo ""
 
@@ -131,7 +147,6 @@ echo ""
 # -----------------------------------------------------
 
 FILES=(
-  005-01-toupper
   006-01-add-year
   006-01-count-chars
   006-01-read-record
@@ -166,7 +181,6 @@ echo ""
 # -----------------------------------------------------
 
 GENERIC_FILES=(
-  005-01-toupper
   008-01-hello-world-nolib
   009-01-memory-layout
   010-01-shift-bit
@@ -264,7 +278,7 @@ gcc -o "011-01-hello-world-c-bin" "011-01-hello-world.c"
 
 for SOURCE in 0AK-*.s
 do
-    [[ "${SOURCE}" == 0AK-0[34]-* ]] && continue  # 64-bit.
+    [[ "${SOURCE}" == 0AK-0[345]-* ]] && continue  # 64-bit.
     echo "Assembling: ${SOURCE%.s}"
     as -o "${SOURCE%.s}.o" "${SOURCE}" --32 --gstabs+
 done
@@ -280,15 +294,11 @@ link_solution() {
 LIBC=(--library c --library-path /usr/lib32/
       -dynamic-linker /usr/lib32/ld-linux.so.2)
 
-for SOURCE in 0AK-05-03-*.s
-do
-    link_solution "${SOURCE%.s}"
-done
-
-link_solution 0AK-05-01-toupper-stdio 0AK-05-00-convert-to-upper.o
-link_solution 0AK-05-02-toupper-bss 0AK-05-00-convert-to-upper.o
-link_solution 0AK-05-04-toupper-checked \
-  0AK-05-00-convert-to-upper.o 006-01-count-chars.o
+# TEMPORARY (until block 6): the 32-bit convert_to_upper for
+# 0AK-08-03-toupper-libc.
+echo "Assembling: legacy32/0AK-05-00-convert-to-upper"
+as -o legacy32/0AK-05-00-convert-to-upper.o --32 --gstabs+ \
+  legacy32/0AK-05-00-convert-to-upper.s
 
 link_solution 0AK-06-01-write-records 0AK-06-01-record-io.o
 link_solution 0AK-06-01-read-records 0AK-06-01-record-io.o \
@@ -309,7 +319,8 @@ echo "Linking #4: libfactorial.so"
 ld -shared -m elf_i386 -o libfactorial.so 0AK-08-01-factorial-lib.o
 link_solution 0AK-08-02-factorial-printf \
   --library-path . --library factorial "${LIBC[@]}"
-link_solution 0AK-08-03-toupper-libc 0AK-05-00-convert-to-upper.o \
+link_solution 0AK-08-03-toupper-libc \
+  legacy32/0AK-05-00-convert-to-upper.o \
   "${LIBC[@]}"
 echo "Linking #4: libexitmsg.so"
 ld -shared -m elf_i386 -o libexitmsg.so 0AK-08-04-exit-message.o
