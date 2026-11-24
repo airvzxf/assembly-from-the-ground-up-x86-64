@@ -42,8 +42,12 @@ material. This file records the decisions and tracks the work, one block
   `activate` signal). GTK 3 is the fallback only if GTK 4 turns out to be
   disproportionately longer.
 - **ABI reference**: link to the x86-64 psABI; `abi386-4.pdf` is removed.
-- **Current practice**: every source file has a `.note.GNU-stack` section
-  (no executable stack), files are opened with `openat`, and the text
+- **Non-executable stack**: every example starts with
+  `.section .note.GNU-stack,"",@progbits`. Chapter 3 explains this line in
+  a paragraph: it marks the stack as not executable, and ld asks for it
+  because without it ld assumes the program needs an executable stack,
+  which makes code injected into the stack runnable.
+- **Current practice**: files are opened with `openat`, and the text
   mentions ASLR, NX and CET where they matter. Tools: `strace`,
   `objdump`, `readelf`, gdb (with its TUI) and `perf`.
 
@@ -63,8 +67,10 @@ material. This file records the decisions and tracks the work, one block
 
 ## Blocks
 
-- [ ] **1. Infrastructure**: 64-bit build and checks in `make.bash` and
-  `test.bash` (ELF64, no executable stack, no absolute relocations).
+- [ ] **1. Infrastructure**: 64-bit build and checks in `make.bash`
+  (ELF64, no executable stack, no absolute relocations in the code and
+  data sections). A source listed in `ABSOLUTE_OK` must explain in a
+  comment why it is the exception.
   The 32-bit programs keep building until their chapter replaces them;
   `gcc-multilib` is removed in block 11.
 - [ ] **2. Chapters 1–3 and Appendix C** (system call table), solutions
