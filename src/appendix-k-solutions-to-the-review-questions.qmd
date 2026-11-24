@@ -561,10 +561,13 @@ callee-saved, so any correct version of `power` must leave it alone.
 
     These tests find a real bug: `power` stops when the power reaches
     1, so with a power of 0 it counts down past 0, wraps around and
-    loops 18446744073709551615 times before it gets back to 1. At a
-    billion iterations per second, that is about 585 years. Changing
-    the program to compute `power(2, 0) + power(5, 0)` gives a program
-    that never seems to finish (try it and stop it with Ctrl+C). The
+    loops 18446744073709551615 times before it gets back to 1. That is
+    2^64 - 1 iterations; if each one took about one nanosecond, the
+    loop would run for about 585 years. This is an estimate, not a
+    measurement: nobody has waited for it. What you can check is that
+    a program that computes `power(2, 0) + power(5, 0)` never seems to
+    finish (try it and stop it with Ctrl+C; when testing this book, it
+    was still running after 10 seconds). The
     stack version above checks for 0 at the start of the loop, so it
     returns 1 for any number to the power 0.
 
