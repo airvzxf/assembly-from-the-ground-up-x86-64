@@ -67,7 +67,7 @@ material. This file records the decisions and tracks the work, one block
 
 ## Blocks
 
-- [ ] **1. Infrastructure**: 64-bit build and checks in `make.bash`
+- [x] **1. Infrastructure**: 64-bit build and checks in `make.bash`
   (ELF64, no executable stack, no absolute relocations in the code and
   data sections). A source listed in `ABSOLUTE_OK` must explain in a
   comment why it is the exception.
