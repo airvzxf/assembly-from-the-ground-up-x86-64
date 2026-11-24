@@ -65,6 +65,8 @@ toc-depth: 2
 
 filters:
   - resource/pandoc/lua/include-code-files.lua
+  # Fails the build if a line of prose was read as a numbered list.
+  - resource/pandoc/lua/check-ordered-lists.lua
 
 highlight-style: resource/pandoc/theme/default.theme
 syntax-definitions:
