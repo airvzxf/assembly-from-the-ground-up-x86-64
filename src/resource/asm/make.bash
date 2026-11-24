@@ -8,7 +8,106 @@ cd "${SCRIPT_DIR}"
 # Clean up previous files
 rm -f ./*.o
 rm -f ./*-bin
-rm -f librecord.so libfactorial.so libexitmsg.so .gdb_history heynow.txt
+rm -f ./*.so .gdb_history heynow.txt
+
+# =====================================================
+# 64-bit programs (x86-64 edition).
+# =====================================================
+#
+# Every source is assembled with `as --64 -g` and must follow the rules
+# of the book, which the build checks:
+#
+#   - It has a `.note.GNU-stack` section, so the stack is not executable.
+#   - Its code and data use no absolute 32-bit addresses (R_X86_64_32 and
+#     R_X86_64_32S relocations in .rela.text, .rela.data, .rela.rodata
+#     and their subsections): data is reached relative to %rip, so the
+#     code also works in PIE programs and shared libraries. A source that
+#     shows absolute addressing on purpose is listed in ABSOLUTE_OK and
+#     explains why in a comment that starts with `# ABSOLUTE_OK:`.
+#   - Every program and library is a 64-bit ELF file (ELF64, x86-64)
+#     whose stack is not executable.
+#
+# ld runs with --fatal-warnings, so a warning (for example, an executable
+# stack) stops the build.
+
+# Sources allowed to use absolute addresses (non-PIE examples).
+ABSOLUTE_OK=()
+
+fail_build() {
+  echo "error: $*" >&2
+  exit 1
+}
+
+# absolute_relocations <object>: print the R_X86_64_32 and R_X86_64_32S
+# relocations of the code and data sections. Other sections, such as the
+# debug sections that -g adds, use 32-bit offsets of their own.
+absolute_relocations() {
+  readelf -rW "$1" | awk '
+    /^Relocation section/ {
+      checked = ($3 ~ /^\047\.rela\.(text|data|rodata)[.\047]/)
+    }
+    checked && $3 ~ /^R_X86_64_32S?$/ { print }'
+}
+
+# assemble64 <name>...: assemble <name>.s into <name>.o and check it.
+assemble64() {
+  local name
+  for name in "$@"; do
+    echo "Assembling (64-bit): ${name}"
+    as --64 -g -o "${name}.o" "${name}.s"
+    readelf -SW "${name}.o" | grep -q '\.note\.GNU-stack' \
+      || fail_build "${name}.s has no .note.GNU-stack section"
+    if [[ " ${ABSOLUTE_OK[*]} " == *" ${name} "* ]]; then
+      grep -qE '^[[:space:]]*#[[:space:]]*ABSOLUTE_OK:[[:space:]]*[^[:space:]]' \
+        "${name}.s" \
+        || fail_build "${name}.s is in ABSOLUTE_OK but has no" \
+             "'# ABSOLUTE_OK: <reason>' comment"
+    elif [[ -n "$(absolute_relocations "${name}.o")" ]]; then
+      fail_build "${name}.s uses absolute addresses; use %rip-relative" \
+        "addressing or list it in ABSOLUTE_OK"
+    fi
+  done
+}
+
+# check_elf64 <file>: a 64-bit x86-64 ELF file with a non-executable stack.
+check_elf64() {
+  readelf -hW "$1" | grep -q 'Class:[[:space:]]*ELF64' \
+    || fail_build "$1 is not a 64-bit ELF file"
+  readelf -hW "$1" | grep -q 'Machine:[[:space:]]*Advanced Micro Devices X86-64' \
+    || fail_build "$1 is not an x86-64 file"
+  if readelf -lW "$1" | awk '$1 == "GNU_STACK" && $(NF-1) ~ /E/ { found = 1 }
+                             END { exit !found }'; then
+    fail_build "$1 has an executable stack"
+  fi
+}
+
+# link64 <program> <object or ld option>...: link <program>-bin.
+link64() {
+  local program="$1"
+  shift
+  echo "Linking (64-bit): ${program}"
+  ld --fatal-warnings -o "${program}-bin" "$@"
+  check_elf64 "${program}-bin"
+}
+
+# link64_shared <library>.so <object or ld option>...: link a library.
+link64_shared() {
+  local library="$1"
+  shift
+  echo "Linking (64-bit): ${library}"
+  ld --fatal-warnings -shared -o "${library}" "$@"
+  check_elf64 "${library}"
+}
+
+# The 64-bit programs are added here, chapter by chapter, as they replace
+# the 32-bit programs below.
+
+echo ""
+
+# =====================================================
+# 32-bit programs inherited from the x86 32-bit edition.
+# =====================================================
+# Each chapter of the x86-64 edition removes its programs from here.
 
 # -----------------------------------------------------
 # Compile all the files.
