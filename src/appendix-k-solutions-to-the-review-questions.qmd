@@ -402,45 +402,73 @@ Chapter 4. All About Functions {#chapter-4.-all-about-functions}
     and the system calls.
 
 -   **What are calling conventions?** The rules that a function and
-    its caller agree on: how parameters are passed (on the stack, in
-    reverse order), where the return value goes (_%eax_), which
-    registers the function may change, and who removes the parameters
-    from the stack (the caller).
+    its caller agree on: where the parameters go (the first six in
+    _%rdi_, _%rsi_, _%rdx_, _%rcx_, _%r8_ and _%r9_, the rest on the
+    stack), where the return value goes (_%rax_), which registers the
+    function must preserve, how the stack must be aligned, and who
+    removes the parameters from the stack (the caller).
 
--   **What is the stack?** A region at the top of memory that grows
-    down, used to store data in last-in, first-out order: return
-    addresses, parameters, saved registers and local variables.
-    _%esp_ always points to its top.
+-   **What is the stack?** A region at the top of the program\'s memory
+    that grows down, used to store data in last-in, first-out order:
+    return addresses, saved registers, local variables and the
+    parameters that don\'t fit in registers. _%rsp_ always points to
+    its top.
 
--   **How do `pushl` and `popl` affect the stack? What special-purpose
-    register do they affect?** `pushl` subtracts 4 from _%esp_ and
-    stores the value at the new top; `popl` reads the value at the top
-    and adds 4 to _%esp_. Both change the stack pointer, _%esp_.
+-   **How do `pushq` and `popq` affect the stack? What special-purpose
+    register do they affect?** `pushq` subtracts 8 from _%rsp_ and
+    stores the value at the new top; `popq` reads the value at the top
+    and adds 8 to _%rsp_. Both change the stack pointer, _%rsp_.
 
 -   **What are local variables and what are they used for?** Variables
     that exist only while a function runs, stored in the function\'s
-    stack frame below _%ebp_. They hold the function\'s intermediate
-    results without touching the data of the rest of the program.
+    stack frame below _%rbp_. They hold the function\'s intermediate
+    results, and the values it needs to keep across the calls it makes,
+    without touching the data of the rest of the program.
 
 -   **Why are local variables so necessary in recursive functions?**
     Because each call needs its own copy of its data. If a recursive
     function used global variables, each new call would overwrite the
-    values of the calls still waiting for it to return.
+    values of the calls still waiting for it to return. Registers don\'t
+    help either: the parameter registers are overwritten by the next
+    call, which is exactly why `factorial` saves its number in
+    `-8(%rbp)`.
 
--   **What are _%ebp_ and _%esp_ used for?** _%esp_ points to the top
-    of the stack. _%ebp_ (the base pointer) is set to the value of
-    _%esp_ when a function starts, and stays fixed while the function
-    runs, so parameters (`8(%ebp)`, `12(%ebp)`, \...) and local
-    variables (`-4(%ebp)`, \...) are always at the same offsets.
+-   **What are _%rbp_ and _%rsp_ used for?** _%rsp_ points to the top
+    of the stack. _%rbp_ (the base pointer) is set to the value of
+    _%rsp_ when a function starts, and stays fixed while the function
+    runs, so the parameters on the stack (`16(%rbp)`, `24(%rbp)`,
+    \...) and the local variables (`-8(%rbp)`, `-16(%rbp)`, \...) are
+    always at the same offsets.
 
 -   **What is a stack frame?** The part of the stack that belongs to
-    one function call: its parameters, the return address, the saved
-    _%ebp_ of the caller and its local variables.
+    one function call: its parameters on the stack (if any), the return
+    address, the saved _%rbp_ of the caller and its local variables.
+
+-   **Where does a function find its first six parameters, and where
+    does it put its return value?** In _%rdi_, _%rsi_, _%rdx_, _%rcx_,
+    _%r8_ and _%r9_, in that order. The return value goes in _%rax_.
+
+-   **Which registers must a function preserve for its caller? Which
+    may it overwrite?** It must preserve _%rbx_, _%rbp_, _%r12_ to
+    _%r15_ and _%rsp_ (the callee-saved registers). It may overwrite
+    _%rax_, _%rcx_, _%rdx_, _%rsi_, _%rdi_ and _%r8_ to _%r11_ (the
+    caller-saved registers).
+
+-   **Why must _%rsp_ be a multiple of 16 when a `call` instruction
+    runs?** Because the convention promises it to every function, and
+    many functions (especially in libraries) rely on it: they use
+    instructions that move 16 bytes at a time to or from the stack, and
+    those instructions require addresses that are multiples of 16. If
+    the stack is misaligned, those functions crash. Our programs keep
+    the promise: _%rsp_ is aligned when the program starts, the `call`
+    and the `pushq %rbp` together push 16 bytes, and the local
+    variables are reserved in blocks of 16 bytes.
 
 ### Use the Concepts {#use-the-concepts-13}
 
 **Write a function called `square` and a program to test it.** The
-function multiplies its argument by itself with `imull`:
+function receives its argument in _%rdi_ and multiplies it by itself
+with `imulq`:
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-04-01-square.s}
 ```
@@ -449,7 +477,8 @@ It returns `144`.
 
 **Convert the maximum program into a function, and call it with 3
 different lists.** The function receives the address of the list in
-its parameter, and walks the list with indirect addressing:
+_%rdi_, and walks the list with indirect addressing. The program gets
+the address of each list with `leaq`, relative to _%rip_:
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-04-02-maximum-function.s}
 ```
@@ -463,6 +492,15 @@ different registers. You would have to read the code of every function
 before calling it, functions written by different people (or in
 different languages, or in libraries) couldn\'t call each other, and
 any change in one function could break all its callers.
+
+**In `004-01-power`, what could happen if the first answer were kept in
+_%rcx_ instead of _%rbx_?** _%rcx_ is a caller-saved register, so
+`power` is allowed to overwrite it. The version in this chapter happens
+not to touch _%rcx_, so the program would still return 33 today, but
+it would be relying on a detail of the function, not on its interface.
+A future version of `power` that used _%rcx_ as its counter (a very
+natural choice) would silently break the program. _%rbx_ is
+callee-saved, so any correct version of `power` must leave it alone.
 
 ### Going Further {#going-further-13}
 
@@ -481,7 +519,7 @@ any change in one function could break all its callers.
 
     It returns `120`. It uses no stack space per step, so it can\'t
     run out of stack for large numbers (although the result overflows
-    32 bits after 12!).
+    64 bits after 20!).
 
 -   **Break a feature of an application into functions.** This
     exercise is yours. As an example, the "save file" feature of a text
@@ -490,35 +528,45 @@ any change in one function could break all its callers.
     and `report_error(status)`.
 
 -   **Come up with your own calling convention.** This program passes
-    the parameters in registers instead of the stack:
+    all of the parameters on the stack instead of in registers. The
+    caller pushes them in reverse order, so the first one ends up on
+    top, and removes them after the call by adding 16 to _%rsp_. The
+    function finds them at `16(%rbp)` and `24(%rbp)`:
 
-    ```{.gnuassembler .numberLines include=resource/asm/0AK-04-04-power-registers.s}
+    ```{.gnuassembler .numberLines include=resource/asm/0AK-04-04-power-stack.s}
     ```
 
-    It returns `33`, the same as `004-01-power`.
+    It returns `33`, the same as `004-01-power`. Passing everything on
+    the stack is simple and works for any number of parameters, but
+    every parameter costs a write to memory and a read back, while the
+    System V convention keeps the common cases in registers.
 
 -   **Can you build a calling convention without using the stack?**
-    Yes, for example with registers (as above) or with a fixed memory
-    area for each function. The limitations: there are only a few
+    Yes, for example with registers only or with a fixed memory area
+    for each function. The limitations: there are only a few
     registers, so the number of parameters is limited; the caller must
     save any register it still needs; and, above all, recursion doesn\'t
     work without extra work, because a function can only store one
-    return address and one set of parameters at a time.
+    return address and one set of parameters at a time. (`call` and
+    `ret` themselves use the stack for the return address, so a
+    convention without any stack can\'t even use them.)
 
 -   **What test cases should we use for the example program?** The
     simplest cases (`power(2, 0)` = 1, `power(0, 3)` = 0,
     `power(1, 5)` = 1), normal cases with known answers
-    (`power(2, 3)` = 8), and the limits: results that don\'t fit in 32
+    (`power(2, 3)` = 8), and the limits: results that don\'t fit in 64
     bits, or in the 8 bits of the exit status (`power(2, 8)` = 256
     returns 0). Also check what happens with a negative power, which
     this function doesn\'t support.
 
-    These tests find a real bug: `_power` stops when the power reaches
+    These tests find a real bug: `power` stops when the power reaches
     1, so with a power of 0 it counts down past 0, wraps around and
-    loops about four billion times. Changing the program to compute
-    `power(2, 0) + power(5, 0)` takes several seconds and returns 1
-    instead of 2. The register version above checks for 0 at the start
-    of the loop, so it returns 1 for any number to the power 0.
+    loops 18446744073709551615 times before it gets back to 1. At a
+    billion iterations per second, that is about 585 years. Changing
+    the program to compute `power(2, 0) + power(5, 0)` gives a program
+    that never seems to finish (try it and stop it with Ctrl+C). The
+    stack version above checks for 0 at the start of the loop, so it
+    returns 1 for any number to the power 0.
 
 Chapter 5. Dealing with Files {#chapter-5.-dealing-with-files}
 -----------------------------

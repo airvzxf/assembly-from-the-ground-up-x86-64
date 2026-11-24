@@ -133,12 +133,13 @@ expect to get and receive data when they are called.[^4-3]
 Assembly language can use any calling convention it wants to. You can
 even make one up yourself. However, if you want to interoperate with
 functions written in other languages, you have to obey their calling
-conventions. We will use the calling convention of the C programming
-language for our examples because it is the most
-widely used, and because it is the standard for Linux platforms.
+conventions. We will use the standard calling convention of 64-bit
+Linux, defined in a document called the *System V Application Binary
+Interface* (ABI), for our examples, because it is the one that every
+language uses to talk to every other language on Linux.[^4-7]
 
-Assembly-Language Functions using the C Calling Convention {#assembly-language-functions-using-the-c-calling-convention}
-----------------------------------------------------------
+Assembly-Language Functions using the System V Calling Convention {#assembly-language-functions-using-the-system-v-calling-convention}
+-----------------------------------------------------------------
 
 You cannot write assembly-language functions without understanding how
 the computer\'s *stack* works. Each computer program that runs uses
@@ -149,65 +150,65 @@ working on toward the top, and you take things off as you are finished
 working with them.
 
 Your computer has a stack, too. The computer\'s stack lives at the
-very top addresses of memory. You can push values onto the top of the
-stack through an instruction called `pushl`, which pushes either a
-register or memory value onto the top of the stack. Well, we say it\'s
-the top, but the \"top\" of the stack is actually the bottom of the
-stack\'s memory. Although this is confusing, the reason for it is that
-when we think of a stack of anything - dishes, papers, etc. - we think
-of adding and removing to the top of it. However, in memory the stack
-starts at the top of memory and grows downward due to architectural
-considerations. Therefore, when we refer to the \"top of the stack\"
-remember it\'s at the bottom of the stack\'s memory. You can
-also pop values off the top using an instruction called `popl`. This
+very top addresses of the program\'s memory. You can push values onto
+the top of the stack through an instruction called `pushq`, which
+pushes either a register or memory value onto the top of the stack.
+Well, we say it\'s the top, but the \"top\" of the stack is actually the
+bottom of the stack\'s memory. Although this is confusing, the reason
+for it is that when we think of a stack of anything - dishes, papers,
+etc. - we think of adding and removing to the top of it. However, in
+memory the stack starts at the top of memory and grows downward due to
+architectural considerations. Therefore, when we refer to the \"top of
+the stack\" remember it\'s at the bottom of the stack\'s memory. You can
+also pop values off the top using an instruction called `popq`. This
 removes the top value from the stack and places it into a register or
 memory location of your choosing.
 
 When we push a value onto the stack, the top of the stack moves to
 accommodate the additional value. We can actually continually push values
 onto the stack and it will keep growing further and further down in
-memory until we hit our code or data. So how do we know where the
-current \"top\" of the stack is? The stack register,
-_%esp_, always contains a pointer to the current top of the
-stack, wherever it is.
+memory until it reaches the limit the kernel gives it (usually 8
+megabytes). So how do we know where the current \"top\" of the stack
+is? The stack register, _%rsp_, always contains a pointer to the
+current top of the stack, wherever it is.
 
-Every time we push something onto the stack with `pushl`, _%esp_ gets
-subtracted by 4 so that it points to the new top of the stack (remember,
-each word is four bytes long, and the stack grows downward). If we want
-to remove something from the stack, we simply use the `popl`
-instruction, which adds 4 to _%esp_ and puts the previous top value in
-whatever register you specified. `pushl` and `popl` each take one
-operand - the register to push onto the stack for `pushl`, or receive
-the data that is popped off the stack for `popl`.
+Every time we push something onto the stack with `pushq`, _%rsp_ gets
+subtracted by 8 so that it points to the new top of the stack (remember,
+each word is eight bytes long, and the stack grows downward). If we want
+to remove something from the stack, we simply use the `popq`
+instruction, which adds 8 to _%rsp_ and puts the previous top value in
+whatever register you specified. `pushq` and `popq` each take one
+operand - the register to push onto the stack for `pushq`, or receive
+the data that is popped off the stack for `popq`.
 
 If we simply want to access the value on the top of the stack without
-removing it, we can simply use the _%esp_ register in indirect
+removing it, we can simply use the _%rsp_ register in indirect
 addressing mode. For example, the following code
-moves whatever is at the top of the stack into _%eax_:
+moves whatever is at the top of the stack into _%rax_:
 
 ```{.gnuassembler}
-movl (%esp), %eax
+movq (%rsp), %rax
 ```
 
 If we were to just do this:
 
 ```{.gnuassembler}
-movl %esp, %eax
+movq %rsp, %rax
 ```
 
-then _%eax_ would just hold the pointer to the top of the stack rather than
-the value at the top. Putting _%esp_ in parentheses causes the computer to
+then _%rax_ would just hold the pointer to the top of the stack rather than
+the value at the top. Putting _%rsp_ in parentheses causes the computer to
 go to indirect addressing mode, and therefore we
-get the value pointed to by _%esp_. If we want to access the value
+get the value pointed to by _%rsp_. If we want to access the value
 right below the top of the stack, we can simply issue this instruction:
 
 ```{.gnuassembler}
-movl 4(%esp), %eax
+movq 8(%rsp), %rax
 ```
 
 This instruction uses the base pointer addressing mode (see
-[Data Accessing Methods](02-computer-architecture.qmd#data-accessing-methods)) which simply adds 4
-to _%esp_ before looking up the value being pointed to.
+[Data Accessing Methods](02-computer-architecture.qmd#data-accessing-methods)) which simply adds 8
+to _%rsp_ before looking up the value being pointed to.
 
 > **NOTE:**
 >
@@ -215,46 +216,61 @@ to _%esp_ before looking up the value being pointed to.
 > how the memory and the stack works:
 > [Chapter 9 -> Table of the Physical Memory in the program](09-intermediate-memory-topics.qmd#chapter-9-table-of-the-physical-memory-in-the-program).
 
-In the C language calling convention, the
-stack is the key element for implementing a function\'s local variables,
-parameters, and return address.
+In the System V calling convention, the first parameters of a function
+travel in registers, and the stack is the key element for implementing
+the function\'s local variables, the rest of its parameters, and its
+return address.
 
-Before executing a function, a program pushes all of the
-parameters for the function onto the stack in the reverse
-order that they are documented. Then the program issues a `call`
-instruction indicating which function it wishes to start. The `call`
-instruction does two things. First it pushes the address of the next
-instruction, which is the return address, onto the
-stack. Then it modifies the instruction pointer
-(_%eip_) to point to the start of the function. So, at the time the
+Before executing a function, a program puts the first six
+parameters for the function in registers, in this order:
+
+1.  _%rdi_
+
+2.  _%rsi_
+
+3.  _%rdx_
+
+4.  _%rcx_
+
+5.  _%r8_
+
+6.  _%r9_
+
+Registers are much faster than memory, and very few functions need
+more than six parameters. If a function does need more, the program
+pushes the rest onto the stack in the reverse order that they are
+documented, so the seventh parameter ends up on top.[^4-8] Then the
+program issues a `call` instruction indicating which function it
+wishes to start. The `call` instruction does two things. First it
+pushes the address of the next instruction, which is the return
+address, onto the stack. Then it modifies the instruction pointer
+(_%rip_) to point to the start of the function. So, at the time the
 function starts, the stack looks like this (the \"top\" of the stack is
 at the bottom on this example):
 
-    0xffffff50: Parameter #N
-    ...
-    0xffffff2c: Parameter 2
-    0xffffff28: Parameter 1
-    0xffffff24: Return Address <--- (%esp)
+    0x7fffffffe0d0: Parameter 8 (if any)
+    0x7fffffffe0c8: Parameter 7 (if any)
+    0x7fffffffe0c0: Return Address <--- (%rsp)
 
-Each of the parameters of the function have been pushed onto the stack,
-and finally the return address is there. Now the function itself has
-some work to do.
+The first six parameters are in their registers, any others are on the
+stack, and finally the return address is there. Now the function itself
+has some work to do.
 
 The first thing it does is save the current base pointer register,
-_%ebp_, by doing `pushl %ebp`. The base pointer
+_%rbp_, by doing `pushq %rbp`. The base pointer
 is a special register used for accessing function
 parameters and local variables. Next,
-it copies the stack pointer to _%ebp_ by doing
-`movl %esp, %ebp`. This allows you to be able to access the function
-parameters as fixed indexes from the base pointer. You may think that
-you can use the stack pointer for this. However, during your program you
-may do other things with the stack such as pushing arguments to other
-functions.
+it copies the stack pointer to _%rbp_ by doing
+`movq %rsp, %rbp`. This allows you to be able to access the function\'s
+stack parameters and local variables as fixed indexes from the base
+pointer. You may think that you can use the stack pointer for this.
+However, during your program you may do other things with the stack such
+as pushing values to save them, or pushing arguments to other functions.
 
 Copying the stack pointer into the base pointer at the beginning of a
 function allows you to always know where your parameters are (and as we
 will see, local variables too), even while you may be pushing things on
-and off the stack. _%ebp_ will always be where the stack pointer
+and off the stack. _%rbp_ will always be where the stack pointer
 was at the beginning of the function, so it is more or less a constant
 reference to the *stack frame* (the stack frame consists of
 all of the stack variables used within a function, including
@@ -262,15 +278,13 @@ parameters, local variables, and the return address).
 
 At this point, the stack looks like this:
 
-    0xffffff50: Parameter #N   <--- N*4+4(%ebp)
-    ...
-    0xffffff2c: Parameter 2    <--- 12(%ebp)
-    0xffffff28: Parameter 1    <---  8(%ebp)
-    0xffffff24: Return Address <---  4(%ebp)
-    0xffffff20: Old %ebp       <---   (%esp) and (%ebp)
+    0x7fffffffe0d0: Parameter 8 (if any) <--- 24(%rbp)
+    0x7fffffffe0c8: Parameter 7 (if any) <--- 16(%rbp)
+    0x7fffffffe0c0: Return Address       <---  8(%rbp)
+    0x7fffffffe0b8: Old %rbp             <---   (%rsp) and (%rbp)
 
-As you can see, each parameter can be accessed using base pointer
-addressing mode using the _%ebp_ register.
+As you can see, each parameter on the stack can be accessed using base
+pointer addressing mode using the _%rbp_ register.
 
 Next, the function reserves space on the stack for any local
 variables it needs. This is done by simply moving the
@@ -280,60 +294,80 @@ stack pointer down two words to reserve the space. This is done like
 this:
 
 ```{.gnuassembler}
-subl $8, %esp
+subq $16, %rsp
 ```
 
-This subtracts 8 from _%esp_ (remember, a word is four bytes long).[^4-4]
-This way, we can use the stack for variable storage without worrying
-about clobbering them with pushes that we may make for function calls.
-Also, since it is allocated on the stack frame for this function call,
-the variable will only be alive during this function. When we return,
-the stack frame will go away, and so will these variables. That\'s why
-they are called local - they only exist while this function is being
-called.
+This subtracts 16 from _%rsp_ (remember, a word is eight bytes
+long).[^4-4] This way, we can use the stack for variable storage
+without worrying about clobbering them with pushes that we may make
+later. Also, since it is allocated on the stack frame for this function
+call, the variable will only be alive during this function. When we
+return, the stack frame will go away, and so will these variables.
+That\'s why they are called local - they only exist while this function
+is being called.
+
+Local variables are also where a function keeps its own parameters when
+it needs them after calling another function. The registers that carry
+the parameters belong to whoever is running, so the next `call` may
+overwrite them, but the local variables of this stack frame stay where
+they are.
 
 Now we have two words for local storage. Our stack now looks like this:
 
-    0xffffff50: Parameter #N     <--- N*4+4(%ebp)
-    ...
-    0xffffff2c: Parameter 2      <--- 12(%ebp)
-    0xffffff28: Parameter 1      <---  8(%ebp)
-    0xffffff24: Return Address   <---  4(%ebp)
-    0xffffff20: Old %ebp         <---   (%ebp)
-    0xffffff1c: Local Variable 1 <--- -4(%ebp)
-    0xffffff18: Local Variable 2 <--- -8(%ebp) and (%esp)
+    0x7fffffffe0d0: Parameter 8 (if any) <--- 24(%rbp)
+    0x7fffffffe0c8: Parameter 7 (if any) <--- 16(%rbp)
+    0x7fffffffe0c0: Return Address       <---  8(%rbp)
+    0x7fffffffe0b8: Old %rbp             <---   (%rbp)
+    0x7fffffffe0b0: Local Variable 1     <---  -8(%rbp)
+    0x7fffffffe0a8: Local Variable 2     <--- -16(%rbp) and (%rsp)
 
 > **The Rule:**
 >
 > The positive numbers or operations take the old stored values,
 > negative numbers or operations take the new stored values.
 
-Get the values before `%ebp` (old values):
+Get the values before `%rbp` (old values):
 
-    0xffffff28: Parameter 1    <--- 8(%ebp)
-    0xffffff24: Return Address <--- 4(%ebp)
-    0xffffff20: Old %ebp       <---  (%ebp)
+    0x7fffffffe0c8: Parameter 7    <--- 16(%rbp)
+    0x7fffffffe0c0: Return Address <---  8(%rbp)
+    0x7fffffffe0b8: Old %rbp       <---   (%rbp)
 
-Get the values after `%ebp` (new values):
+Get the values after `%rbp` (new values):
 
-    0xffffff20: Old %ebp         <---    (%ebp)
-    0xffffff1c: Local Variable 1 <---  -4(%ebp)
-    0xffffff18: Local Variable 2 <---  -8(%ebp)
+    0x7fffffffe0b8: Old %rbp         <---    (%rbp)
+    0x7fffffffe0b0: Local Variable 1 <---  -8(%rbp)
+    0x7fffffffe0a8: Local Variable 2 <--- -16(%rbp)
 
-Also this rule apply for the %esp, get the values before `%esp` (old values):
+Also this rule apply for the %rsp, get the values before `%rsp` (old values):
 
-    0xffffff20: Old %ebp         <---    (%ebp)
-    0xffffff1c: Local Variable 1 <---   8(%esp)
-    0xffffff18: Local Variable 2 <---   4(%esp)
-    0xffffff14: New %esp         <---    (%esp)
+    0x7fffffffe0b8: Old %rbp         <---  16(%rsp)
+    0x7fffffffe0b0: Local Variable 1 <---   8(%rsp)
+    0x7fffffffe0a8: Local Variable 2 <---    (%rsp)
 
 So we can now access all of the data we need for this function by using
 base pointer addressing mode using different
-offsets from _%ebp_. _%ebp_ was made specifically for this
+offsets from _%rbp_. _%rbp_ was made specifically for this
 purpose, which is why it is called the base pointer
 register. You can use other registers in base pointer addressing mode,
-but the x86 architecture makes using the _%ebp_ register a lot
-faster.
+and _%rsp_ works just as well, but _%rbp_ doesn\'t move while the
+function pushes and pops values, so its offsets never change.
+
+> **NOTE.**
+>
+> **Stack Alignment:**
+> The System V convention has one more rule about the stack: *the value
+> of _%rsp_ must be a multiple of 16 every time a `call` instruction
+> runs*. When Linux starts a program, _%rsp_ is already a multiple of 16.
+> The `call` pushes the 8-byte return address, and the function\'s
+> `pushq %rbp` pushes 8 bytes more, so after them _%rsp_ is a multiple of
+> 16 again. That is why a function reserves its local variables in
+> blocks of 16 bytes: `subq $16, %rsp` even if it only needs one
+> 8-byte variable. If _%rsp_ is not aligned, our own functions keep
+> working, but many library functions use instructions that move 16
+> bytes at a time and require aligned addresses, and they crash. We will
+> meet them in
+> [Chapter 8. Sharing Functions with Code Libraries](08-sharing-functions-with-code-libraries.qmd#chapter-8-sharing-functions-with-code-libraries).
+> The programs in this book follow the rule everywhere.
 
 Global variables and static variables
 are accessed just like the memory we have been accessing memory in
@@ -344,7 +378,7 @@ them exactly the same, although most other languages distinguish them.
 
 When a function is done executing, it does three things:
 
-1.  It stores its return value in _%eax_.
+1.  It stores its return value in _%rax_.
 
 2.  It resets the stack to what it was when it was called (it gets rid
     of the current stack frame and puts the stack frame of
@@ -352,20 +386,20 @@ When a function is done executing, it does three things:
 
 3.  It returns control back to wherever it was called from. This is done
     using the `ret` instruction, which pops whatever value is at the
-    top of the stack, and sets the instruction pointer, _%eip_, to that value.
+    top of the stack, and sets the instruction pointer, _%rip_, to that value.
 
 So, before a function returns control to the code that called it, it
 must restore the previous stack frame. Note also that without doing
 this, `ret` wouldn\'t work, because in our current stack frame, the
 return address is not at the top of the stack. Therefore, before we
-return, we have to reset the stack pointer _%esp_ and
-base pointer _%ebp_ to what they were when the function began.
+return, we have to reset the stack pointer _%rsp_ and
+base pointer _%rbp_ to what they were when the function began.
 
 Therefore to return from the function you have to do the following:
 
 ```{.gnuassembler}
-movl %ebp, %esp
-popl %ebp
+movq %rbp, %rsp
+popq %rbp
 ret
 ```
 
@@ -374,15 +408,14 @@ of.* The reason is that after you move the stack pointer back, future
 stack pushes will likely overwrite everything you put there. Therefore,
 you should never save the address of a local variable
 past the life of the function it was created in, or else it will be
-overwritten after the life of its stack frame ends.
+overwritten after the life of its stack frame ends.[^4-9]
 
 Control has now been handed back to the calling code, which can now
-examine _%eax_ for the return value. The calling code
-also needs to pop off all of the parameters it pushed onto the stack in
-order to get the stack pointer back where it was (you can
-also simply add 4 \* number of parameters to _%esp_ using the
-`addl` instruction, if you don\'t need the values of the parameters
-anymore).[^4-5]
+examine _%rax_ for the return value. If the calling code pushed any
+parameters onto the stack, it also needs to remove them in order to get
+the stack pointer back where it was. It can pop them off, or, if it
+doesn\'t need their values anymore, simply add 8 \* number of
+parameters to _%rsp_ using the `addq` instruction.[^4-5]
 
 ---
 
@@ -390,49 +423,55 @@ anymore).[^4-5]
 >
 > **Destruction of Registers:**
 >
-> When you call a function, you should assume that everything
-> currently in your registers will be wiped out. The only
-> register that is guaranteed to be left with the value it started with
-> are _%ebp_ and a few others (the Linux C calling convention
-> requires functions to preserve the values of _%ebx_, _%edi_,
-> and _%esi_ if they are altered - this is not strictly held during
-> this book because these programs are self-contained and not called by
-> outside functions). _%ebx_ also has some other uses in position-independent
-> code, which is not covered in this book. _%eax_ is guaranteed to be
-> overwritten with the return value, and the others likely are. If there
-> are registers you want to save before calling a function, you need to
-> save them by pushing them on the stack before pushing the
-> function\'s parameters. You can then pop them back off in reverse order
-> after popping off the parameters. Even if you know a function does not
-> overwrite a register you should save it, because future versions of that
-> function may.
+> The System V convention divides the registers into two groups:
 >
-> Other languages\' calling convention may be
-> different. For example, other calling conventions may place the burden
-> on the function to save any registers it uses. Be sure to check to make
-> sure the calling conventions of your languages are compatible before
-> trying to mix languages. Or in the case of assembly language, be sure
-> you know how to call the other language\'s functions.
+> - *Callee-saved registers*: _%rbx_, _%rbp_, _%r12_, _%r13_, _%r14_
+>   and _%r15_ (and, of course, _%rsp_). A function must return them
+>   with the same values they had when it was called. If it wants to
+>   use one of them, it saves the old value first (usually by pushing
+>   it onto the stack) and restores it before returning.
+>
+> - *Caller-saved registers*: _%rax_, _%rcx_, _%rdx_, _%rsi_, _%rdi_
+>   and _%r8_ to _%r11_. A function may overwrite them freely. _%rax_ is
+>   guaranteed to be overwritten with the return value, and the
+>   parameter registers most likely are.
+>
+> So, when you call a function, you should assume that everything in
+> the caller-saved registers will be wiped out. If you need one of those
+> values after the call, either keep it in a callee-saved register or
+> save it on the stack (for example, in a local variable). Even if you
+> know a function does not overwrite a register you should save it,
+> because future versions of that function may. All the functions in
+> this book follow these rules, so you can call them from programs
+> written in other languages.
+>
+> Other languages\' calling convention may be different. For example,
+> Rust and Go use their own conventions between their own functions, and
+> switch to this one only for functions declared to follow it. Be sure
+> to check to make sure the calling conventions of your languages are
+> compatible before trying to mix languages. Or in the case of assembly
+> language, be sure you know how to call the other language\'s functions.
 
 ---
 
 > **NOTE.**
 >
 > **Extended Specification:**
-> Details of the C language calling convention (also
-> known as the ABI, or Application Binary Interface) is available online.
+> Details of the calling convention (part of what is
+> known as the ABI, or Application Binary Interface) are available online.
 > We have oversimplified and left out
-> several important pieces to make this simpler for new programmers. For
-> full details, you should check out the documents available at
-> [Linux Standard Base (LSB)][4-LSB], you should look for the
-> [System V Application Binary Interface - Intel386 Architecture Processor
-> Supplement, Fourth  Edition][4-ABI].
+> several important pieces to make this simpler for new programmers,
+> such as how floating-point numbers and structures are passed. For
+> full details, you should check out the
+> [System V Application Binary Interface - AMD64 Architecture Processor
+> Supplement][4-ABI], maintained by the people who write compilers and
+> operating systems for x86-64.
 
 A Function Example {#a-function-example}
 ------------------
 
 Let\'s take a look at how a function call works in a real
-program. The function we are going to write is the `_power` function. We
+program. The function we are going to write is the `power` function. We
 will give the power function two parameters - the number and the power
 we want to raise it to. For example, if we gave it the parameters 2 and
 3, it would raise 2 to the power of 3, or 2\*2\*2, giving 8. In order to
@@ -447,58 +486,59 @@ explanation follows. Name the file `004-01-power.s`.
 Type in the program, assemble it, and run it. Try calling power for
 different values, but remember that the result has to be less than 256
 when it is passed back to the operating system. Also try subtracting the
-results of the two computations. Try adding a third call to the `_power`
+results of the two computations. Try adding a third call to the `power`
 function, and add its result back in.
 
-The main program code is pretty simple. You push the arguments onto the
-stack, call the function, and then move the stack pointer back. The
-result is stored in _%eax_. Note that between the two calls to `_power`, we
-save the first value onto the stack. This is because the only register
-that is guaranteed to be saved is _%ebp_. Therefore we push the
-value onto the stack, and pop the value back off after the second
-function call is complete.
+The main program code is pretty simple. You put the arguments in
+_%rdi_ and _%rsi_, and call the function. The result is stored in
+_%rax_. Note that between the two calls to `power`, we save the first
+value in _%rbx_. This is because _%rax_ will be overwritten by the
+second call, while _%rbx_ is a callee-saved register, so `power` must
+leave it as it was. If we had kept the first answer in a caller-saved
+register such as _%rcx_, the second call could have destroyed it.
 
 Let\'s look at how the function itself is written. Notice that before
 the function, there is documentation as to what the function does, what
 its arguments are, and what it gives as a return value. This is useful
 for programmers who use this function. This is the function\'s
-interface. This lets the programmer know what values are needed on the
-stack, and what will be in _%eax_ at the end.
+interface. This lets the programmer know what values are needed in
+which registers, and what will be in _%rax_ at the end.
 
 We then have the following line:
 
-```{.gnuassembler .numberLines include=resource/asm/004-01-power.s startLine=67 endLine=67}
+```{.gnuassembler .numberLines include=resource/asm/004-01-power.s startLine=59 endLine=59}
 ```
 
-This tells the linker that the symbol `_power` should
+This tells the linker that the symbol `power` should
 be treated as a function. Since this program is only in one file, it
 would work just the same with this left out. However, it is good
 practice.
 
-After that, we define the value of the `_power` label:
+After that, we define the value of the `power` label:
 
-```{.gnuassembler .numberLines include=resource/asm/004-01-power.s startLine=69 endLine=69}
+```{.gnuassembler .numberLines include=resource/asm/004-01-power.s startLine=61 endLine=61}
 ```
 
-As mentioned previously, this defines the symbol `_power` to be the
+As mentioned previously, this defines the symbol `power` to be the
 address where the instructions following the label begin. This is how
-`call _power` works. It transfers control to this spot of the program.
+`call power` works. It transfers control to this spot of the program.
 The difference between `call` and `jmp` is that `call` also
 pushes the return address onto the stack so that the function can
 return, while the `jmp` does not.
 
 Next, we have our instructions to set up our function:
 
-```{.gnuassembler .numberLines include=resource/asm/004-01-power.s startLine=70 endLine=74}
+```{.gnuassembler .numberLines include=resource/asm/004-01-power.s startLine=62 endLine=68}
 ```
 
-At this point, our stack looks like this:
+We only need one local variable (8 bytes), but we reserve 16 to keep
+_%rsp_ aligned, as we saw above. At this point, our stack looks like
+this:
 
-    Base Number    <--- 12(%ebp)
-    Power          <--- 8(%ebp)
-    Return Address <--- 4(%ebp)
-    Old %ebp       <--- (%ebp)
-    Current result <--- -4(%ebp) and (%esp)
+    Return Address <--- 8(%rbp)
+    Old %rbp       <--- (%rbp)
+    Current result <--- -8(%rbp)
+    (unused)       <--- -16(%rbp) and (%rsp)
 
 Although we could use a register for temporary storage, this program
 uses a local variable in order to show how to set it up.
@@ -509,16 +549,18 @@ some of your data. You can\'t have a pointer to a
 register, so you have to store it in a local variable in order
 to send a pointer to it.
 
-Basically, what the program does is start with the base number, and
-store it both as the multiplier (stored in _%ebx_) and the current value
-(stored in -4(%ebp)). It also has the power stored in _%ecx_ It then
+Basically, what the program does is start with the base number, which
+arrives in _%rdi_ and stays there as the multiplier, and store it as
+the current value (in -8(%rbp)). The power arrives in _%rsi_. It then
 continually multiplies the current value by the multiplier, decreases
-the power, and leaves the loop if the power (in _%ecx_) gets down to 1.
+the power, and leaves the loop if the power (in _%rsi_) gets down to 1.
+The function only uses caller-saved registers (_%rax_, _%rdi_ and
+_%rsi_), so it doesn\'t need to save any register for its caller.
 
 By now, you should be able to go through the program without help. The
-only things you should need to know is that `imull` does integer
+only things you should need to know is that `imulq` does integer
 multiplication and stores the result in the second operand, and
-`decl` decreases the given register by 1. For more information on
+`decq` decreases the given register by 1. For more information on
 these and other instructions, see
 [Appendix B. Common x86 Instructions](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions)
 
@@ -526,7 +568,7 @@ A good project to try now is to extend the program so it will return the
 value of a number if the power is 0 (hint, anything raised to the zero
 power is 1). Keep trying. If it doesn\'t work at first, try going
 through your program by hand with a scrap of paper, keeping track of
-where _%ebp_ and _%esp_ are pointing, what is on the stack, and what the
+where _%rbp_ and _%rsp_ are pointing, what is on the stack, and what the
 values are in each register.
 
 Recursive Functions {#recursive-functions}
@@ -577,12 +619,8 @@ Let\'s look at the `004-02-factorial.s` code to see how this works:
 Assemble, link, and run it with these commands:
 
 ```{.bash}
-as -o 004-02-factorial.o  --32 \
-                          --gstabs+ \
-                          004-02-factorial.s
-
-ld -o 004-02-factorial    -m elf_i386 \
-                          004-02-factorial.o
+as -g -o 004-02-factorial.o 004-02-factorial.s
+ld -o 004-02-factorial 004-02-factorial.o
 ./004-02-factorial
 echo $?
 ```
@@ -593,39 +631,33 @@ test it out yourself with a calculator: 4 \* 3 \* 2 \* 1 = 24.
 I\'m guessing you didn\'t understand the whole code listing. Let\'s go
 through it a line at a time to see what is happening.
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=20 endLine=26}
+```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=22 endLine=28}
 ```
 
 Okay, this program is intended to compute the factorial of the number 4.
 When programming functions, you are supposed to put the
-parameters of the function on the top of the stack right
+parameters of the function in their registers right
 before you call it. Remember, a function\'s *parameters* are
 the data that you want the function to work with. In this case, the
 factorial function takes 1 parameter - the number you want the factorial
-of.
+of - so it goes in _%rdi_, the register for the first parameter.
 
-The `pushl` instruction puts the given value at the top of the
-stack. The `call` instruction then makes the function call.
+The `call` instruction then makes the function call.
 
 Next we have these lines:
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=27 endLine=34}
+```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=30 endLine=35}
 ```
 
-This takes place after `_factorial` has finished and computed the
-factorial of 4 for us. Now we have to clean up the stack. The `addl`
-instruction moves the stack pointer back to where it was before we
-pushed the `$4` onto the stack. You should always clean up your stack
-parameters after a function call returns.
-
-The next instruction moves _%eax_ to _%ebx_. What\'s in _%eax_? It is
-`_factorial`\'s return value. In our case, it is the value of
-the factorial function. With 4 as our parameter, 24 should be our return
-value. Remember, return values are always stored in _%eax_. We want
-to return this value as the status code to the operating system.
-However, Linux requires that the program\'s exit status be stored in
-_%ebx_, not _%eax_, so we have to move it. Then we do the standard
-exit system call.
+This takes place after `factorial` has finished and computed the
+factorial of 4 for us. The instruction moves _%rax_ to _%rdi_. What\'s
+in _%rax_? It is `factorial`\'s return value. In our case, it is the
+value of the factorial function. With 4 as our parameter, 24 should be
+our return value. Remember, return values are always stored in _%rax_.
+We want to return this value as the status code to the operating
+system. However, Linux requires that the program\'s exit status be
+stored in _%rdi_, not _%rax_, so we have to move it. Then we do the
+standard exit system call.
 
 The nice thing about function calls is that:
 
@@ -644,100 +676,97 @@ functions to break down complex pieces of code into smaller, simpler
 ones. In fact, almost all of programming is writing and calling
 functions.
 
-Let\'s now take a look at how the `_factorial` function itself is
+Let\'s now take a look at how the `factorial` function itself is
 implemented.
 
 Before the function starts, we have this directive:
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=39 endLine=40}
+```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=42 endLine=43}
 ```
 
-The `.type` directive tells the linker that `_factorial` is a
-function. This isn\'t really needed unless we were using `_factorial` in
+The `.type` directive tells the linker that `factorial` is a
+function. This isn\'t really needed unless we were using `factorial` in
 other programs. We have included it for completeness. The line that says
-`_factorial:` gives the symbol `_factorial` the storage location of the
+`factorial:` gives the symbol `factorial` the storage location of the
 next instruction. That\'s how `call` knew where to go when we said
-`call _factorial`.
+`call factorial`.
 
 The first real instructions of the function are:
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=41 endLine=48}
+```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=44 endLine=54}
 ```
 
 As shown in the previous program, this creates the stack frame for this
-function. These two lines will be the way you should start every function.
+function, with room for one local variable. These lines will be the way
+you should start every function.
 
-The next instruction is this:
+The next instructions are these:
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=50 endLine=54}
+```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=56 endLine=60}
 ```
 
-This uses base pointer addressing mode to move
-the first parameter of the function into _%eax_. Remember,
-`(%ebp)` has the old _%ebp_, `4(%ebp)` has the return address, and
-`8(%ebp)` is the location of the first parameter to the function. If you
-think back, this will be the value 4 on the first call, since that was
-what we pushed on the stack before calling the function the first time
-(with `pushl $4`). As this function calls itself, it will have other
-values, too.
-
-Next, we check to see if we\'ve hit our base case (a parameter of 1). If
-so, we jump to the instruction at the label `_end_factorial`, where it
-will be returned. It\'s already in _%eax_ which we mentioned earlier is
-where you put return values. That is accomplished by these
-lines:
-
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=55 endLine=60}
-```
+This copies the first parameter of the function, which arrived in
+_%rdi_, into _%rax_. This will be the value 4 on the first call, since
+that was what we put in _%rdi_ before calling the function the first
+time (with `movq $4, %rdi`). As this function calls itself, it will
+have other values, too. Then we check to see if we\'ve hit our base
+case (a parameter of 1). If so, we jump to the instruction at the label
+`end_factorial`, where it will be returned. It\'s already in _%rax_
+which we mentioned earlier is where you put return values.
 
 If it\'s not our base case, what did we say we would do? We would call
-the `_factorial` function again with our parameter minus one. So, first
-we decrease _%eax_ by one:
+the `factorial` function again with our parameter minus one. But first
+we have to think about what happens to our own parameter. After the
+call, we still need it, to multiply it by the factorial of the number
+below it. However, it is in _%rdi_, a caller-saved register, and the
+function we are about to call is free to overwrite it (in fact, it
+will: it puts its own parameter there before calling itself again). So
+we save it in our local variable, which lives in our own stack frame,
+where no other call can touch it:
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=61 endLine=62}
+```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=62 endLine=64}
 ```
 
-`decl` stands for decrement. It subtracts 1 from the given register
-or memory location (_%eax_ in our case). `incl` is the inverse - it
-adds 1. After decrementing _%eax_ we push it onto the stack since it\'s
-going to be the parameter of the next function call. And then we call
-`_factorial` again!
+This is exactly why recursive functions need local variables. Every
+call to `factorial` has its own stack frame, so every call has its own
+`-8(%rbp)`, at a different address. When `factorial` of 4 calls
+`factorial` of 3, the 4 stays safe in the first frame.
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=63 endLine=65}
+Then we decrease _%rdi_ by one, which leaves our parameter minus one in
+the register of the first parameter, and we call `factorial` again!
+
+```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=65 endLine=67}
 ```
 
-Okay, now we\'ve called `_factorial`. One thing to remember is that after
-a function call, we can never know what the registers are (except `%esp`
-and `%ebp`). So even though we had the value we were called with in
-`%eax`, it\'s not there anymore. Therefore, we need to pull it off the
-stack from the same place we got it the first time (at `8(%ebp)`). So,
-we do this:
+`decq` stands for decrement. It subtracts 1 from the given register
+or memory location (_%rdi_ in our case). `incq` is the inverse - it
+adds 1.
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=66 endLine=68}
-```
-
+Okay, now we\'ve called `factorial`. One thing to remember is that after
+a function call, we can never know what the caller-saved registers
+are. So even though we had the value we were called with in
+`%rdi`, it\'s not there anymore. But we have it in our local variable.
 Now, we want to multiply that number with the result of the factorial
 function. If you remember our previous discussion, the result of
-functions are left in _%eax_. So, we need to multiply _%ebx_ with _%eax_. This is
-done with this instruction:
+functions are left in _%rax_. So, we need to multiply `-8(%rbp)` with
+_%rax_. This is done with this instruction:
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=69 endLine=75}
+```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=68 endLine=74}
 ```
 
-This also stores the result in _%eax_, which is exactly where we want the
+This also stores the result in _%rax_, which is exactly where we want the
 return value for the function to be! Since the return value
 is in place we just need to leave the function. If you remember, at the
-start of the function we pushed _%ebp_, and moved _%esp_ into _%ebp_ to create
+start of the function we pushed _%rbp_, and moved _%rsp_ into _%rbp_ to create
 the current stack frame. Now we reverse the operation to destroy the
 current stack frame and reactivate the last one:
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=76 endLine=79}
+```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=76 endLine=81}
 ```
 
 Now we\'re already to return, so we issue the following command
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=80 endLine=84}
-ret
+```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=82 endLine=84}
 ```
 
 This pops the top value off of the stack, and then jumps to it. If you
@@ -765,14 +794,22 @@ Review {#review-2}
 
 -   What is the stack?
 
--   How do `pushl` and `popl` affect the stack? What special-purpose
+-   How do `pushq` and `popq` affect the stack? What special-purpose
     register do they affect?
 
 -   What are local variables and what are they used for?
 
 -   Why are local variables so necessary in recursive functions?
 
--   What are _%ebp_ and _%esp_ used for?
+-   What are _%rbp_ and _%rsp_ used for?
+
+-   Where does a function find its first six parameters, and where does
+    it put its return value?
+
+-   Which registers must a function preserve for its caller? Which may
+    it overwrite?
+
+-   Why must _%rsp_ be a multiple of 16 when a `call` instruction runs?
 
 -   What is a stack frame?
 
@@ -793,6 +830,10 @@ Review {#review-2}
 -   Explain the problems that would arise without a standard calling
     convention.
 
+-   In `004-01-power`, the first answer is kept in _%rbx_ during the
+    second call to `power`. What could happen if it were kept in _%rcx_
+    instead?
+
 ### Going Further {#going-further-2}
 
 -   Do you think it\'s better for a system to have a large set of
@@ -808,10 +849,10 @@ Review {#review-2}
 
 -   Come up with your own calling convention. Rewrite the programs in
     this chapter using it. An example of a different calling convention
-    would be to pass parameters in registers rather than the stack, to
-    pass them in a different order, to return values in other registers
-    or memory locations. Whatever you pick, be consistent and apply it
-    throughout the whole program.
+    would be to pass all of the parameters on the stack rather than in
+    registers, to pass them in a different order, to return values in
+    other registers or memory locations. Whatever you pick, be
+    consistent and apply it throughout the whole program.
 
 -   Can you build a calling convention without using the stack? What
     limitations might it have?
@@ -838,21 +879,44 @@ Review {#review-2}
     makes it easier for programs written by multiple independent authors
     to work together.
 
-[^4-4]: Just a reminder - the dollar sign in front of the eight indicates
-    immediate mode addressing, meaning that we
-    subtract the number 8 itself from _%esp_ rather than the value at
-    address 8.
+[^4-4]: Just a reminder - the dollar sign in front of the sixteen
+    indicates immediate mode addressing, meaning that we
+    subtract the number 16 itself from _%rsp_ rather than the value at
+    address 16.
 
-[^4-5]: This is not always strictly needed unless you are saving registers
-    on the stack before a function call. The base pointer keeps the
-    stack frame in a reasonably consistent state. However, it is still a
-    good idea, and is absolutely necessary if you are temporarily saving
-    registers on the stack.
+[^4-5]: This is not always strictly needed, because the function\'s
+    epilogue (`movq %rbp, %rsp`) puts the stack pointer back anyway,
+    and the base pointer keeps the stack frame in a reasonably
+    consistent state. However, it is still a good idea, and it is
+    absolutely necessary if you are also saving registers on the stack,
+    so that you pop them back from the right place.
 
 [^4-6]: By \"running at the same time\" I am talking about the fact that
     one will not have finished before a new one is activated. I am not
     implying that their instructions are running at the same time.
 
 
-[4-LSB]: https://refspecs.linuxfoundation.org/lsb.shtml
-[4-ABI]: https://github.com/airvzxf/assembly-from-the-ground-up-x86-64/raw/main/src/resource/pdf/abi386-4.pdf
+[^4-7]: You will often see this convention called the \"C calling
+    convention\" or the \"C ABI\". The name comes from history: Unix
+    and its tools were written in C, so the convention was first
+    described in terms of C functions. Today it is simply the common
+    language of the system. When a Rust function must be callable from
+    another language, it is declared `extern "C"`, which means \"use
+    this convention\", and Python\'s `ctypes` module uses it to call
+    functions in libraries. Assembly functions that follow it can be
+    called from all of them, as we will see in
+    [Chapter 8. Sharing Functions with Code Libraries](08-sharing-functions-with-code-libraries.qmd#chapter-8-sharing-functions-with-code-libraries).
+
+[^4-8]: The 32-bit x86 processors had only eight registers, so their
+    convention passed *every* parameter on the stack this way. The
+    64-bit processors doubled the number of registers, and the
+    convention moved the first parameters into them.
+
+[^4-9]: Some languages check this for you. The Rust compiler, for
+    example, refuses to compile a function that returns a reference to
+    one of its local variables, because it knows the variable stops
+    existing when the function returns. In assembly language nobody
+    checks: the program simply reads whatever overwrote the variable
+    later.
+
+[4-ABI]: https://gitlab.com/x86-psABIs/x86-64-ABI

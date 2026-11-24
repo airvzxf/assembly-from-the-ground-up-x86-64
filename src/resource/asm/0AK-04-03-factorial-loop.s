@@ -1,53 +1,43 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
     # PURPOSE:
     #     Solution to Chapter 4, "Going Further":
-    #     the factorial function without recursion.
-    #     It returns the factorial of 5.
+    #     the factorial function written with a loop
+    #     instead of recursion.
     #
     # OUTPUT:
-    #     Exit status code 120.
+    #     Exit status 120 (the factorial of 5).
     #
+    .section .note.GNU-stack,"",@progbits
+
     .section .data
 
     .section .text
         .globl _start
 
 _start:
-    pushl $5
-    call  _factorial
-    addl  $4, %esp
+    movq  $5, %rdi
+    call  factorial
+    movq  %rax, %rdi
+    movq  $60, %rax
+    syscall
 
-    movl  %eax, %ebx
-    movl  $1, %eax
-    int   $0x80
-
-    # PURPOSE:
-    #     Compute n! with a loop:
-    #     result = 1; while (n > 1) result *= n--;
+    # INPUT:   %rdi - The number.
+    # OUTPUT:  %rax - Its factorial.
     #
-    # INPUT:
-    #     First argument - n.
-    #
-    # OUTPUT:
-    #     %eax - n! (1 for n = 0 or 1).
-    #
-        .type _factorial, @function
-_factorial:
-    pushl %ebp
-    movl  %esp, %ebp
+    .type factorial, @function
+factorial:
+    pushq %rbp
+    movq  %rsp, %rbp
 
-    movl  $1, %eax           # Result.
-    movl  8(%ebp), %ecx      # Counter = n.
+    movq  $1, %rax           # Result.
 
-_factorial_loop:
-    cmpl  $1, %ecx           # Done when n <= 1.
-    jle   _factorial_end
-    imull %ecx, %eax         # result *= n
-    decl  %ecx               # n--
-    jmp   _factorial_loop
+factorial_loop:
+    cmpq  $1, %rdi           # Done when n <= 1.
+    jle   factorial_end
+    imulq %rdi, %rax         # result *= n
+    decq  %rdi               # n--
+    jmp   factorial_loop
 
-_factorial_end:
-    movl  %ebp, %esp
-    popl  %ebp
+factorial_end:
+    movq  %rbp, %rsp
+    popq  %rbp
     ret

@@ -83,7 +83,7 @@ expect 0AK-03-06-exit-without-syscall 139
 expect 0AK-04-01-square 144
 expect 0AK-04-02-maximum-function 99
 expect 0AK-04-03-factorial-loop 120
-expect 0AK-04-04-power-registers 33
+expect 0AK-04-04-power-stack 33
 
 # ----- Chapter 5 -----
 INPUT="Hey, diddle 123!" expect_output 0AK-05-01-toupper-stdio \
