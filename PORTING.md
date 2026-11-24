@@ -73,7 +73,7 @@ material. This file records the decisions and tracks the work, one block
   comment why it is the exception.
   The 32-bit programs keep building until their chapter replaces them;
   `gcc-multilib` is removed in block 11.
-- [ ] **2. Chapters 1–3 and Appendix C** (system call table), solutions
+- [x] **2. Chapters 1–3 and Appendix C** (system call table), solutions
   for Chapters 2 and 3. Programs: exit, maximum; 6 solutions.
 - [ ] **3. Chapter 4** (System V convention, frames, alignment, recursion),
   solutions. Programs: power, factorial; 4 solutions.

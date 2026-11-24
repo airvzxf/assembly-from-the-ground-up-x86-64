@@ -48,6 +48,25 @@ expect_file() {
 # ----- Book examples -----
 expect 003-01-exit 0
 expect 003-02-maximum 222
+expect 003-03-maximum-absolute 222
+# The box "Absolute Addresses and PIE" (Chapter 3): the %rip-relative
+# program also links and runs as PIE; the absolute one can't be linked.
+if ld -pie --no-dynamic-linker -o "${TMP_DIR}/maximum-pie" \
+     003-02-maximum.o 2>/dev/null; then
+  expect_output "003-02-maximum (PIE)" 222 \
+    sh -c "'${TMP_DIR}/maximum-pie'; echo \$?"
+else
+  fail "003-02-maximum (PIE): can't be linked as PIE"
+fi
+if ld -pie --no-dynamic-linker -o "${TMP_DIR}/absolute-pie" \
+     003-03-maximum-absolute.o 2>"${TMP_DIR}/pie.err"; then
+  fail "003-03-maximum-absolute (PIE): linked, but it shouldn't"
+elif grep -q "R_X86_64_32S.*can not be used when making a PIE object" \
+       "${TMP_DIR}/pie.err"; then
+  pass "003-03-maximum-absolute (PIE): rejected by ld"
+else
+  fail "003-03-maximum-absolute (PIE): unexpected error"
+fi
 expect 004-01-power 33
 expect 004-02-factorial 24
 
@@ -57,8 +76,8 @@ expect 0AK-03-02-minimum 3
 expect 0AK-03-03-maximum-255 125
 expect 0AK-03-04-maximum-end-address 222
 expect 0AK-03-05-maximum-length 222
-# Without `int $0x80` the CPU runs past the code: SIGSEGV is 128 + 11.
-expect 0AK-03-06-exit-without-int 139
+# Without `syscall` the CPU runs past the code: SIGSEGV is 128 + 11.
+expect 0AK-03-06-exit-without-syscall 139
 
 # ----- Chapter 4 -----
 expect 0AK-04-01-square 144

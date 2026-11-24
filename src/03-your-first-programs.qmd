@@ -43,9 +43,7 @@ human-readable file into a machine-readable one. To assembly the program
 type in the command:
 
 ```{.bash}
-as -o 003-01-exit.o  --32 \
-                     --gstabs+ \
-                     003-01-exit.s
+as -g -o 003-01-exit.o 003-01-exit.s
 ```
 
 `as` is the command which runs the assembler, `003-01-exit.s` is the source
@@ -54,8 +52,9 @@ the file `003-01-exit.o`. `003-01-exit.o` is an *object file*. An object
 file is code that is in the machine\'s language, but has not been
 completely put together. In most large programs, you will have several
 source files, and you will convert each one into an object file.
-The `--gstabs+` option, adds debugging information in the
-executable file, review more information in the
+The `-g` option adds debugging information (in the DWARF format) to
+the object file, so a debugger can show you the source line that is
+running. You can find more information in the
 [Appendix F. Using the GDB Debugger](appendix-f-using-the-gdb-debugger.qmd#appendix-f-using-the-gdb-debugger).
 
 The *linker* is the program that is responsible for putting the object
@@ -65,8 +64,7 @@ linker is only adding the information to enable it to run. To *link*
 the file, enter the command:
 
 ```{.bash}
-ld -o 003-01-exit  -m elf_i386 \
-                   003-01-exit.o
+ld -o 003-01-exit 003-01-exit.o
 ```
 
 `ld` is the command to run the linker, `003-01-exit.o` is the object file we
@@ -122,7 +120,7 @@ the following in your comments:
 
 After the comments, the next line says:
 
-```{.gnuassembler .numberLines include=resource/asm/003-01-exit.s startLine=17 endLine=17}
+```{.gnuassembler .numberLines include=resource/asm/003-01-exit.s startLine=15 endLine=15}
 ```
 
 Anything starting with a period isn\'t directly translated into a
@@ -130,8 +128,34 @@ machine instruction. Instead, it\'s an instruction to the assembler
 itself. These are called *assembler directives* or
 *pseudo-operations* because they are handled by the
 assembler and are not actually run by the computer. The
-`.section` command breaks your program up into sections. This
-command starts the data section, where you list any memory
+`.section` command breaks your program up into sections.
+
+This first section is empty, and it is there only to carry a message
+to the linker: *this program never runs code stored in its stack*. The
+stack is an area of memory where a program keeps temporary data (we
+will meet it in
+[Chapter 4. All About Functions](04-all-about-functions.qmd#chapter-4-all-about-functions)).
+If that memory were also allowed to hold instructions, an attacker who
+managed to write some bytes into it, for example by sending a program
+more data than it expects, could make the processor run those bytes
+as code. Current processors can mark memory as *non-executable*, and
+Linux does that with the stack, unless the program asks otherwise. The
+problem is that, for historical reasons, `ld` treats an object file
+without a `.note.GNU-stack` section as one that *might* need an
+executable stack, and then marks the whole program that way. Recent
+versions of `ld` warn about it (\"missing .note.GNU-stack section
+implies executable stack\"), and the scripts of this book treat that
+warning as an error. Compilers such as GCC and `rustc` add this section
+to every object file they create, so you never see it there; in
+assembly language you write it yourself. Every program in this book
+starts with this line, and yours should too.
+
+The next line:
+
+```{.gnuassembler .numberLines include=resource/asm/003-01-exit.s startLine=17 endLine=17}
+```
+
+starts the data section, where you list any memory
 storage you will need for data. Our program doesn\'t use any, so we
 don\'t need the section. It\'s just here for completeness. Almost every
 program you write in the future will have data.
@@ -192,11 +216,11 @@ is this:
 ```
 
 
-When the program runs, this instruction transfers the number `1` into
-the _%eax_ register. In assembly language, many instructions have
-*operands*. `movl` has two operands - the *source* and the
-*destination*. In this case, the source is the literal number 1, and the
-destination is the _%eax_ register. Operands can be numbers, memory
+When the program runs, this instruction transfers the number `60` into
+the _%rax_ register. In assembly language, many instructions have
+*operands*. `movq` has two operands - the *source* and the
+*destination*. In this case, the source is the literal number 60, and the
+destination is the _%rax_ register. Operands can be numbers, memory
 location references, or registers. Different instructions allow
 different types of operands. See
 [Appendix B. Common x86 Instructions](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions)
@@ -206,65 +230,59 @@ information on which instructions take which kinds of operands.
 On most instructions which have two operands, the first one is the
 source operand and the second one is the destination. Note that in these
 cases, the source operand is not modified at all. Other instructions of
-this type are, for example, `addl`, `subl`, and `imull`.
+this type are, for example, `addq`, `subq`, and `imulq`.
 These add/subtract/multiply the source operand from/to/by the
 destination operand and save the result in the destination operand.
-Other instructions may have an operand hardcoded in. `idivl`, for
-example, requires that the dividend be in _%eax_, and _%edx_ be zero, and the
-quotient is then transferred to _%eax_ and the remainder to _%edx_. However,
+Other instructions may have an operand hardcoded in. `idivq`, for
+example, requires that the dividend be in _%rax_, and _%rdx_ be zero, and the
+quotient is then transferred to _%rax_ and the remainder to _%rdx_. However,
 the divisor can be any register or memory location.
 
-On x86 processors, there are several general-purpose
-registers[^3-4] (all of which can be used with `movl`):
+On x86-64 processors, there are fourteen general-purpose
+registers[^3-4] (all of which can be used with `movq`):
 
--   _%eax_
+-   _%rax_, _%rbx_, _%rcx_ and _%rdx_
 
--   _%ebx_
+-   _%rsi_ and _%rdi_
 
--   _%ecx_
-
--   _%edx_
-
--   _%edi_
-
--   _%esi_
+-   _%r8_, _%r9_, _%r10_, _%r11_, _%r12_, _%r13_, _%r14_ and _%r15_
 
 In addition to these general-purpose registers, there are also several
 special-purpose registers, including:
 
--   _%ebp_
+-   _%rbp_
 
--   _%esp_
+-   _%rsp_
 
--   _%eip_
+-   _%rip_
 
--   _%eflags_
+-   _%rflags_
 
 We\'ll discuss these later, just be aware that they exist.[^3-5] Some of
-these registers, like _%eip_ and _%eflags_ can only be
+these registers, like _%rip_ and _%rflags_ can only be
 accessed through special instructions. The others can be accessed using
 the same instructions as general-purpose registers, but they have
 special meanings, special uses, or are simply faster when used in a
 specific way.
 
-So, the `movl` instruction moves the number `1` into `%eax`. The
-dollar-sign in front of the one indicates that we want to use immediate
+So, the `movq` instruction moves the number `60` into `%rax`. The
+dollar-sign in front of the number indicates that we want to use immediate
 mode addressing (refer back to
 [Data Accessing Methods](02-computer-architecture.qmd#data-accessing-methods)).
 Without the dollar-sign it would do
 direct addressing mode, loading whatever number is at
-address `1`. We want the actual number `1` loaded in, so we have to use
+address `60`. We want the actual number `60` loaded in, so we have to use
 immediate mode.
 
-The reason we are moving the number 1 into _%eax_ is because we are
-preparing to call the Linux Kernel. The number `1` is the number of the
+The reason we are moving the number 60 into _%rax_ is because we are
+preparing to call the Linux Kernel. The number `60` is the number of the
 `exit` *system call*. We will discuss system calls in
 more depth soon, but basically they are requests for the operating
 system\'s help. Normal programs can\'t do everything. Many operations
 such as calling other programs, dealing with files, and exiting have to
 be handled by the operating system through system calls.
 When you make a system call, which we will do shortly, the system call
-number has to be loaded into _%eax_ (for a complete listing of
+number has to be loaded into _%rax_ (for a complete listing of
 system calls and their numbers, see
 [Appendix C. Important System Calls](appendix-c-important-system-calls.qmd#appendix-c-important-system-calls)).
 Depending on the
@@ -279,8 +297,8 @@ system needs to know which file you are dealing with, what data you want
 to write, and other details. The extra details, called
 *parameters* are stored in other registers. In the case of the
 `exit` system call, the operating system requires a status code be
-loaded in _%ebx_. This value is then returned to the system. This
-is the value you retrieved when you typed `echo $?`. So, we load _%ebx_
+loaded in _%rdi_. This value is then returned to the system. This
+is the value you retrieved when you typed `echo $?`. So, we load _%rdi_
 with `0` by typing the following:
 
 ```{.gnuassembler .numberLines include=resource/asm/003-01-exit.s startLine=27 endLine=31}
@@ -291,9 +309,10 @@ itself. Registers are used for all sorts of things besides system calls.
 They are where all program logic such as addition, subtraction, and
 comparisons take place. Linux simply requires that certain registers be
 loaded with certain parameter values before making a system call.
-_%eax_ is always required to be loaded with the system call number.
-For the other registers, however, each system call has different
-requirements. In the `exit` system call, _%ebx_ is required to
+_%rax_ is always required to be loaded with the system call number.
+The parameters go, in order, in _%rdi_, _%rsi_, _%rdx_, _%r10_, _%r8_
+and _%r9_, and each system call says how many it needs and what they
+mean. The `exit` system call needs only one: _%rdi_ is required to
 be loaded with the exit status code. We will discuss
 different system calls as they are needed. For a list of common system
 calls and what is required to be in each register, see
@@ -301,35 +320,41 @@ calls and what is required to be in each register, see
 
 The next instruction is the \"magic\" one. It looks like this:
 
-```{.gnuassembler .numberLines include=resource/asm/003-01-exit.s startLine=33 endLine=35}
+```{.gnuassembler .numberLines include=resource/asm/003-01-exit.s startLine=33 endLine=34}
 ```
 
-The `int` stands for *interrupt*. The `0x80` is the
-interrupt number to use.[^3-6] An *interrupt* interrupts the
-normal program flow, and transfers control from our program to
-Linux so that it will do a system call.[^3-7]. You can think of it as
+The `syscall` instruction stops the normal program flow and transfers
+control from our program to Linux so that it will do a system call.
+The processor switches to the privileged mode the kernel runs in, and
+jumps to the address the kernel registered for system calls when the
+computer started.[^3-7] When the kernel is done, it returns to the
+instruction that follows `syscall`, with the result of the system call
+in _%rax_. You can think of it as
 like signaling Batman (or Larry-Boy[^3-8], if you prefer). You
 need something done, you send the signal, and then he comes to the
 rescue. You don\'t care how he does his work - it\'s more or less magic
 - and when he\'s done you\'re back in control. In this case, all we\'re
 doing is asking Linux to terminate the program, in which case we won\'t
-be back in control. If we didn\'t signal the interrupt, then no system
-call would have been performed.
+be back in control. If we didn\'t issue the `syscall` instruction, then
+no system call would have been performed.
 
 > **NOTE.**
 >
 > **Quick System Call Review:**
 > To recap - Operating System features are accessed through system
 > calls. These are invoked by setting up the registers in a
-> special way and issuing the instruction `int $0x80`. Linux knows which
-> system call we want to access by what we stored in the _%eax_
-> register. Each system call has other requirements as to what needs to be
-> stored in the other registers. System call number 1 is the `exit` system
-> call, which requires the status code to be placed in _%ebx_.
+> special way and issuing the instruction `syscall`. Linux knows which
+> system call we want to access by what we stored in the _%rax_
+> register. The parameters go in _%rdi_, _%rsi_, _%rdx_, _%r10_, _%r8_
+> and _%r9_, in that order. The result comes back in _%rax_, and the
+> `syscall` instruction itself overwrites _%rcx_ and _%r11_, so don\'t
+> keep anything there across a system call. System call number 60 is the
+> `exit` system call, which requires the status code to be placed in
+> _%rdi_.
 
 Now that you\'ve assembled, linked, run, and examined the program, you
 should make some basic edits. Do things like change the number that is
-loaded into `%ebx`, and watch it come out at the end with
+loaded into `%rdi`, and watch it come out at the end with
 `echo $?`. Don\'t forget to assemble and link it again before
 running it. Add some comments. Don\'t worry, the worse thing that would
 happen is that the program won\'t assemble or link, or will freeze your
@@ -377,11 +402,17 @@ stop. We also need a value to hold the current position in the list, a
 value to hold the current list element being examined, and the current
 highest value on the list. Let\'s assign each of these a register:
 
--   _%edi_ will hold the current position in the list.
+-   _%rcx_ will hold the current position in the list.
 
--   _%ebx_ will hold the current highest value in the list.
+-   _%rdi_ will hold the current highest value in the list. We pick
+    _%rdi_ because that is where the `exit` system call wants the
+    status code, and the highest value is what our program returns.
 
--   _%eax_ will hold the current element being examined.
+-   _%rax_ will hold the current element being examined.
+
+We need one more register to remember where the list starts in memory:
+
+-   _%rbx_ will hold the address of `data_items`.
 
 When we begin the program and look at the first item in the list, since
 we haven\'t seen any other items, that item will automatically be the
@@ -389,18 +420,18 @@ current largest element in the list. Also, we will set the current
 position in the list to be zero - the first element. From then, we will
 follow the following steps:
 
-1.  Check the current list element (_%eax_) to see if it\'s zero (the
+1.  Check the current list element (_%rax_) to see if it\'s zero (the
     terminating element).
 
 2.  If it is zero, exit.
 
-3.  Increase the current position (_%edi_).
+3.  Increase the current position (_%rcx_).
 
 4.  Load the next value in the list into the current value register
-    (_%eax_). What addressing mode might we use here? Why?
+    (_%rax_). What addressing mode might we use here? Why?
 
-5.  Compare the current value (_%eax_) with the current highest value
-    (_%ebx_).
+5.  Compare the current value (_%rax_) with the current highest value
+    (_%rdi_).
 
 6.  If the current value is greater than the current highest value,
     replace the current highest value with the current value.
@@ -470,12 +501,8 @@ Enter the following program as `003-02-maximum.s`:
 Now, assemble and link it with these commands:
 
 ```{.bash}
-as -o 003-02-maximum.o  --32 \
-                        --gstabs+ \
-                        003-02-maximum.s
-
-ld -o 003-02-maximum    -m elf_i386 \
-                        003-02-maximum.o
+as -g -o 003-02-maximum.o 003-02-maximum.s
+ld -o 003-02-maximum 003-02-maximum.o
 ```
 
 Now run it, and check its status.
@@ -492,19 +519,20 @@ wonderful!). You may also notice that in this program we actually have
 something in the data section. These lines are the data
 section:
 
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=19 endLine=20}
+```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=19 endLine=21}
 ```
 
 Let\'s look at this. `data_items` is a label that refers to the
 location that follows it. Then, there is a directive that starts with
-`.long`. That causes the assembler to reserve memory for the list
+`.quad`. That causes the assembler to reserve memory for the list
 of numbers that follow it. `data_items` refers to the location of the
 first one. Because `data_items` is a label, any time in our program
 where we need to refer to this address we can use the `data_items`
-symbol, and the assembler will substitute it with the address where the
-numbers start during assembly. For example, the instruction
-`movl data_items, %eax` would move the value 3 into _%eax_. There are
-several different types of memory locations other than `.long` that
+symbol, and the assembler and the linker will work out the address
+where the numbers start. For example, the instruction
+`movq data_items(%rip), %rax` would move the value 3 into _%rax_ (we
+will see what `(%rip)` means in a moment). There are
+several different types of memory locations other than `.quad` that
 can be reserved. The main ones are as follows:
 
 `.byte`:
@@ -512,17 +540,22 @@ can be reserved. The main ones are as follows:
 :   Bytes take up one storage location for each number. They are limited
     to numbers between 0 and 255.
 
-`.int`:
+`.word`:
 
-:   Ints (which differ from the `int` instruction) take up two storage
-    locations for each number. These are limited to numbers between 0
-    and 65535.[^3-9]
+:   Words take up two storage locations for each number. These are
+    limited to numbers between 0 and 65535.[^3-9]
 
 `.long`:
 
-:   Longs take up four storage locations. This is the same amount of
-    space the registers use, which is why they are used in this program.
-    They can hold numbers between 0 and 4294967295.
+:   Longs take up four storage locations. They can hold numbers between
+    0 and 4294967295.
+
+`.quad`:
+
+:   Quads (short for *quadwords*) take up eight storage locations. This
+    is the same amount of space the registers use, which is why they are
+    used in this program. They can hold numbers between
+    0 and 18446744073709551615.
 
 `.ascii`:
 
@@ -542,9 +575,9 @@ can be reserved. The main ones are as follows:
     refers to the \"tab\" character. All of the letters in an
     `.ascii` directive should be in quotes.
 
-In our example, the assembler reserves 14 `.long`s, one right after
-another. Since each long takes up 4 bytes, that means that the whole
-list takes up 56 bytes. These are the numbers we will be searching
+In our example, the assembler reserves 9 `.quad`s, one right after
+another. Since each quad takes up 8 bytes, that means that the whole
+list takes up 72 bytes. These are the numbers we will be searching
 through to find the maximum. `data_items` is used by the assembler to
 refer to the address of the first of these values.
 
@@ -568,9 +601,10 @@ located. This is in contrast to the `_start` symbol, which Linux
 needs to know where it is so that it knows where to begin the program\'s
 execution. It\'s not an error to write `.globl data_items`, it\'s just
 not necessary. Anyway, play around with this line and add your own
-numbers. Even though they are `.long`, the program will produce strange
+numbers. Even though they are `.quad`, the program will produce strange
 results if any number is greater than 255, because that\'s the largest
-allowed exit status code. Also notice that if you move the 0
+allowed exit status code: Linux keeps only the lowest byte of the
+number in _%rdi_. Also notice that if you move the 0
 to earlier in the list, the rest get ignored. *Remember that any time
 you change the source file, you have to re-assemble and re-link your
 program. Do this now and see the results*.
@@ -599,8 +633,8 @@ not used to having to think through every detail of a process, and
 therefore leave out needed variables in their first programming
 attempts.
 
-In this program, we are using _%ebx_ as the location of the largest item
-we\'ve found. _%edi_ is used as the *index* to the current data item
+In this program, we are using _%rdi_ as the location of the largest item
+we\'ve found. _%rcx_ is used as the *index* to the current data item
 we\'re looking at. Now, let\'s talk about what an index is. When we read
 the information from `data_items`, we will start with the first one
 (data item number 0), then go to the second one (data item number 1),
@@ -608,58 +642,73 @@ then the third (data item number 2), and so on. The data item number is
 the *index* of `data_items`. You\'ll notice that the first
 instruction we give to the computer is:
 
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=26 endLine=27}
+```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=27 endLine=28}
 ```
 
-Since we are using `%edi` as our index, and we want to start looking at
-the first item, we load `%edi` with 0. Now, the next instruction is
+`leaq` stands for *load effective address*. Instead of reading memory,
+it computes an address and puts the address itself in the destination
+register. Here it puts in _%rbx_ the address where `data_items` starts.
+The `(%rip)` part says that the address is written as a distance from
+the instruction pointer, which is how x86-64 programs find their data.
+We will see why in
+[Addressing Relative to the Instruction Pointer](#addressing-relative-to-the-instruction-pointer).
+For now, remember the pattern: `leaq label(%rip), %register` puts the
+address of `label` in a register.
+
+The next instruction is:
+
+```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=29 endLine=30}
+```
+
+Since we are using `%rcx` as our index, and we want to start looking at
+the first item, we load `%rcx` with 0. Now, the next instruction is
 tricky, but crucial to what we\'re doing. It says:
 
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=28 endLine=29}
+```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=31 endLine=32}
 ```
 
 Now to understand this line, you need to keep several things in mind:
 
--   `data_items` is the location number of the start of our number list.
+-   `%rbx` holds the address of the start of our number list.
 
--   Each number is stored across 4 storage locations (because we
-    declared it using `.long`).
+-   Each number is stored across 8 storage locations (because we
+    declared it using `.quad`).
 
--   `%edi` is holding 0 at this point.
+-   `%rcx` is holding 0 at this point.
 
-So, basically what this line does is say, \"start at the beginning of
-data_items, and take the first item number (because `%edi` is 0), and
-remember that each number takes up four storage locations.\" Then it
-stores that number in `%eax`. This is how you write indexed addressing
+So, basically what this line does is say, \"start at the address in
+`%rbx`, and take the first item number (because `%rcx` is 0), and
+remember that each number takes up eight storage locations.\" Then it
+stores that number in `%rax`. This is how you write indexed addressing
 mode instructions in assembly language. The instruction in a general
 form is this:
 
 ```{.gnuassembler}
-movl BEGINNINGADDRESS(, %INDEXREGISTER, WORDSIZE)
+movq (%BASEREGISTER, %INDEXREGISTER, WORDSIZE), %DESTINATION
 ```
 
-In our case `data_items` was our beginning address, _%edi_ was our index
-register, and 4 was our word size. This topic is discussed further in
+In our case _%rbx_ held our beginning address, _%rcx_ was our index
+register, and 8 was our word size. This topic is discussed further in
 [Addressing Modes](#addressing-modes).
 
 If you look at the numbers in `data_items`, you will see that the number
-3 is now in _%eax_. If _%edi_ was set to 1, the number 67 would be in
-_%eax_, and if it was set to 2, the number 34 would be in _%eax_, and so
-forth. Very strange things would happen if we used a number other than 4
+3 is now in _%rax_. If _%rcx_ was set to 1, the number 67 would be in
+_%rax_, and if it was set to 2, the number 34 would be in _%rax_, and so
+forth. Very strange things would happen if we used a number other than 8
 as the size of our storage locations.[^3-10] The way you write this is
 very awkward, but if you know what each piece does, it\'s not too difficult.
 For more information about this, see [Addressing Modes](#addressing-modes).
 
 Let\'s look at the next line:
 
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=30 endLine=31}
+```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=33 endLine=34}
 ```
 
-We have the first item to look at stored in `%eax`. Since it is the
+We have the first item to look at stored in `%rax`. Since it is the
 first item, we know it\'s the biggest one we\'ve looked at. We store it
-in `%ebx`, since that\'s where we are keeping the largest number found.
-Also, even though `movl` stands for *move*, it actually copies the
-value, so `%eax` and `%ebx` both contain the starting value.[^3-11]
+in `%rdi`, since that\'s where we are keeping the largest number found.
+Also, even though `movq` stands for *move*, it actually copies the
+value, so `%rax` and `%rdi` both contain the starting value.[^3-11]
 
 Now we move into a *loop*. A loop is a segment of your program that
 might run more than once. We have marked the starting location of the
@@ -691,13 +740,13 @@ Okay, so now let\'s go to the code. We have the beginning of the loop
 marked with `_start_loop`. That is so we know where to go back to at the
 end of our loop. Then we have these instructions:
 
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=34 endLine=35}
+```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=37 endLine=38}
 ```
 
-The `cmpl` instruction compares the two values. Here, we are
-comparing the number 0 to the number stored in _%eax_. This compare
+The `cmpq` instruction compares the two values. Here, we are
+comparing the number 0 to the number stored in _%rax_. This compare
 instruction also affects a register not mentioned here, the
-_%eflags_ register. This is also known as the status register, and
+_%rflags_ register. This is also known as the status register, and
 has many uses which we will discuss later. Just be aware
 that the result of the comparison is stored in the status register. The
 next line is a flow control instruction which says to *jump*
@@ -735,49 +784,49 @@ many jump statements that you can use:
 The complete list is documented in
 [Appendix B. Common x86 Instructions](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions).
 In this
-case, we are jumping if _%eax_ holds the value of zero. If so, we are done
+case, we are jumping if _%rax_ holds the value of zero. If so, we are done
 and we go to `_loop_exit`.[^3-13]
 
 If the last loaded element was not zero, we go on to the next
 instructions:
 
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=36 endLine=37}
+```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=39 endLine=40}
 ```
 
-If you remember from our previous discussion, _%edi_ contains the
-index to our list of values in `data_items`. `incl` increments
-the value of _%edi_ by one. Then the `movl` is just like the one we did
-beforehand. However, since we already incremented _%edi_, _%eax_ is getting
-the next value from the list. Now _%eax_ has the next value to be tested.
+If you remember from our previous discussion, _%rcx_ contains the
+index to our list of values in `data_items`. `incq` increments
+the value of _%rcx_ by one. Then the `movq` is just like the one we did
+beforehand. However, since we already incremented _%rcx_, _%rax_ is getting
+the next value from the list. Now _%rax_ has the next value to be tested.
 So, let\'s test it!
-
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=38 endLine=40}
-```
-
-Here we compare our current value, stored in _%eax_ to our biggest value so
-far, stored in _%ebx_. If the current value is less or equal to our biggest
-value so far, we don\'t care about it, so we just jump back to the
-beginning of the loop. Otherwise, we need to record that value as the
-largest one:
 
 ```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=41 endLine=43}
 ```
 
-which moves the current value into _%ebx_, which we are using to store the
+Here we compare our current value, stored in _%rax_ to our biggest value so
+far, stored in _%rdi_. If the current value is less or equal to our biggest
+value so far, we don\'t care about it, so we just jump back to the
+beginning of the loop. Otherwise, we need to record that value as the
+largest one:
+
+```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=44 endLine=46}
+```
+
+which moves the current value into _%rdi_, which we are using to store the
 current largest value, and starts the loop over again.
 
 Okay, so the loop executes until it reaches a 0, when it jumps to
 `_loop_exit`. This part of the program calls the Linux kernel to exit. If
 you remember from the last program, when you call the operating system
 (remember it\'s like signaling Batman), you store the system call
-number in _%eax_ (1 for the `exit` call), and store the other
+number in _%rax_ (60 for the `exit` call), and store the other
 values in the other registers. The exit call requires that we put our
-exit status code in _%ebx_. We already have the exit
-status there since we are using _%ebx_ as our largest number, so all we
-have to do is load _%eax_ with the number one and call the kernel to exit.
+exit status code in _%rdi_. We already have the exit
+status there since we are using _%rdi_ as our largest number, so all we
+have to do is load _%rax_ with the number 60 and call the kernel to exit.
 Like this:
 
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=46 endLine=50}
+```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=48 endLine=53}
 ```
 
 Okay, that was a lot of work and explanation, especially for such a
@@ -826,51 +875,67 @@ except immediate-mode can be represented in this fashion.
 
 :   This is done by only using the `ADDRESS_OR_OFFSET` portion. Example:
 
-    This loads _%eax_ with the value at memory address `ADDRESS`.
+    This loads _%rax_ with the value at memory address `ADDRESS`. As we
+    will see in the box below, x86-64 programs rarely write the address
+    of their data this way; they use the next mode instead.
 
 ```{.gnuassembler}
-movl ADDRESS, %eax
+movq ADDRESS, %rax
+```
+
+**Instruction-pointer-relative addressing mode:**
+
+:   This is the form `OFFSET(%rip)`. The address is the instruction
+    pointer plus a constant offset. When you write a label, as in
+    `data_items(%rip)`, the assembler and the linker calculate the
+    offset for you. This loads _%rax_ with the value stored at
+    `data_items`:
+
+```{.gnuassembler}
+movq data_items(%rip), %rax
 ```
 
 **Indexed addressing mode:**
 
-:   This is done by using the `ADDRESS_OR_OFFSET` and the `%INDEX`
+:   This is done by using the `%BASE_OR_OFFSET` and the `%INDEX`
     portion. You can use any general-purpose register as the index
-    register. You can also have a constant multiplier of 1, 2,
-    or 4 for the index register, to make it easier to
-    index by bytes, double-bytes, and words. For example, let\'s say
+    register. You can also have a constant multiplier of 1, 2, 4
+    or 8 for the index register, to make it easier to
+    index by bytes, words, longs and quads. For example, let\'s say
     that we had a string of bytes as `string_start` and wanted to access
     the third one (an index of 2 since we start counting the index at
-    zero), and _%ecx_ held the value 2. If you wanted to load it into _%eax_
+    zero), and _%rcx_ held the value 2. If you wanted to load it into _%al_
+    (the lowest byte of _%rax_, as we will see shortly)
     you could do the following:
 
-    This starts at `string_start`, and adds `1 * %ecx` to that address,
-    and loads the value into _%eax_.
+    This puts the address of `string_start` in _%rbx_, adds `1 * %rcx`
+    to that address, and loads the byte at the result into _%al_.
 
 ```{.gnuassembler}
-movl string_start(,%ecx,1), %eax
+leaq string_start(%rip), %rbx
+movb (%rbx,%rcx,1), %al
 ```
 
 **Indirect addressing mode:**
 
 :   Indirect addressing mode loads a value from the address indicated by
-    a register. For example, if _%eax_ held an address, we could move the
-    value at that address to _%ebx_ by doing the following:
+    a register. For example, if _%rax_ held an address, we could move the
+    value at that address to _%rbx_ by doing the following:
 
 ```{.gnuassembler}
-movl (%eax), %ebx
+movq (%rax), %rbx
 ```
 
 **Base pointer addressing mode:**
 
 :   Base-pointer addressing is similar to indirect addressing, except
     that it adds a constant value to the address in the register. For
-    example, if you have a record where the age value is 4 bytes into
-    the record, and you have the address of the record in _%eax_, you can
-    retrieve the age into _%ebx_ by issuing the following instruction:
+    example, if you have a record where the age value is 16 bytes into
+    the record, and you have the address of the record in _%rax_, you can
+    retrieve the age into _%rbx_ by issuing the following instruction:
 
 ```{.gnuassembler}
-movl 4(%eax), %ebx
+movq 16(%rax), %rbx
 ```
 
 **Immediate mode addressing:**
@@ -878,15 +943,15 @@ movl 4(%eax), %ebx
 :   Immediate mode is very simple. It does not follow the general form
     we have been using. Immediate mode is used to load direct values
     into registers or memory locations. For example, if you wanted to
-    load the number 12 into _%eax_, you would simply do the following:
+    load the number 12 into _%rax_, you would simply do the following:
 
     Notice that to indicate immediate mode, we used a dollar sign in
     front of the number. If we did not, it would be direct addressing
     mode, in which case the value located at memory location 12 would be
-    loaded into _%eax_ rather than the number 12 itself.
+    loaded into _%rax_ rather than the number 12 itself.
 
 ```{.gnuassembler}
-movl $12, %eax
+movq $12, %rax
 ```
 
 **Register addressing mode:**
@@ -900,43 +965,125 @@ use one of these. Every mode except immediate mode can be used as either
 the source or destination operand. Immediate mode can
 only be a source operand.
 
+### Addressing Relative to the Instruction Pointer {#addressing-relative-to-the-instruction-pointer}
+
+Why do we write `leaq data_items(%rip), %rbx` instead of simply using
+the address of `data_items`? Because on a modern system *your program
+doesn\'t know in advance where it will be loaded*. Linux places most
+programs at a different, random address every time they run. This is
+called *address space layout randomization* (ASLR), and it makes
+attacks much harder, because an attacker can\'t guess where the code
+and the data are. A program that can run at any address is called a
+*position-independent executable* (PIE). GCC and `rustc` build PIE
+programs by default, and shared libraries (see
+[Chapter 8. Sharing Functions with Code Libraries](08-sharing-functions-with-code-libraries.qmd#chapter-8-sharing-functions-with-code-libraries))
+must always be position-independent.
+
+The address of `data_items` changes from one run to the next, but the
+*distance* between an instruction and `data_items` never changes,
+because the code and the data move together. So the instruction stores
+that distance, and the processor adds it to _%rip_, which holds the
+address of the next instruction, while it runs. You can see it with
+`objdump -d 003-02-maximum`, which *disassembles* the program (turns
+the machine code back into assembly language). On my computer, the first
+instructions look like this:[^3-6]
+
+```
+0000000000401000 <_start>:
+  401000:  48 8d 1d 29 20 00 00  lea  0x2029(%rip),%rbx  # 403030 <data_items>
+  401007:  48 c7 c1 00 00 00 00  mov  $0x0,%rcx
+```
+
+The next instruction starts at address `0x401007`, and `0x401007` plus
+the offset `0x2029` is `0x403030`, the address of `data_items`. The
+addresses on your computer may be different, but the sum always points
+to `data_items`.
+
+> **NOTE.**
+>
+> **Absolute Addresses and PIE:**
+> In other texts you will find the maximum program written with the
+> address of the list inside the instruction, like this (the file
+> `003-03-maximum-absolute.s` in the examples does exactly that):
+>
+> ```{.gnuassembler}
+> movq data_items(,%rcx,8), %rax
+> ```
+>
+> This is *absolute* indexed addressing: the instruction contains the
+> address of `data_items` itself, stored in 32 bits. It works when you
+> link with `ld` as we have done, because `ld` builds a program that is
+> always loaded at the same low address (`0x400000`), where every
+> address fits in 32 bits. But try to link it as a position-independent
+> program:
+>
+> ```{.bash}
+> ld -pie --no-dynamic-linker -o maximum-pie 003-03-maximum-absolute.o
+> ```
+>
+> and `ld` refuses:
+>
+> ```
+> ld: 003-03-maximum-absolute.o: relocation R_X86_64_32S against `.data'
+> can not be used when making a PIE object; recompile with -fPIE
+> ```
+>
+> A PIE program can be loaded anywhere in the 64-bit address space, so
+> its addresses don\'t fit in 32 bits, and nobody would correct the
+> address written inside the instruction when the program is loaded at
+> a different place. GCC gives the same error when it builds the
+> program, because it builds PIE by default. The same command with
+> `003-02-maximum.o` works, and the program still returns `222`,
+> because it only contains distances. That is why this book always
+> reaches data relative to _%rip_: the extra `leaq` costs very little,
+> and the code works everywhere. The scripts that build the examples
+> check that no program uses absolute addresses, except this one.
+
+### Sizes of Data and Parts of Registers {#sizes-of-data-and-parts-of-registers}
+
 In addition to these modes, there are also different instructions for
 different sizes of values to move. For example, we have been using
-`movl` to move data a word at a time. in many cases, you will only
-want to move data a byte at a time. This is accomplished by the
-instruction `movb`. However, since the registers we have discussed
-are word-sized and not byte-sized, you cannot use the full register.
-Instead, you have to use a portion of the register.
+`movq` to move data eight bytes (a quadword) at a time. In many cases,
+you will only want to move data a byte at a time. This is accomplished
+by the instruction `movb`. Similarly, `movw` moves two bytes and `movl`
+moves four. However, since the registers we have discussed are
+eight bytes long, you cannot use the full register. Instead, you have to
+use a portion of the register.
 
-Take for instance _%eax_. If you only wanted to work with two bytes at a
-time, you could just use _%ax_. _%ax_ is the least-significant half
-(i.e. - the last part of the number) of the _%eax_ register, and is useful
-when dealing with two-byte quantities. _%ax_ is further divided up into
-_%al_ and _%ah_. _%al_ is the least-significant byte of _%ax_, and
-_%ah_ is the most significant byte.[^3-14] Loading a value into _%eax_ will wipe
-out whatever was in _%al_ and _%ah_ (and also _%ax_, since _%ax_ is made up of
-them). Similarly, loading a value into either _%al_ or _%ah_ will corrupt any
-value that was formerly in _%eax_. Basically, it\'s wise to only use a
-register for either a byte or a word, but never both at the same time.
+Take for instance _%rax_. Its lowest four bytes are called _%eax_, the
+lowest two bytes _%ax_, and the lowest byte _%al_. _%ax_ is further
+divided up into _%al_ and _%ah_. _%al_ is the least-significant byte of
+_%ax_, and _%ah_ is the most significant byte.[^3-14] The registers
+added by x86-64 follow a simpler naming scheme: the parts of _%r8_ are
+_%r8d_ (four bytes), _%r8w_ (two bytes) and _%r8b_ (one byte).
 
-    Layout of the 32-bit registers.
-    |=======================================|
-    |-----------------%eax------------------| ===> 32-bit = 4-byte.
-    |-------------------|--------%ax--------| ===> 16-bit = 2-byte.
-    |-------------------|---%ah---|---%al---| ===>  8-bit = 1-byte.
-    |=======================================|
-    |-----------------%ebx------------------| ===> 32-bit = 4-byte.
-    |-------------------|--------%bx--------| ===> 16-bit = 2-byte.
-    |-------------------|---%bh---|---%bl---| ===>  8-bit = 1-byte.
-    |=======================================|
-    |-----------------%ecx------------------| ===> 32-bit = 4-byte.
-    |-------------------|--------%cx--------| ===> 16-bit = 2-byte.
-    |-------------------|---%ch---|---%cl---| ===>  8-bit = 1-byte.
-    |=======================================|
-    |-----------------%edx------------------| ===> 32-bit = 4-byte.
-    |-------------------|--------%dx--------| ===> 16-bit = 2-byte.
-    |-------------------|---%dh---|---%dl---| ===>  8-bit = 1-byte.
-    |=======================================|
+    Layout of the 64-bit registers.
+    |===============================================|
+    |---------------------%rax----------------------|  64-bit = 8 bytes
+    |-----------------------|---------%eax----------|  32-bit = 4 bytes
+    |-----------------------|-----------|----%ax----|  16-bit = 2 bytes
+    |-----------------------|-----------|-%ah-|-%al-|   8-bit = 1 byte
+    |===============================================|
+
+| 8 bytes          | 4 bytes            | 2 bytes            | 1 byte             |
+|------------------|--------------------|--------------------|--------------------|
+| _%rax_           | _%eax_             | _%ax_              | _%al_ (and _%ah_)  |
+| _%rbx_           | _%ebx_             | _%bx_              | _%bl_ (and _%bh_)  |
+| _%rcx_           | _%ecx_             | _%cx_              | _%cl_ (and _%ch_)  |
+| _%rdx_           | _%edx_             | _%dx_              | _%dl_ (and _%dh_)  |
+| _%rsi_           | _%esi_             | _%si_              | _%sil_             |
+| _%rdi_           | _%edi_             | _%di_              | _%dil_             |
+| _%rbp_           | _%ebp_             | _%bp_              | _%bpl_             |
+| _%rsp_           | _%esp_             | _%sp_              | _%spl_             |
+| _%r8_ to _%r15_  | _%r8d_ to _%r15d_  | _%r8w_ to _%r15w_  | _%r8b_ to _%r15b_  |
+
+Writing to a part of a register has one rule you must remember. Loading
+a value into a four-byte part, such as _%eax_, *clears* the upper four
+bytes of _%rax_. Loading a value into a one-byte or two-byte part, such
+as _%al_ or _%ax_, leaves the rest of the register as it was. So
+loading a value into _%al_ will corrupt any value that was formerly in
+_%rax_, but only partly, which is even more confusing. Basically, it\'s
+wise to only use a register for one size at a time.
 
 For a more comprehensive list of instructions, see
 [Appendix B. Common x86 Instructions](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions).
@@ -954,9 +1101,12 @@ Review {#review-1}
 
 -   What does the linker do?
 
+-   What does the line `.section .note.GNU-stack,"",@progbits` do, and
+    why do we write it in every program?
+
 -   How do you check the result status code of the last program you ran?
 
--   What is the difference between `movl $1, %eax` and `movl 1, %eax`?
+-   What is the difference between `movq $1, %rax` and `movq 1, %rax`?
 
 -   Which register holds the system call number?
 
@@ -964,13 +1114,17 @@ Review {#review-1}
 
 -   Why do indexes usually start at 0?
 
--   If I issued the command `movl data_items(,%edi,4), %eax` and
-    data_items was address 3634 and _%edi_ held the value 13, what address
-    would you be using to move into _%eax_?
+-   If I issued the command `movq (%rbx,%rcx,8), %rax`, _%rbx_ held the
+    address 3634 and _%rcx_ held the value 13, what address would you be
+    using to move into _%rax_?
+
+-   Why do we load the address of `data_items` with
+    `leaq data_items(%rip), %rbx` instead of writing the address of
+    `data_items` inside the instruction?
 
 -   List the general-purpose registers.
 
--   What is the difference between `movl` and `movb`?
+-   What is the difference between `movq`, `movl` and `movb`?
 
 -   What is flow control?
 
@@ -996,14 +1150,14 @@ Review {#review-1}
 -   Modify the `003-02-maximum` program to use a length count rather than the
     number 0 to know when to stop.
 
--   What would the instruction `movl _start, %eax` do? Be specific,
-    based on your knowledge of both addressing modes and the meaning of
-    `_start`. How would this differ from the instruction
-    `movl $_start, %eax`?
+-   What would the instruction `movq _start(%rip), %rax` do? Be
+    specific, based on your knowledge of both addressing modes and the
+    meaning of `_start`. How would this differ from the instruction
+    `leaq _start(%rip), %rax`?
 
 ### Going Further {#going-further-1}
 
--   Modify the first program to leave off the `int` instruction line.
+-   Modify the first program to leave off the `syscall` instruction line.
     Assemble, link, and execute the new program. What error message do
     you get. Why do you think this might be?
 
@@ -1029,40 +1183,43 @@ Review {#review-1}
     and what is straightforward comes mostly with experience.
 
 [^3-4]: Note that on x86 processors, even the general-purpose registers
-    have some special purposes, or used to before it went 32-bit.
-    However, these are general-purpose registers for most instructions.
-    Each of them has at least one instruction where it is used in a
-    special way. However, for most of them, those instructions aren\'t
-    covered in this book.
+    have some special purposes, inherited from the first processors of
+    the family. For example, some instructions always use _%rcx_ as a
+    counter, and multiplication and division use _%rax_ and _%rdx_.
+    However, these are general-purpose registers for most instructions,
+    and for most of them those special instructions aren\'t covered in
+    this book. _%rsp_ and _%rbp_ could also be used as general-purpose
+    registers, but they have special jobs with the stack, so we list
+    them separately.
 
 [^3-5]: You may be wondering, *why do all of these registers begin with
-    the letter `e`?* The reason is that early generations of x86
-    processors were 16 bits rather than 32 bits. Therefore, the
-    registers were only half the length they are now. In later
-    generations of x86 processors, the size of the registers doubled.
-    They kept the old names to refer to the first half of the register,
-    and added an `e` to refer to the extended versions of the register.
-    Usually you will only use the extended versions. Newer models also
-    offer a 64-bit mode, which doubles the size of these registers yet
-    again and uses an `r` prefix to indicate the larger registers (i.e.
-    _%rax_ is the 64-bit version of _%eax_). However, these processors are not
-    widely used, and are not covered in this book.
+    the letter `r`?* The reason is history. The first x86 processors
+    were 16 bits, and their registers were called _%ax_, _%bx_ and so
+    on. When the registers grew to 32 bits, the longer versions got an
+    `e` for *extended* (_%eax_), and when they grew again to 64 bits,
+    they got an `r` (_%rax_). The old names still work, and they refer
+    to the lower parts of the 64-bit registers, as we will see in
+    [Sizes of Data and Parts of Registers](#sizes-of-data-and-parts-of-registers).
+    The eight new registers that came with 64 bits were simply numbered:
+    _%r8_ to _%r15_.
 
-[^3-6]: You may be wondering why it\'s `0x80` instead of just `80`. The
-    reason is that the number is written in hexadecimal. In
-    hexadecimal, a single digit can hold 16 values instead of the normal
-    10. This is done by utilizing the letters `a` through `f` in
-    addition to the regular digits. `a` represents 10, `b` represents
-    11, and so on. 0x10 represents the number 16, and so on. This will
-    be discussed more in depth later, but just be aware that numbers
-    starting with `0x` are in hexadecimal. Tacking on an `H` at the end
-    is also sometimes used instead, but we won\'t do that in this book.
-    For more information about this, see
+[^3-6]: You may be wondering what `0x2029` means. The number is written
+    in hexadecimal. In hexadecimal, a single digit can hold 16 values
+    instead of the normal 10. This is done by utilizing the letters `a`
+    through `f` in addition to the regular digits. `a` represents 10,
+    `b` represents 11, and so on. 0x10 represents the number 16, and so
+    on. This will be discussed more in depth later, but just be aware
+    that numbers starting with `0x` are in hexadecimal. Tacking on an
+    `H` at the end is also sometimes used instead, but we won\'t do that
+    in this book. For more information about this, see
     [Chapter 10. Counting Like a Computer](10-counting-like-a-computer.qmd#chapter-10-counting-like-a-computer)
 
-[^3-7]: Actually, the interrupt transfers control to whoever set up an
-    *interrupt handler* for the interrupt number. In the case of Linux,
-    all of them are set to be handled by the Linux kernel.
+[^3-7]: You will find older programs that call the kernel with the
+    instruction `int $0x80` instead of `syscall`. That is how 32-bit
+    Linux programs make system calls, with different system call numbers
+    and different registers. It doesn\'t work correctly in 64-bit
+    programs, because it only passes the lower 32 bits of each
+    register, so don\'t use it.
 
 [^3-8]: If you don\'t watch Veggie Tales, you should. Start with Dave and
     the Giant Pickle.
@@ -1071,17 +1228,19 @@ Review {#review-1}
     language I\'ve seen) have commas embedded in them. So, always write
     numbers like `65535`, and never like `65,535`.
 
-[^3-10]: The instruction doesn\'t really use 4 for the size of the storage
+[^3-10]: The instruction doesn\'t really use 8 for the size of the storage
     locations, although looking at it that way works for our purposes
     now. It\'s actually what\'s called a *multiplier*.
-    basically, the way it works is that you start at the location
-    specified by `data_items`, then you add `%edi`\*4 storage locations,
+    basically, the way it works is that you start at the address in
+    `%rbx`, then you add `%rcx`\*8 storage locations,
     and retrieve the number there. Usually, you use the size of the
     numbers as your multiplier, but in some circumstances you\'ll want
     to do other things.
 
-[^3-11]: Also, the `l` in `movl` stands for *move long* since we are
-    moving a value that takes up four storage locations.
+[^3-11]: Also, the `q` in `movq` stands for *quadword*, since we are
+    moving a value that takes up eight storage locations. The name comes
+    from the first x86 processors, where a *word* was two bytes: a
+    quadword is four of those words.
 
 [^3-12]: Notice that the comparison is to see if the *second* value is
     greater than the first. I would have thought it the other way

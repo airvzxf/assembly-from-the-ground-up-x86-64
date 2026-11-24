@@ -1,5 +1,3 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
     # PURPOSE:
     #     Solution to Chapter 3, "Use the Concepts":
     #     find the maximum number of a set of data
@@ -7,35 +5,39 @@
     #     terminating number.
     #
     # VARIABLES:
-    #     %edi - Index of the data item being examined.
-    #     %ebx - Largest data item found.
-    #     %eax - Current data item.
+    #     %rbx - Address of the first data item.
+    #     %rcx - Index of the data item being examined.
+    #     %rdi - Largest data item found.
+    #     %rax - Current data item.
     #
+    .section .note.GNU-stack,"",@progbits
+
     .section .data
         data_length:         # Number of items.
-            .long 8
+            .quad 8
         data_items:
-            .long 3, 67, 34, 222, 45, 22, 11, 125
+            .quad 3, 67, 34, 222, 45, 22, 11, 125
 
     .section .text
         .globl _start
 
 _start:
-    movl $0, %edi            # Start at index 0.
-    movl data_items(,%edi,4), %ebx
+    leaq data_items(%rip), %rbx
+    movq $0, %rcx            # Start at index 0.
+    movq (%rbx,%rcx,8), %rdi
                              # The first item is the
                              # largest so far.
 
 _start_loop:
-    incl %edi                # Next index.
-    cmpl data_length, %edi   # index == length?
+    incq %rcx                # Next index.
+    cmpq data_length(%rip), %rcx  # index == length?
     je   _loop_exit
-    movl data_items(,%edi,4), %eax
-    cmpl %ebx, %eax
+    movq (%rbx,%rcx,8), %rax
+    cmpq %rdi, %rax
     jle  _start_loop
-    movl %eax, %ebx          # New largest value.
+    movq %rax, %rdi          # New largest value.
     jmp  _start_loop
 
 _loop_exit:
-    movl $1, %eax            # exit(); %ebx holds
-    int  $0x80               # the maximum.
+    movq $60, %rax           # exit(); %rdi holds
+    syscall                  # the maximum.

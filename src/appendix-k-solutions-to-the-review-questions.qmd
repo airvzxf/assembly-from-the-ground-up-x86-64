@@ -37,27 +37,32 @@ Chapter 2. Computer Architecture {#chapter-2.-computer-architecture}
     operands, which makes instructions larger.
 
 -   **How do you represent numbers larger than 255?** By using several
-    bytes together. On x86, four bytes form a word, which can hold
-    unsigned values up to 4294967295. Larger numbers use several words.
+    bytes together. On x86-64, eight bytes form a word, which can hold
+    unsigned values up to 18446744073709551615. Larger numbers use
+    several words.
 
 -   **How big are the registers on the machines we will be using?**
-    Four bytes (32 bits).
+    Eight bytes (64 bits).
 
 -   **How does a computer know how to interpret a given byte or set of
     bytes of memory?** It doesn\'t. Memory only holds numbers. Whether
     they are an instruction, a number, an address or a character depends
     entirely on how the program uses them. If the instruction pointer
-    points to them, they are executed as instructions.
+    points to them, they are executed as instructions (unless that
+    memory is marked as non-executable, in which case the program is
+    stopped).
 
 -   **What are the addressing modes and what are they used for?**
     Addressing modes are the ways an instruction can find its data:
     *immediate* (the value is inside the instruction), *register* (the
     value is in a register), *direct* (the instruction contains the
-    memory address), *indexed* (a base address plus an index register
-    multiplied by the element size, used for lists), *indirect* (a
-    register holds the address) and *base pointer* (a register holds an
-    address and the instruction adds a fixed offset, used for records
-    and for the stack).
+    memory address), *instruction-pointer-relative* (the instruction
+    contains the distance from the next instruction to the data, which
+    lets the program work at any address), *indexed* (a base address
+    plus an index register multiplied by the element size, used for
+    lists), *indirect* (a register holds the address) and *base pointer*
+    (a register holds an address and the instruction adds a fixed
+    offset, used for records and for the stack).
 
 -   **What does the instruction pointer do?** It holds the address of
     the next instruction to execute.
@@ -72,32 +77,38 @@ Chapter 2. Computer Architecture {#chapter-2.-computer-architecture}
 
     ```
     Offset  Size  Field
-    0       4     Employee ID
-    4       40    Name (padded with zeros)
-    44      4     Department number
-    48      4     Salary
-    52      4     Hire date (days since 1970-01-01)
-    56            Total size of the record
+    0       8     Employee ID
+    8       40    Name (padded with zeros)
+    48      8     Department number
+    56      8     Salary
+    64      8     Hire date (days since 1970-01-01)
+    72            Total size of the record
     ```
 
 -   **If I had the pointer to the beginning of the employee record
     above, and wanted to access a particular piece of data inside of it,
     what addressing mode would I use?** Base pointer addressing: the
     register holds the address of the record and the instruction adds the
-    offset of the field. For example, `movl 48(%ebx), %eax` loads the
+    offset of the field. For example, `movq 56(%rbx), %rax` loads the
     salary.
 
 -   **Base pointer addressing, register 3122, offset 20:**
     3122 + 20 = **3142**.
 
--   **Indexed addressing, base 6512, index 5, multiplier 4:**
-    6512 + 5 × 4 = **6532**.
+-   **Indexed addressing, base 6512, index 5, multiplier 8:**
+    6512 + 5 × 8 = **6552**.
 
--   **Indexed addressing, base 123472, index 0, multiplier 4:**
-    123472 + 0 × 4 = **123472**.
+-   **Indexed addressing, base 123472, index 0, multiplier 8:**
+    123472 + 0 × 8 = **123472**.
 
 -   **Indexed addressing, base 9123478, index 20, multiplier 1:**
     9123478 + 20 × 1 = **9123498**.
+
+-   **Instruction-pointer-relative addressing, next instruction at
+    4198407, offset 8233:** 4198407 + 8233 = **4206640**. In
+    hexadecimal these numbers are `0x401007`, `0x2029` and `0x403030`:
+    they are the numbers `objdump` shows for the first instruction of
+    `003-02-maximum` in Chapter 3.
 
 ### Going Further {#going-further-11}
 
@@ -113,7 +124,9 @@ Chapter 2. Computer Architecture {#chapter-2.-computer-architecture}
     Because they make programs shorter and faster. Indexed addressing,
     for example, does in one instruction what would otherwise take a
     multiplication, an addition and a load, and it doesn\'t use an extra
-    register to hold the computed address.
+    register to hold the computed address. Instruction-pointer-relative
+    addressing lets a program find its data at any address without
+    any extra instruction.
 
 -   **How does pipelining affect the fetch-execute cycle?** With
     pipelining, the CPU doesn\'t wait for one instruction to finish
@@ -130,7 +143,7 @@ Chapter 2. Computer Architecture {#chapter-2.-computer-architecture}
     instructions.** Fixed-length instructions (for example 4 bytes in
     most ARM and RISC-V code) are easy and fast to decode, and several
     can be decoded in parallel, but simple instructions waste space.
-    Variable-length instructions (1 to 15 bytes on x86) make programs
+    Variable-length instructions (1 to 15 bytes on x86-64) make programs
     smaller and leave room to add new instructions over time, but the
     decoder is much more complex, because the CPU doesn\'t know where
     the next instruction starts until it has decoded the current one.
@@ -155,16 +168,24 @@ Chapter 3. Your First Programs {#chapter-3.-your-first-programs}
     the final memory addresses, and writes an executable file that the
     operating system can load.
 
+-   **What does the line `.section .note.GNU-stack,"",@progbits` do,
+    and why do we write it in every program?** It creates an empty
+    section that tells the linker that the program doesn\'t need to run
+    code stored in its stack, so the stack stays non-executable and
+    bytes written there by an attacker can\'t be run as code. Without
+    it, `ld` assumes the program might need an executable stack, marks
+    the whole program that way and warns about it.
+
 -   **How do you check the result status code of the last program you
     ran?** With `echo $?`.
 
--   **What is the difference between `movl $1, %eax` and
-    `movl 1, %eax`?** The first uses immediate addressing and loads the
-    number 1 into _%eax_. The second uses direct addressing and loads
-    the four bytes stored at memory address 1. That address isn\'t
+-   **What is the difference between `movq $1, %rax` and
+    `movq 1, %rax`?** The first uses immediate addressing and loads the
+    number 1 into _%rax_. The second uses direct addressing and loads
+    the eight bytes stored at memory address 1. That address isn\'t
     mapped, so the program would crash with a segmentation fault.
 
--   **Which register holds the system call number?** _%eax_.
+-   **Which register holds the system call number?** _%rax_.
 
 -   **What are indexes used for?** To select one element of a list by
     its position, counting from the start of the list.
@@ -174,23 +195,39 @@ Chapter 3. Your First Programs {#chapter-3.-your-first-programs}
     elements away from the start, so its address is the base address
     plus 0 × the size of an element.
 
--   **If I issued the command `movl data_items(,%edi,4), %eax` and
-    data_items was address 3634 and _%edi_ held the value 13, what
-    address would you be using to move into _%eax_?**
-    3634 + 13 × 4 = **3686**.
+-   **If I issued the command `movq (%rbx,%rcx,8), %rax`, _%rbx_ held
+    the address 3634 and _%rcx_ held the value 13, what address would
+    you be using to move into _%rax_?** 3634 + 13 × 8 = **3738**.
 
--   **List the general-purpose registers.** _%eax_, _%ebx_, _%ecx_,
-    _%edx_, _%edi_ and _%esi_.
+-   **Why do we load the address of `data_items` with
+    `leaq data_items(%rip), %rbx` instead of writing the address of
+    `data_items` inside the instruction?** Because the program may be
+    loaded at a different address every time it runs (PIE and ASLR).
+    The distance from the instruction to `data_items` never changes, so
+    an instruction that stores that distance works wherever the program
+    is loaded. An address written inside the instruction only fits in
+    32 bits and only works if the program is always loaded at the same
+    low address; the linker refuses it in position-independent
+    programs and shared libraries.
 
--   **What is the difference between `movl` and `movb`?** `movl` moves a
-    long, which is four bytes (a word); `movb` moves a single byte.
+-   **List the general-purpose registers.** _%rax_, _%rbx_, _%rcx_,
+    _%rdx_, _%rsi_, _%rdi_ and _%r8_ to _%r15_. (_%rbp_ and _%rsp_ can
+    also be used as general-purpose registers, but they have special
+    jobs with the stack.)
+
+-   **What is the difference between `movq`, `movl` and `movb`?**
+    `movq` moves a quadword (eight bytes, a full register), `movl`
+    moves a long (four bytes) and `movb` moves a single byte. When the
+    destination is a register, `movl` also clears the upper four bytes
+    of the 64-bit register, while `movb` leaves the other seven bytes as
+    they were.
 
 -   **What is flow control?** Deciding which instruction runs next.
     Instead of always running the next instruction in memory, a program
     uses jumps to repeat code (loops) or to skip code (conditions).
 
 -   **What does a conditional jump do?** It looks at the result of a
-    previous comparison, stored in the _%eflags_ register. If the
+    previous comparison, stored in the _%rflags_ register. If the
     condition is true, it jumps to the given label; otherwise the program
     continues with the next instruction.
 
@@ -204,40 +241,46 @@ Chapter 3. Your First Programs {#chapter-3.-your-first-programs}
     being used for each operand.** In `003-01-exit`:
 
     ```
-    movl $1, %eax     immediate, register
-    movl $0, %ebx     immediate, register
-    int  $0x80        immediate
+    movq $60, %rax    immediate, register
+    movq $0, %rdi     immediate, register
+    syscall           (no operands)
     ```
 
     In `003-02-maximum`:
 
     ```
-    movl $0, %edi                   immediate, register
-    movl data_items(,%edi,4), %eax  indexed, register
-    movl %eax, %ebx                 register, register
-    cmpl $0, %eax                   immediate, register
-    je   _loop_exit                 jump target (label)
-    incl %edi                       register
-    movl data_items(,%edi,4), %eax  indexed, register
-    cmpl %ebx, %eax                 register, register
-    jle  _start_loop                jump target (label)
-    movl %eax, %ebx                 register, register
-    jmp  _start_loop                jump target (label)
-    movl $1, %eax                   immediate, register
-    int  $0x80                      immediate
+    leaq data_items(%rip), %rbx  instruction-pointer-relative
+                                 (the address, not the value),
+                                 register
+    movq $0, %rcx                immediate, register
+    movq (%rbx,%rcx,8), %rax     indexed, register
+    movq %rax, %rdi              register, register
+    cmpq $0, %rax                immediate, register
+    je   _loop_exit              jump target (label)
+    incq %rcx                    register
+    movq (%rbx,%rcx,8), %rax     indexed, register
+    cmpq %rdi, %rax              register, register
+    jle  _start_loop             jump target (label)
+    movq %rax, %rdi              register, register
+    jmp  _start_loop             jump target (label)
+    movq $60, %rax               immediate, register
+    syscall                      (no operands)
     ```
+
+    The jump targets are also stored as distances from the instruction
+    pointer, just like `data_items(%rip)`.
 
 ### Use the Concepts {#use-the-concepts-12}
 
 **Modify the first program to return the value 3.** Only the status code
-in _%ebx_ changes:
+in _%rdi_ changes:
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-03-01-exit-3.s}
 ```
 
 ```bash
-as -o 0AK-03-01-exit-3.o --32 0AK-03-01-exit-3.s
-ld -o 0AK-03-01-exit-3 -m elf_i386 0AK-03-01-exit-3.o
+as -g -o 0AK-03-01-exit-3.o 0AK-03-01-exit-3.s
+ld -o 0AK-03-01-exit-3 0AK-03-01-exit-3.o
 ./0AK-03-01-exit-3
 echo $?
 ```
@@ -269,7 +312,8 @@ It returns `125`.
 **Modify the `003-02-maximum` program to use an ending address rather
 than the number 0 to know when to stop.** The label `data_end` marks the
 first address after the list. The program walks the list with a pointer
-in _%ecx_ (indirect addressing) and stops when it reaches `data_end`:
+in _%rcx_ (indirect addressing) and stops when it reaches the address of
+`data_end`, which it keeps in _%rdx_:
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-03-04-maximum-end-address.s}
 ```
@@ -278,44 +322,55 @@ It returns `222`.
 
 **Modify the `003-02-maximum` program to use a length count rather than
 the number 0 to know when to stop.** The number of items is stored in
-`data_length`, and the loop stops when the index reaches it:
+`data_length`, and the loop stops when the index reaches it. The
+comparison reads `data_length` directly from memory, relative to
+_%rip_:
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-03-05-maximum-length.s}
 ```
 
 It returns `222`.
 
-**What would the instruction `movl _start, %eax` do? How would this
-differ from `movl $_start, %eax`?** `movl _start, %eax` uses direct
-addressing: it loads the four bytes stored *at* the address `_start`,
-which are the machine code of the first instruction. In
-`003-02-maximum`, the first instruction `movl $0, %edi` is encoded as the
-bytes `bf 00 00 00 00`, so _%eax_ would get `0x000000bf` (191).
-`movl $_start, %eax` uses immediate addressing: it loads the address
-`_start` itself, which is `0x08049000` in that program.
+**What would the instruction `movq _start(%rip), %rax` do? How would
+this differ from `leaq _start(%rip), %rax`?** `movq _start(%rip), %rax`
+reads memory: it loads the eight bytes stored *at* the address `_start`,
+which are the machine code of the first instructions. In
+`003-02-maximum`, the program starts with the bytes
+`48 8d 1d 29 20 00 00` (`leaq data_items(%rip), %rbx`) and `48 c7 ...`
+(the next instruction). x86-64 stores the first byte in the lowest part
+of the register, so _%rax_ would get `0x48000020291d8d48`. You can check
+it in gdb with `x/gx _start`. `leaq _start(%rip), %rax` doesn\'t read
+memory: it loads the address `_start` itself, which is `0x401000` in
+that program when it is linked with `ld` as in Chapter 3.
 
 ### Going Further {#going-further-12}
 
-**Modify the first program to leave off the `int` instruction line.
+**Modify the first program to leave off the `syscall` instruction line.
 What error message do you get? Why?**
 
-```{.gnuassembler .numberLines include=resource/asm/0AK-03-06-exit-without-int.s}
+```{.gnuassembler .numberLines include=resource/asm/0AK-03-06-exit-without-syscall.s}
 ```
 
 ```bash
-as -o 0AK-03-06-exit-without-int.o --32 0AK-03-06-exit-without-int.s
-ld -o 0AK-03-06-exit-without-int -m elf_i386 0AK-03-06-exit-without-int.o
-./0AK-03-06-exit-without-int
+as -g -o 0AK-03-06-exit-without-syscall.o \
+  0AK-03-06-exit-without-syscall.s
+ld -o 0AK-03-06-exit-without-syscall \
+  0AK-03-06-exit-without-syscall.o
+./0AK-03-06-exit-without-syscall
 echo $?
 ```
 
 The shell prints `Segmentation fault (core dumped)` and `echo $?` prints
 `139` (128 + 11, where 11 is the number of the `SIGSEGV` signal).
-Without `int $0x80`, the kernel is never asked to end the program. The
+Without `syscall`, the kernel is never asked to end the program. The
 CPU doesn\'t know that the program is over, so it keeps executing
-whatever bytes come after the last instruction. Those bytes are not
-valid code for this program, and sooner or later one of them accesses
-memory the program isn\'t allowed to touch, so the kernel stops it.
+whatever bytes come after the last instruction. After the code, the
+memory is filled with zeros, and the bytes `00 00` are the instruction
+`add %al,(%rax)`: \"add _%al_ to the memory at the address in _%rax_\".
+_%rax_ still holds 60, and address 60 isn\'t mapped, so the kernel
+stops the program. You can see it in gdb: after `run`, `x/i $pc` shows
+that instruction and `p $_siginfo._sifields._sigfault.si_addr` shows
+the address `0x3c`, which is 60.
 
 **Which approach to finding the end of the list is best? Which would you
 use if you knew that the list was sorted?** It depends on the data:
@@ -327,12 +382,13 @@ use if you knew that the list was sorted?** It depends on the data:
 -   An ending address or a length count allow any value in the list, and
     they make an empty list easy to detect. A length count is the
     easiest to work with, because it also tells you how many items there
-    are without reading them.
+    are without reading them. This is also what current languages do:
+    a Rust slice or a Python list always carries its length.
 
 -   If the list is sorted, you don\'t need a loop at all. In ascending
     order, the maximum is the last item and the minimum is the first.
     With a length count (or an ending address) you can jump straight to
-    the last item: `data_items + (length - 1) × 4`. With a terminating
+    the last item: `data_items + (length - 1) × 8`. With a terminating
     number you would still have to walk the whole list to find the end.
 
 Chapter 4. All About Functions {#chapter-4.-all-about-functions}

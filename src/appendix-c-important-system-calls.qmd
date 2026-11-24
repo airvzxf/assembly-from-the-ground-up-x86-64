@@ -4,123 +4,158 @@ These are some of the more important system calls to use when dealing
 with Linux. For most cases, however, it is best to use library functions
 rather than direct system calls, because the system calls were designed
 to be minimalistic while the library functions were designed to be easy
-to program with. For information about the [GNU C Library][AC-GNU-C].
+to program with. Most programs on Linux, whatever the language they are
+written in, reach the system calls through the
+[GNU C Library][AC-GNU-C] or through the standard library of their
+language.
 
-Remember that _%eax_ holds the system call numbers, and that the
-return values and error codes are also stored in _%eax_.
+To make a system call on x86-64 Linux:
+
+-   Put the system call number in _%rax_.
+
+-   Put the parameters, in order, in _%rdi_, _%rsi_, _%rdx_, _%r10_,
+    _%r8_ and _%r9_. No system call takes more than six.
+
+-   Run the `syscall` instruction.
+
+-   The result comes back in _%rax_. A value between -4095 and -1 means
+    an error: it is the negative of the error number (for example, -2
+    is `ENOENT`, \"no such file or directory\").
+
+The `syscall` instruction overwrites _%rcx_ and _%r11_. All of the
+other registers, except _%rax_, keep their values.
 
 Table C-1. Important Linux System Calls.
 
-**System Call**: _%eax_.
+**System Call**: _%rax_.
 
 ---
 
-**exit**: _1_.
+**read**: _0_.
 
-> - **%ebx**: Return value (int).
-  - Exits the program.
+> - **%rdi**: File descriptor.
+  - **%rsi**: Buffer start.
+  - **%rdx**: Buffer size.
+  - Reads into the given buffer. Returns the number of bytes read, 0
+    at the end of the file, or an error number.
 
-**read**: _3_.
+**write**: _1_.
 
-> - **%ebx**: File descriptor.
-  - **%ecx**: Buffer start.
-  - **%edx**: Buffer size (int).
-  - Reads into the given buffer.
+> - **%rdi**: File descriptor.
+  - **%rsi**: Buffer start.
+  - **%rdx**: Buffer size.
+  - Writes the buffer to the file descriptor. Returns the number of
+    bytes written or an error number.
 
-**write**: _4_.
+**close**: _3_.
 
-> - **%ebx**: File descriptor.
-  - **%ecx**: Buffer start.
-  - **%edx**: Buffer size (int).
-  - Writes the buffer to the file descriptor.
+> - **%rdi**: File descriptor.
+  - Closes the given file descriptor.
 
-**open**: _5_.
+**lseek**: _8_.
 
-> - **%ebx**: Null-terminated file name.
-  - **%ecx**: Option list.
-  - **%edx**: Permission mode.
-  - Opens the given file. Returns the file descriptor or an error number.
-
-**close**: _6_.
-
-> - **%ebx**: File descriptor.
-  - Closes the give file descriptor.
-
-**chdir**: _12_.
-
-> - **%ebx**: Null-terminated directory name.
-  - Changes the current directory of your program.
-
-**lseek**: _19_.
-
-> - **%ebx**: File descriptor.
-  - **%ecx**: Offset.
-  - **%edx**: Mode.
+> - **%rdi**: File descriptor.
+  - **%rsi**: Offset.
+  - **%rdx**: Mode.
   - Repositions where you are in the given file. The mode (called the
-    "whence") should be 0 for absolute positioning, and 1 for relative
-    positioning.
+    "whence") should be 0 for absolute positioning, 1 for relative
+    positioning and 2 for positioning relative to the end of the file.
 
-**getpid**: _20_.
+**mmap**: _9_.
 
-> - Returns the process ID of the current process.
+> - **%rdi**: Suggested address (usually 0, to let the kernel choose).
+  - **%rsi**: Length in bytes.
+  - **%rdx**: Protection (for example 3 for reading and writing).
+  - **%r10**: Flags (for example 0x22 for private memory not backed
+    by a file).
+  - **%r8**: File descriptor (-1 if there is no file).
+  - **%r9**: Offset in the file.
+  - Maps a region of memory into the program and returns its address.
 
-**mkdir**: _39_.
+**brk**: _12_.
 
-> - **%ebx**: Null-terminated directory name.
-  - **%ecx**: Permission mode.
-  - Creates the given directory. Assumes all directories leading up to it
-    already exist.
+> - **%rdi**: New system break.
+  - Sets the system break, i.e. the end of the data section of the
+    program. Returns the new system break. If the parameter is 0, it
+    simply returns the current system break.
 
-**rmdir**: _40_.
+**ioctl**: _16_.
 
-> - **%ebx**: Null-terminated directory name.
-  - Removes the given directory.
-
-**dup**: _41_.
-
-> - **%ebx**: File descriptor.
-  - Returns a new file descriptor that works just like the existing file
-    descriptor.
-
-**pipe**: _42_.
-
-> - **%ebx**: Pipe array.
-  - Creates two file descriptors, where writing on one produces data to
-    read on the other and vice-versa. %ebx is a pointer to two words of
-    storage to hold the file descriptors.
-
-**brk**: _45_.
-
-> - **%ebx**: New system break.
-  - Sets the system break If the system break is 0, it simply returns the
-    current system break. I.E. - The end of the data section.
-
-**ioctl**: _54_.
-
-> - **%ebx**: File descriptor.
-  - **%ecx**: Request.
-  - **%edx**: Arguments.
+> - **%rdi**: File descriptor.
+  - **%rsi**: Request.
+  - **%rdx**: Arguments.
   - This is used to set parameters on device files. Its actual usage
     varies based on the type of file or device your descriptor references.
 
+**pipe**: _22_.
+
+> - **%rdi**: Pipe array.
+  - Creates two file descriptors, where writing on one produces data to
+    read on the other. _%rdi_ is a pointer to two longs (four bytes
+    each) of storage to hold the file descriptors.
+
+**dup**: _32_.
+
+> - **%rdi**: File descriptor.
+  - Returns a new file descriptor that works just like the existing file
+    descriptor.
+
+**getpid**: _39_.
+
+> - Returns the process ID of the current process.
+
+**exit**: _60_.
+
+> - **%rdi**: Return value. Only the lowest byte (0 to 255) reaches
+    the shell.
+  - Exits the program. (A program with several threads uses
+    **exit_group**, number 231, to end all of them.)
+
+**chdir**: _80_.
+
+> - **%rdi**: Null-terminated directory name.
+  - Changes the current directory of your program.
+
+**mkdir**: _83_.
+
+> - **%rdi**: Null-terminated directory name.
+  - **%rsi**: Permission mode.
+  - Creates the given directory. Assumes all directories leading up to it
+    already exist.
+
+**rmdir**: _84_.
+
+> - **%rdi**: Null-terminated directory name.
+  - Removes the given directory.
+
+**openat**: _257_.
+
+> - **%rdi**: Directory file descriptor. -100 (`AT_FDCWD`) means the
+    current directory.
+  - **%rsi**: Null-terminated file name.
+  - **%rdx**: Option list.
+  - **%r10**: Permission mode.
+  - Opens the given file. Returns the file descriptor or an error
+    number. If the file name starts with `/`, the directory is ignored.
+    The older system call **open** (number 2) does the same without the
+    directory parameter; current libraries use `openat`.
+
 ---
 
-A more complete listing of system calls is in this web site
-[Call convention by architecture][AC-Call-convention],
-along with additional information is available at
-[System Calls for Assembly Level Access][AC-Syscalls]
-You can also get more information about a system call by typing in
-`man 2 syscalls` which will return you the information about the
-system call from section 2 of the UNIX manual. However, this
-refers to the usage of the system call from the C programming language,
-and may or may not be directly helpful.
-
-For information on how system calls are implemented on
-Linux, see the [Linux Kernel 2.4 Internals section on how system calls
-are implemented][AC-Linux-kernel].
+The complete list of system calls for x86-64, with their numbers, is in
+the Linux source code, in the file
+[arch/x86/entry/syscalls/syscall_64.tbl][AC-Syscall-table]. On your own
+computer, the numbers are in `/usr/include/asm/unistd_64.h`. The
+[syscall.sh][AC-Call-convention] web site shows the numbers and the
+registers for each architecture. You can also get more information about
+a system call by typing in `man 2 openat` (or the name of another
+system call), which will return you the information about the system
+call from section 2 of the UNIX manual. The manual describes the library
+function with the same name, but its parameters are the same as the
+system call\'s, in the same order. `man 2 syscall` lists the registers
+used to make system calls on each architecture.
 
 
 [AC-GNU-C]: https://www.gnu.org/software/libc/manual/
 [AC-Call-convention]: https://syscall.sh/
-[AC-Syscalls]: http://www.lxhp.in-berlin.de/lhpsyscal.html
-[AC-Linux-kernel]: http://www.faqs.org/docs/kernel_2_4/lki-2.html#ss2.11
+[AC-Syscall-table]: https://github.com/torvalds/linux/blob/master/arch/x86/entry/syscalls/syscall_64.tbl

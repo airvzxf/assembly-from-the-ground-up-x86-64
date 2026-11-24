@@ -31,7 +31,7 @@ rm -f ./*.so .gdb_history heynow.txt
 # stack) stops the build.
 
 # Sources allowed to use absolute addresses (non-PIE examples).
-ABSOLUTE_OK=()
+ABSOLUTE_OK=(003-03-maximum-absolute)
 
 fail_build() {
   echo "error: $*" >&2
@@ -102,6 +102,18 @@ link64_shared() {
 # The 64-bit programs are added here, chapter by chapter, as they replace
 # the 32-bit programs below.
 
+# ----- Chapter 3 -----
+assemble64 003-01-exit 003-02-maximum 003-03-maximum-absolute
+link64 003-01-exit 003-01-exit.o
+link64 003-02-maximum 003-02-maximum.o
+link64 003-03-maximum-absolute 003-03-maximum-absolute.o
+
+# ----- Appendix K, Chapter 3 -----
+for SOURCE in 0AK-03-*.s; do
+  assemble64 "${SOURCE%.s}"
+  link64 "${SOURCE%.s}" "${SOURCE%.s}.o"
+done
+
 echo ""
 
 # =====================================================
@@ -114,8 +126,6 @@ echo ""
 # -----------------------------------------------------
 
 FILES=(
-  003-01-exit
-  003-02-maximum
   004-01-power
   004-02-factorial
   005-01-toupper
@@ -153,8 +163,6 @@ echo ""
 # -----------------------------------------------------
 
 GENERIC_FILES=(
-  003-01-exit
-  003-02-maximum
   004-01-power
   004-02-factorial
   005-01-toupper
@@ -255,6 +263,7 @@ gcc -o "011-01-hello-world-c-bin" "011-01-hello-world.c"
 
 for SOURCE in 0AK-*.s
 do
+    [[ "${SOURCE}" == 0AK-03-* ]] && continue  # 64-bit.
     echo "Assembling: ${SOURCE%.s}"
     as -o "${SOURCE%.s}.o" "${SOURCE}" --32 --gstabs+
 done
@@ -270,7 +279,7 @@ link_solution() {
 LIBC=(--library c --library-path /usr/lib32/
       -dynamic-linker /usr/lib32/ld-linux.so.2)
 
-for SOURCE in 0AK-03-*.s 0AK-04-*.s 0AK-05-03-*.s
+for SOURCE in 0AK-04-*.s 0AK-05-03-*.s
 do
     link_solution "${SOURCE%.s}"
 done
