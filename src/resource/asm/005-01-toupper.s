@@ -1,5 +1,3 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
     # PURPOSE:
     #     This program converts an input file to an
     #     output file with all letters converted to
@@ -17,26 +15,32 @@
     #           to uppercase.
     #        c) Write the memory buffer to output file.
     #
+    .section .note.GNU-stack,"",@progbits
+
     .section .data
         # ----- CONSTANTS ----- #
         #
         # System call numbers.
         #
-        .equ SYS_OPEN,   5
-        .equ SYS_WRITE,  4
-        .equ SYS_READ,   3
-        .equ SYS_CLOSE,  6
-        .equ SYS_EXIT,   1
+        .equ SYS_READ,     0
+        .equ SYS_WRITE,    1
+        .equ SYS_CLOSE,    3
+        .equ SYS_EXIT,     60
+        .equ SYS_OPENAT,   257
+
+        # Directory for openat: the current one.
+        #
+        .equ AT_FDCWD,     -100
 
         # Options for open:
-        # Look at /usr/include/asm-generic/fcntl.h or
-        # /usr/include/asm/fcntl.h for various values.
-        # You can combine them by adding them or ORing
-        # them). It is discussed at greater length in
-        # "Counting Like a Computer".
+        # Look at /usr/include/asm-generic/fcntl.h
+        # for various values. You can combine them
+        # by adding them or ORing them. It is
+        # discussed at greater length in "Counting
+        # Like a Computer".
         #
         .equ O_RDONLY,              0
-        .equ O_CREAT_WRONLY_TRUNC,  03101
+        .equ O_CREAT_WRONLY_TRUNC,  01101
 
         # Standard file descriptors.
         #
@@ -44,15 +48,11 @@
         .equ STDOUT,  1
         .equ STDERR,  2
 
-        # System call interrupt.
-        #
-        .equ LINUX_SYSCALL,     0x80
                             # This is the return value
                             # of read which means we
                             # have hit the end of the
                             # file.
         .equ END_OF_FILE,       0
-
 
         .equ NUMBER_ARGUMENTS,  2
 
@@ -60,8 +60,7 @@
         # Buffer:
         #     This is where the data is loaded into
         #     from the data file and written from into
-        #     the output file.  This should never
-        #     exceed 16,000 for various reasons.
+        #     the output file.
         #
         .equ   BUFFER_SIZE,     500
         .lcomm BUFFER_DATA,     BUFFER_SIZE
@@ -71,129 +70,134 @@
 
         # ----- STACK POSITIONS ----- #
         #
-        .equ ST_SIZE_RESERVE,   8
-        .equ ST_FD_IN,         -4
-        .equ ST_FD_OUT,        -8
+        .equ ST_SIZE_RESERVE,   16
+        .equ ST_FD_IN,         -8
+        .equ ST_FD_OUT,        -16
         .equ ST_ARGC,           0  # Number of args
-        .equ ST_ARGV_0,         4  # Name of program.
-        .equ ST_ARGV_1,         8  # Input file name.
-        .equ ST_ARGV_2,         12 # Output file name.
+        .equ ST_ARGV_0,         8  # Name of program.
+        .equ ST_ARGV_1,         16 # Input file name.
+        .equ ST_ARGV_2,         24 # Output file name.
 
 _start:
     # ----- INITIALIZE PROGRAM ----- #
     #
-    movl  %esp, %ebp        # Save the stack pointer.
+    movq  %rsp, %rbp        # Save the stack pointer.
                             # Allocate space for our
                             # file descriptors on the
                             # stack.
-    subl  $ST_SIZE_RESERVE, %esp
+    subq  $ST_SIZE_RESERVE, %rsp
 
-__open_files:
+open_files:
 
-__open_fd_in:
+open_fd_in:
     # ----- OPEN INPUT FILE ----- #
     #
-    movl  $SYS_OPEN, %eax   # Open syscall.
-    movl  ST_ARGV_1(%ebp), %ebx     # Input filename
-                                    # into %ebx.
-    movl  $O_RDONLY, %ecx   # Read-only flag.
-    movl  $0666, %edx       # This does not matter for
+    movq  $SYS_OPENAT, %rax # Open syscall.
+    movq  $AT_FDCWD, %rdi   # Relative to the
+                            # current directory.
+    movq  ST_ARGV_1(%rbp), %rsi     # Input filename
+                                    # into %rsi.
+    movq  $O_RDONLY, %rdx   # Read-only flag.
+    movq  $0666, %r10       # This does not matter for
                             # reading.
-    int   $LINUX_SYSCALL    # Call Linux.
+    syscall                 # Call Linux.
 
-__store_fd_in:
-    # ----- STORE INPUT FILE DESCRIPTION ----- #
+store_fd_in:
+    # ----- STORE INPUT FILE DESCRIPTOR ----- #
     #
-    movl  %eax, ST_FD_IN(%ebp)      # Save the given
+    movq  %rax, ST_FD_IN(%rbp)      # Save the given
                                     # file descriptor.
 
-__open_fd_out:
+open_fd_out:
     # ----- OPEN OUTPUT FILE ----- #
     #
-    movl  $SYS_OPEN, %eax   # Open the file.
-                            # Output filename into %ebx
-    movl  ST_ARGV_2(%ebp), %ebx
+    movq  $SYS_OPENAT, %rax # Open the file.
+    movq  $AT_FDCWD, %rdi
+                            # Output filename into %rsi
+    movq  ST_ARGV_2(%rbp), %rsi
                             # Flags for writing to the
                             # file.
-    movl  $O_CREAT_WRONLY_TRUNC, %ecx
-    movl  $0666, %edx       # Permission set for new
+    movq  $O_CREAT_WRONLY_TRUNC, %rdx
+    movq  $0666, %r10       # Permission set for new
                             # file (if it is created).
-    int   $LINUX_SYSCALL    # Call Linux.
+    syscall                 # Call Linux.
 
-__store_fd_out:
-    # ----- STORE OUTPUT FILE DESCRIPTION ----- #
+store_fd_out:
+    # ----- STORE OUTPUT FILE DESCRIPTOR ----- #
     #
                             # Store the file descriptor
                             # here.
-    movl  %eax, ST_FD_OUT(%ebp)
+    movq  %rax, ST_FD_OUT(%rbp)
 
     # ----- BEGIN MAIN LOOP ----- #
     #
-_read_loop_begin:
+read_loop_begin:
     # ----- READ IN A BLOCK FROM THE INPUT FILE ----- #
     #
-    movl  $SYS_READ, %eax
+    movq  $SYS_READ, %rax
                             # Get the input file
                             # descriptor.
-    movl  ST_FD_IN(%ebp), %ebx
+    movq  ST_FD_IN(%rbp), %rdi
                             # The location to read into
-    movl  $BUFFER_DATA, %ecx
+    leaq  BUFFER_DATA(%rip), %rsi
                             # The size of the buffer.
-    movl  $BUFFER_SIZE, %edx
-    int   $LINUX_SYSCALL    # Size of buffer read is
-                            # returned in %eax.
+    movq  $BUFFER_SIZE, %rdx
+    syscall                 # Size of buffer read is
+                            # returned in %rax.
 
     # ----- EXIT IF WE HAVE REACHED THE END ----- #
     #
                             # Check for end of file
                             # marker.
-    cmpl  $END_OF_FILE, %eax
-    jle   _lower_case       # If found or on error, go
+    cmpq  $END_OF_FILE, %rax
+    jle   end_loop          # If found or on error, go
                             # to the end.
 
-__continue_read_loop:
+continue_read_loop:
     # ----- CONVERT THE BLOCK TO UPPER CASE ----- #
     #
-    pushl $BUFFER_DATA      # Location of buffer.
-    pushl %eax              # Size of the buffer.
-    call  _convert_to_upper
-    popl  %eax              # Get the size back.
-    addl  $4, %esp          # Restore %esp.
+    movq  %rax, %rbx        # Keep the size in %rbx:
+                            # the function must not
+                            # change it.
+    leaq  BUFFER_DATA(%rip), %rdi  # Location of the
+                                   # buffer.
+    movq  %rbx, %rsi        # Size of the buffer.
+    call  convert_to_upper
 
     # --- WRITE THE BLOCK OUT TO THE OUTPUT FILE --- #
     #
-    movl  %eax, %edx        # Size of the buffer.
-    movl  $SYS_WRITE, %eax
+    movq  $SYS_WRITE, %rax
                             # File to use.
-    movl  ST_FD_OUT(%ebp), %ebx
+    movq  ST_FD_OUT(%rbp), %rdi
                             # Location of the buffer.
-    movl  $BUFFER_DATA, %ecx
-    int   $LINUX_SYSCALL
+    leaq  BUFFER_DATA(%rip), %rsi
+    movq  %rbx, %rdx        # Size of the buffer.
+    syscall
 
     # ----- CONTINUE THE LOOP ----- #
     #
-    jmp   _read_loop_begin
+    jmp   read_loop_begin
 
-_lower_case:
+end_loop:
     # ----- CLOSE THE FILES ----- #
     # NOTE:
     #     We do not need to do error checking on
     #     these, because error conditions do not
     #     signify anything special here.
     #
-    movl  $SYS_CLOSE, %eax
-    movl  ST_FD_OUT(%ebp), %ebx
-    int   $LINUX_SYSCALL
+    movq  $SYS_CLOSE, %rax
+    movq  ST_FD_OUT(%rbp), %rdi
+    syscall
 
-    movl  $SYS_CLOSE, %eax
-    movl  ST_FD_IN(%ebp), %ebx
-    int   $LINUX_SYSCALL
+    movq  $SYS_CLOSE, %rax
+    movq  ST_FD_IN(%rbp), %rdi
+    syscall
 
     # ----- EXIT ----- #
     #
-    movl  $SYS_EXIT, %eax
-    movl  $0, %ebx
-    int   $LINUX_SYSCALL
+    movq  $SYS_EXIT, %rax
+    movq  $0, %rdi
+    syscall
 
 
     # PURPOSE:
@@ -201,22 +205,20 @@ _lower_case:
     #     conversion to upper case for a block.
     #
     # INPUT:
-    #     The first parameter is the length of
-    #     the block of memory to convert.
-    #
-    #     The second parameter is the starting
-    #     address of that block of memory.
+    #     %rdi - The starting address of the block
+    #            of memory to convert.
+    #     %rsi - The length of that block.
     #
     # OUTPUT:
     #     This function overwrites the current
     #     buffer with the upper-casified version.
     #
     # VARIABLES:
-    #     %eax - beginning of buffer.
-    #     %ebx - length of buffer.
-    #     %edi - current buffer offset.
-    #     %cl -  current byte being examined (first
-    #            part of %ecx).
+    #     %rdi - beginning of buffer.
+    #     %rsi - length of buffer.
+    #     %rcx - current buffer offset.
+    #     %al  - current byte being examined (lowest
+    #            byte of %rax).
     #
     # ----- CONSTANTS ----- #
     #
@@ -230,53 +232,45 @@ _lower_case:
                             # lower case.
         .equ  UPPER_CONVERSION,  'A' - 'a'
 
-    # ----- STACK STUFF ----- #
-    #
-        .equ  ST_BUFFER,      12    # Actual buffer.
-        .equ  ST_BUFFER_LEN,  8     # Length of buffer.
-
-_convert_to_upper:
-    pushl %ebp
-    movl  %esp, %ebp
+    .type convert_to_upper, @function
+convert_to_upper:
+    pushq %rbp
+    movq  %rsp, %rbp
 
     # ----- SET UP VARIABLES ----- #
     #
-    movl  ST_BUFFER(%ebp), %eax
-    movl  ST_BUFFER_LEN(%ebp), %ebx
-    movl  $0, %edi
+    movq  $0, %rcx
 
-    cmpl  $0, %ebx          # If a buffer with zero
+    cmpq  $0, %rsi          # If a buffer with zero
                             # length was given to us,
                             # just leave.
-    je    _end_convert_loop
+    je    end_convert_loop
 
-_convert_loop:
+convert_loop:
                             # Get the current byte.
-    movb  (%eax,%edi,1), %cl
+    movb  (%rdi,%rcx,1), %al
 
                             # Go to the next byte
                             # unless it is between 'a'
                             # and 'z'.
-    cmpb  $LOWERCASE_A, %cl
-
-    jl    _next_byte
-    cmpb  $LOWERCASE_Z, %cl
-    jg    _next_byte
+    cmpb  $LOWERCASE_A, %al
+    jl    next_byte
+    cmpb  $LOWERCASE_Z, %al
+    jg    next_byte
 
                             # Otherwise convert the
                             # byte to uppercase and
                             # store it back.
-    addb  $UPPER_CONVERSION, %cl
+    addb  $UPPER_CONVERSION, %al
+    movb  %al, (%rdi,%rcx,1)
 
-    movb  %cl, (%eax,%edi,1)
-
-_next_byte:
-    incl  %edi              # Next byte.
-    cmpl  %edi, %ebx        # Continue unless we have
+next_byte:
+    incq  %rcx              # Next byte.
+    cmpq  %rcx, %rsi        # Continue unless we have
                             # reached the end.
-    jne   _convert_loop
+    jne   convert_loop
 
-_end_convert_loop:
-    movl  %ebp, %esp        # No return value, just
-    popl  %ebp              # leave.
+end_convert_loop:
+    movq  %rbp, %rsp        # No return value, just
+    popq  %rbp              # leave.
     ret

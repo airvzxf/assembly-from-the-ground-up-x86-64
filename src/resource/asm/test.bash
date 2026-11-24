@@ -86,6 +86,11 @@ expect 0AK-04-03-factorial-loop 120
 expect 0AK-04-04-power-stack 33
 
 # ----- Chapter 5 -----
+# 005-01-toupper with a file bigger than its 500-byte buffer: its own
+# source code, compared with the result of `tr`.
+./005-01-toupper-bin 005-01-toupper.s "${TMP_DIR}/toupper.txt"
+expect_file 005-01-toupper "${TMP_DIR}/toupper.txt" \
+  "$(tr 'a-z' 'A-Z' < 005-01-toupper.s)"
 INPUT="Hey, diddle 123!" expect_output 0AK-05-01-toupper-stdio \
   "HEY, DIDDLE 123!" ./0AK-05-01-toupper-stdio-bin
 printf 'The cow jumped over the moon; the little dog laughed.\n' \

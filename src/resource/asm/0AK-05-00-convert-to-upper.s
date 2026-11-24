@@ -1,54 +1,46 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
     # PURPOSE:
-    #     The `_convert_to_upper` function of
+    #     The `convert_to_upper` function of
     #     `005-01-toupper`, in its own file so the
     #     Chapter 5 solutions can link it.
     #
     # INPUT:
-    #     First argument  - Length of the buffer.
-    #     Second argument - Address of the buffer.
+    #     %rdi - Address of the buffer.
+    #     %rsi - Length of the buffer.
     #
     # OUTPUT:
     #     The buffer is converted in place.
     #
+    .section .note.GNU-stack,"",@progbits
+
         .equ LOWERCASE_A,       'a'
         .equ LOWERCASE_Z,       'z'
         .equ UPPER_CONVERSION,  'A' - 'a'
-        .equ ST_BUFFER_LEN,     8
-        .equ ST_BUFFER,         12
 
     .section .text
-        .globl _convert_to_upper
-        .type  _convert_to_upper, @function
-_convert_to_upper:
-    pushl %ebp
-    movl  %esp, %ebp
-    pushl %ebx               # Preserve %ebx and
-    pushl %edi               # %edi for the caller.
+        .globl convert_to_upper
+        .type  convert_to_upper, @function
+convert_to_upper:
+    pushq %rbp
+    movq  %rsp, %rbp
 
-    movl  ST_BUFFER(%ebp), %eax
-    movl  ST_BUFFER_LEN(%ebp), %ebx
-    movl  $0, %edi
-    cmpl  $0, %ebx           # Empty buffer?
-    je    _end_convert_loop
+    movq  $0, %rcx           # Offset in the buffer.
+    cmpq  $0, %rsi           # Empty buffer?
+    je    end_convert_loop
 
-_convert_loop:
-    movb  (%eax,%edi,1), %cl
-    cmpb  $LOWERCASE_A, %cl  # Only 'a' to 'z'.
-    jl    _next_byte
-    cmpb  $LOWERCASE_Z, %cl
-    jg    _next_byte
-    addb  $UPPER_CONVERSION, %cl
-    movb  %cl, (%eax,%edi,1)
-_next_byte:
-    incl  %edi
-    cmpl  %edi, %ebx
-    jne   _convert_loop
+convert_loop:
+    movb  (%rdi,%rcx,1), %al
+    cmpb  $LOWERCASE_A, %al  # Only 'a' to 'z'.
+    jl    next_byte
+    cmpb  $LOWERCASE_Z, %al
+    jg    next_byte
+    addb  $UPPER_CONVERSION, %al
+    movb  %al, (%rdi,%rcx,1)
+next_byte:
+    incq  %rcx
+    cmpq  %rcx, %rsi
+    jne   convert_loop
 
-_end_convert_loop:
-    popl  %edi
-    popl  %ebx
-    movl  %ebp, %esp
-    popl  %ebp
+end_convert_loop:
+    movq  %rbp, %rsp
+    popq  %rbp
     ret

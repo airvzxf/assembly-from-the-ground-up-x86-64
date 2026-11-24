@@ -1,6 +1,4 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    # Link with `0AK-05-00-convert-to-upper.o` and
-    # `006-01-count-chars.o`.
+    # Link with `0AK-05-00-convert-to-upper.o`.
     #
     # PURPOSE:
     #     Solution to Chapter 5, "Going Further":
@@ -19,125 +17,145 @@
     #     they never get mixed with the converted
     #     text when STDOUT is redirected to a file.
     #     Linux returns errors as a negative number
-    #     (-errno) in %eax.
+    #     (-errno) in %rax.
     #
-    .include "006-01-linux.s"
-        .equ O_RDONLY,             0
-        .equ O_CREAT_WRONLY_TRUNC, 03101
-        .equ ST_ARGC,              0
-        .equ ST_ARGV_1,            8
-        .equ ST_ARGV_2,            12
+    .section .note.GNU-stack,"",@progbits
 
+        .equ SYS_READ,             0
+        .equ SYS_WRITE,            1
+        .equ SYS_CLOSE,            3
+        .equ SYS_EXIT,             60
+        .equ SYS_OPENAT,           257
+        .equ AT_FDCWD,             -100
+        .equ O_RDONLY,             0
+        .equ O_CREAT_WRONLY_TRUNC, 01101
+        .equ STDIN,                0
+        .equ STDOUT,               1
+        .equ STDERR,               2
+        .equ ST_ARGC,              0
+        .equ ST_ARGV_1,            16
+        .equ ST_ARGV_2,            24
+
+    # Each message is followed by a label at its
+    # end, so its length is end - start.
     .section .data
         msg_usage:
-            .ascii "Usage: toupper [input output]\n\0"
+            .ascii "Usage: toupper [input output]\n"
+        msg_usage_end:
         msg_open_in:
-            .ascii "Error: can't open input file\n\0"
+            .ascii "Error: can't open input file\n"
+        msg_open_in_end:
         msg_open_out:
-            .ascii "Error: can't open output file\n\0"
+            .ascii "Error: can't open output file\n"
+        msg_open_out_end:
         msg_read:
-            .ascii "Error: read failed\n\0"
+            .ascii "Error: read failed\n"
+        msg_read_end:
         msg_write:
-            .ascii "Error: write failed\n\0"
+            .ascii "Error: write failed\n"
+        msg_write_end:
 
     .section .bss
         .equ   BUFFER_SIZE, 500
         .lcomm BUFFER_DATA, BUFFER_SIZE
-        .lcomm FD_IN,  4
-        .lcomm FD_OUT, 4
+        .lcomm FD_IN,  8
+        .lcomm FD_OUT, 8
 
     .section .text
         .globl _start
 
 _start:
-    movl  %esp, %ebp
-    movl  $STDIN, FD_IN      # Defaults.
-    movl  $STDOUT, FD_OUT
+    movq  %rsp, %rbp
+    movq  $STDIN, FD_IN(%rip)    # Defaults.
+    movq  $STDOUT, FD_OUT(%rip)
 
-    movl  ST_ARGC(%ebp), %eax
-    cmpl  $1, %eax           # No arguments.
-    je    _read_loop
-    cmpl  $3, %eax           # Two arguments.
-    je    _open_files
-    pushl $msg_usage
-    jmp   _fail
+    movq  ST_ARGC(%rbp), %rax
+    cmpq  $1, %rax           # No arguments.
+    je    read_loop
+    cmpq  $3, %rax           # Two arguments.
+    je    open_files
+    leaq  msg_usage(%rip), %rsi
+    movq  $msg_usage_end - msg_usage, %rdx
+    jmp   fail
 
-_open_files:
-    movl  $SYS_OPEN, %eax
-    movl  ST_ARGV_1(%ebp), %ebx
-    movl  $O_RDONLY, %ecx
-    movl  $0666, %edx
-    int   $LINUX_SYSCALL
-    cmpl  $0, %eax           # Negative = error.
-    jl    _fail_open_in
-    movl  %eax, FD_IN
+open_files:
+    movq  $SYS_OPENAT, %rax
+    movq  $AT_FDCWD, %rdi
+    movq  ST_ARGV_1(%rbp), %rsi
+    movq  $O_RDONLY, %rdx
+    movq  $0666, %r10
+    syscall
+    cmpq  $0, %rax           # Negative = error.
+    jl    fail_open_in
+    movq  %rax, FD_IN(%rip)
 
-    movl  $SYS_OPEN, %eax
-    movl  ST_ARGV_2(%ebp), %ebx
-    movl  $O_CREAT_WRONLY_TRUNC, %ecx
-    movl  $0666, %edx
-    int   $LINUX_SYSCALL
-    cmpl  $0, %eax
-    jl    _fail_open_out
-    movl  %eax, FD_OUT
+    movq  $SYS_OPENAT, %rax
+    movq  $AT_FDCWD, %rdi
+    movq  ST_ARGV_2(%rbp), %rsi
+    movq  $O_CREAT_WRONLY_TRUNC, %rdx
+    movq  $0666, %r10
+    syscall
+    cmpq  $0, %rax
+    jl    fail_open_out
+    movq  %rax, FD_OUT(%rip)
 
-_read_loop:
-    movl  $SYS_READ, %eax
-    movl  FD_IN, %ebx
-    movl  $BUFFER_DATA, %ecx
-    movl  $BUFFER_SIZE, %edx
-    int   $LINUX_SYSCALL
-    cmpl  $0, %eax
-    jl    _fail_read
-    je    _close_files       # End of file.
+read_loop:
+    movq  $SYS_READ, %rax
+    movq  FD_IN(%rip), %rdi
+    leaq  BUFFER_DATA(%rip), %rsi
+    movq  $BUFFER_SIZE, %rdx
+    syscall
+    cmpq  $0, %rax
+    jl    fail_read
+    je    close_files        # End of file.
 
-    movl  %eax, %esi
-    pushl $BUFFER_DATA
-    pushl %esi
-    call  _convert_to_upper
-    addl  $8, %esp
+    movq  %rax, %rbx         # Bytes read.
+    leaq  BUFFER_DATA(%rip), %rdi
+    movq  %rbx, %rsi
+    call  convert_to_upper
 
-    movl  $SYS_WRITE, %eax
-    movl  FD_OUT, %ebx
-    movl  $BUFFER_DATA, %ecx
-    movl  %esi, %edx
-    int   $LINUX_SYSCALL
-    cmpl  $0, %eax
-    jl    _fail_write
-    jmp   _read_loop
+    movq  $SYS_WRITE, %rax
+    movq  FD_OUT(%rip), %rdi
+    leaq  BUFFER_DATA(%rip), %rsi
+    movq  %rbx, %rdx
+    syscall
+    cmpq  $0, %rax
+    jl    fail_write
+    jmp   read_loop
 
-_close_files:
-    movl  $SYS_CLOSE, %eax   # Closing STDIN or
-    movl  FD_OUT, %ebx       # STDOUT is harmless
-    int   $LINUX_SYSCALL     # at exit.
-    movl  $SYS_CLOSE, %eax
-    movl  FD_IN, %ebx
-    int   $LINUX_SYSCALL
-    movl  $SYS_EXIT, %eax
-    movl  $0, %ebx
-    int   $LINUX_SYSCALL
+close_files:
+    movq  $SYS_CLOSE, %rax   # Closing STDIN or
+    movq  FD_OUT(%rip), %rdi # STDOUT is harmless
+    syscall                  # at exit.
+    movq  $SYS_CLOSE, %rax
+    movq  FD_IN(%rip), %rdi
+    syscall
+    movq  $SYS_EXIT, %rax
+    movq  $0, %rdi
+    syscall
 
-_fail_open_in:
-    pushl $msg_open_in
-    jmp   _fail
-_fail_open_out:
-    pushl $msg_open_out
-    jmp   _fail
-_fail_read:
-    pushl $msg_read
-    jmp   _fail
-_fail_write:
-    pushl $msg_write
+fail_open_in:
+    leaq  msg_open_in(%rip), %rsi
+    movq  $msg_open_in_end - msg_open_in, %rdx
+    jmp   fail
+fail_open_out:
+    leaq  msg_open_out(%rip), %rsi
+    movq  $msg_open_out_end - msg_open_out, %rdx
+    jmp   fail
+fail_read:
+    leaq  msg_read(%rip), %rsi
+    movq  $msg_read_end - msg_read, %rdx
+    jmp   fail
+fail_write:
+    leaq  msg_write(%rip), %rsi
+    movq  $msg_write_end - msg_write, %rdx
 
-    # Write the message on top of the stack to
-    # STDERR and exit with status 1.
-_fail:
-    call  _count_chars       # Length of message.
-    movl  %eax, %edx
-    popl  %ecx               # Message address.
-    movl  $SYS_WRITE, %eax
-    movl  $STDERR, %ebx
-    int   $LINUX_SYSCALL
-    movl  $SYS_EXIT, %eax
-    movl  $1, %ebx
-    int   $LINUX_SYSCALL
+    # Write the message in %rsi (%rdx bytes long)
+    # to STDERR and exit with status 1.
+fail:
+    movq  $SYS_WRITE, %rax
+    movq  $STDERR, %rdi
+    syscall
+    movq  $SYS_EXIT, %rax
+    movq  $1, %rdi
+    syscall
