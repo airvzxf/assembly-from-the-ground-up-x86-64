@@ -8,7 +8,7 @@ project:
     - resource/image/**
 
 book:
-  title: "Assembly from the Ground Up: x86 32-bit Edition"
+  title: "Assembly from the Ground Up: x86-64 Edition"
   subtitle: >-
     An updated Linux edition of *Programming from the Ground Up*
     by Jonathan Bartlett
@@ -19,7 +19,7 @@ book:
   date: today
   date-format: iso
   output-file: ProgrammingGroundUp
-  repo-url: https://github.com/airvzxf/assembly-from-the-ground-up-x86-32
+  repo-url: https://github.com/airvzxf/assembly-from-the-ground-up-x86-64
   repo-subdir: src
   repo-actions: [source, issue]
   downloads: [pdf, epub]
@@ -90,4 +90,4 @@ format:
     fontsize: 11pt
   epub:
     css: resource/pandoc/css/style.css
-    identifier: urn:uuid:7ee56819-71ac-415a-a058-0b83d99113d3
+    identifier: urn:uuid:c042c78a-27f6-45be-8fe0-18ecca1a7897

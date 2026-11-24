@@ -2,6 +2,8 @@
 # Build command for Cloudflare Pages (Git integration).
 #
 # Cloudflare Pages settings:
+#   Project name:           assembly-from-the-ground-up-x86-64
+#   Custom domain:          asm64.rovisoft.net
 #   Build command:          bash scripts/cloudflare-build.bash
 #   Build output directory: release/latest/site
 #   Root directory:         (empty)

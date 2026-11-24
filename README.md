@@ -1,10 +1,10 @@
-# Assembly from the Ground Up: x86 32-bit Edition
+# Assembly from the Ground Up: x86-64 Edition
 
 An updated Linux edition of [_Programming from the Ground Up_](https://savannah.nongnu.org/projects/pgubook) by Jonathan Bartlett, maintained by Israel Roldan (AirvZxf).
 
-- This is the **x86 32-bit edition**. An x86-64 edition, for 64-bit programs, will be published in its own repository.
-- Read online and download the PDF and ePUB: <https://asm32.rovisoft.net/>
-- Downloads for every version: [GitHub releases](https://github.com/airvzxf/assembly-from-the-ground-up-x86-32/releases).
+- This is the **x86-64 edition**, for 64-bit Linux programs: AT&T syntax with the GNU Assembler, the `syscall` instruction and the System V AMD64 calling convention. It starts from version 3.0 of the [x86 32-bit edition](https://github.com/airvzxf/assembly-from-the-ground-up-x86-32) ([asm32.rovisoft.net](https://asm32.rovisoft.net/)), and the port of the text and the examples is in progress: until it is finished, parts of the book still describe 32-bit programs.
+- Read online and download the PDF and ePUB: <https://asm64.rovisoft.net/>
+- Downloads for every version: [GitHub releases](https://github.com/airvzxf/assembly-from-the-ground-up-x86-64/releases).
 
 ## Build
 
@@ -18,7 +18,7 @@ podman run --rm -v "$PWD:/data:Z" pgu-book -c 'bash src/resource/asm/make.bash &
 
 The output is in `release/latest/`: the PDF, the ePUB, `resource.zip` with the example programs, and `site/`, the website. To preview the website while you write, run `quarto preview` in `src/`.
 
-The website is published by Cloudflare Pages, connected to this repository: every push to `main` builds it with `bash scripts/cloudflare-build.bash` (output directory `release/latest/site`), and every pull request gets a preview deployment.
+The website is published by the Cloudflare Pages project `assembly-from-the-ground-up-x86-64`, connected to this repository: every push to `main` builds it with `bash scripts/cloudflare-build.bash` (output directory `release/latest/site`), and every pull request gets a preview deployment.
 
 ## License
 
@@ -71,7 +71,7 @@ You're able to find my documents about assembly in my GitHub repository [airvzxf
 ## About the original books.
 
 ### Important notes.
-- This book is under the “GNU Free Documentation License”. The modified version is named _Assembly from the Ground Up: x86 32-bit Edition_ because the license requires a title distinct from the original.
+- This book is under the “GNU Free Documentation License”. The modified version is named _Assembly from the Ground Up: x86-64 Edition_ because the license requires a title distinct from the original.
 
 ### Original source: Programming from the ground up.
 - Title: Programming from the Ground Up
