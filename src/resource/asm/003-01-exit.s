@@ -1,5 +1,3 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
     # PURPOSE:    Simple program that exits and returns
     #             a status code back to the Linux
     #             kernel.
@@ -11,24 +9,26 @@
     #             running the program.
     #
     # VARIABLES:
-    #             %eax holds the system call number.
-    #             %ebx holds the return status .
+    #             %rax holds the system call number.
+    #             %rdi holds the return status.
     #
+    .section .note.GNU-stack,"",@progbits
+
     .section .data
 
     .section .text
         .globl _start
 
 _start:
-    movl $1, %eax      # This is the Linux kernel
+    movq $60, %rax     # This is the Linux kernel
                        # command number (system call)
                        # for exiting a program.
 
-    movl $0, %ebx      # This is the status number we
+    movq $0, %rdi      # This is the status number we
                        # will return to the operating
                        # system. Change this around and
                        # it will return different
                        # things to `echo $?`.
 
-    int $0x80          # This wakes up the kernel to
+    syscall            # This wakes up the kernel to
                        # run the exit command.
