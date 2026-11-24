@@ -21,8 +21,15 @@ program breaks one of these rules:
 
 - Data is reached relative to `%rip` (`movq value(%rip), %rax`,
   `leaq table(%rip), %rbx`), never through an absolute 32-bit address, so
-  the code also works in PIE programs and shared libraries. A source that
-  shows absolute addressing on purpose is listed in `ABSOLUTE_OK`.
+  the code also works in PIE programs and shared libraries. The build
+  checks the relocations of the code and data sections (`.rela.text`,
+  `.rela.data`, `.rela.rodata` and their subsections). A source that
+  shows absolute addressing on purpose is listed in `ABSOLUTE_OK` and
+  explains why in a comment:
+
+  ```gnuassembler
+  # ABSOLUTE_OK: <why this example uses absolute addresses>
+  ```
 - Every program and library is a 64-bit x86-64 ELF file with a
   non-executable stack.
 

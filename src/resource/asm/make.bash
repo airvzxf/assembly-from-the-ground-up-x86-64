@@ -18,10 +18,12 @@ rm -f ./*.so .gdb_history heynow.txt
 # of the book, which the build checks:
 #
 #   - It has a `.note.GNU-stack` section, so the stack is not executable.
-#   - It uses no absolute 32-bit addresses (R_X86_64_32 and
-#     R_X86_64_32S relocations): data is reached relative to %rip, so the
+#   - Its code and data use no absolute 32-bit addresses (R_X86_64_32 and
+#     R_X86_64_32S relocations in .rela.text, .rela.data, .rela.rodata
+#     and their subsections): data is reached relative to %rip, so the
 #     code also works in PIE programs and shared libraries. A source that
-#     shows absolute addressing on purpose is listed in ABSOLUTE_OK.
+#     shows absolute addressing on purpose is listed in ABSOLUTE_OK and
+#     explains why in a comment that starts with `# ABSOLUTE_OK:`.
 #   - Every program and library is a 64-bit ELF file (ELF64, x86-64)
 #     whose stack is not executable.
 #
@@ -36,6 +38,17 @@ fail_build() {
   exit 1
 }
 
+# absolute_relocations <object>: print the R_X86_64_32 and R_X86_64_32S
+# relocations of the code and data sections. Other sections, such as the
+# debug sections that -g adds, use 32-bit offsets of their own.
+absolute_relocations() {
+  readelf -rW "$1" | awk '
+    /^Relocation section/ {
+      checked = ($3 ~ /^\047\.rela\.(text|data|rodata)[.\047]/)
+    }
+    checked && $3 ~ /^R_X86_64_32S?$/ { print }'
+}
+
 # assemble64 <name>...: assemble <name>.s into <name>.o and check it.
 assemble64() {
   local name
@@ -44,13 +57,12 @@ assemble64() {
     as --64 -g -o "${name}.o" "${name}.s"
     readelf -SW "${name}.o" | grep -q '\.note\.GNU-stack' \
       || fail_build "${name}.s has no .note.GNU-stack section"
-    # The debug sections (-g) use 32-bit offsets of their own: skip them.
-    if [[ " ${ABSOLUTE_OK[*]} " != *" ${name} "* ]] \
-       && readelf -rW "${name}.o" \
-          | awk '/^Relocation section/ { debug = ($3 ~ /\.debug_/) }
-                 !debug && $3 ~ /^R_X86_64_32S?$/ { found = 1 }
-                 END { exit !found }'
-    then
+    if [[ " ${ABSOLUTE_OK[*]} " == *" ${name} "* ]]; then
+      grep -qE '^[[:space:]]*#[[:space:]]*ABSOLUTE_OK:[[:space:]]*[^[:space:]]' \
+        "${name}.s" \
+        || fail_build "${name}.s is in ABSOLUTE_OK but has no" \
+             "'# ABSOLUTE_OK: <reason>' comment"
+    elif [[ -n "$(absolute_relocations "${name}.o")" ]]; then
       fail_build "${name}.s uses absolute addresses; use %rip-relative" \
         "addressing or list it in ABSOLUTE_OK"
     fi
