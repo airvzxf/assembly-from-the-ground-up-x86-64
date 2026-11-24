@@ -1,5 +1,14 @@
 # Document History {#appendix-g-document-history}
 
+-   11/24/2026 - Version 4.0 - Israel Roldan (AirvZxf). Started the
+    x86-64 edition from Version 3.0 of the x86 32-bit edition: renamed
+    the Modified Version to *Assembly from the Ground Up: x86-64
+    Edition*, as required by the GNU Free Documentation License, and
+    pointed the copyright page, the links and the website to this
+    edition. The text and the examples are being ported to 64-bit Linux
+    programs: AT&T syntax with the GNU Assembler, the `syscall`
+    instruction and the System V AMD64 calling convention.
+
 -   11/23/2026 - Version 3.0 - Israel Roldan (AirvZxf). Renamed the
     Modified Version to *Assembly from the Ground Up: x86 32-bit
     Edition*, as required by the
