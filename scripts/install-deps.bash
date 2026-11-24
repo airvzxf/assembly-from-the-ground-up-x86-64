@@ -39,6 +39,7 @@ if [[ "${USER_MODE}" == 0 ]]; then
     ca-certificates \
     curl \
     gcc-multilib \
+    python3 \
     xz-utils \
     zip
   rm -rf /var/lib/apt/lists/*
