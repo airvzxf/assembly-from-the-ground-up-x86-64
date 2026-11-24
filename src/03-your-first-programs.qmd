@@ -554,8 +554,8 @@ can be reserved. The main ones are as follows:
 
 :   Quads (short for *quadwords*) take up eight storage locations. This
     is the same amount of space the registers use, which is why they are
-    used in this program. They can hold numbers between 0 and
-    18446744073709551615.
+    used in this program. They can hold numbers between
+    0 and 18446744073709551615.
 
 `.ascii`:
 
