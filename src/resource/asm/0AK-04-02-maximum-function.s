@@ -1,78 +1,67 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
     # PURPOSE:
     #     Solution to Chapter 4, "Use the Concepts":
     #     the maximum program as a function that
-    #     receives a pointer to a list of numbers
-    #     ended by 0, called with 3 different lists.
+    #     receives the address of a list, called
+    #     with three different lists.
     #
     # OUTPUT:
-    #     The maximum of the last list (99) as the
-    #     exit status code.
+    #     Exit status 99 (the maximum of list_3).
     #
+    .section .note.GNU-stack,"",@progbits
+
     .section .data
         list_1:
-            .long 3, 67, 34, 222, 45, 0
+            .quad 3, 67, 34, 222, 45, 0
         list_2:
-            .long 5, 4, 3, 2, 1, 0
+            .quad 5, 4, 3, 2, 1, 0
         list_3:
-            .long 10, 99, 18, 50, 0
+            .quad 10, 99, 18, 50, 0
 
     .section .text
         .globl _start
 
 _start:
-    pushl $list_1
-    call  _maximum           # %eax = 222
-    addl  $4, %esp
+    leaq  list_1(%rip), %rdi # Address of the list.
+    call  maximum            # %rax = 222
+    leaq  list_2(%rip), %rdi
+    call  maximum            # %rax = 5
+    leaq  list_3(%rip), %rdi
+    call  maximum            # %rax = 99
 
-    pushl $list_2
-    call  _maximum           # %eax = 5
-    addl  $4, %esp
+    movq  %rax, %rdi         # Last result as the
+    movq  $60, %rax          # status code.
+    syscall
 
-    pushl $list_3
-    call  _maximum           # %eax = 99
-    addl  $4, %esp
-
-    movl  %eax, %ebx         # Last result as the
-    movl  $1, %eax           # status code.
-    int   $0x80
-
-    # PURPOSE:
-    #     Find the largest number of a list.
+    # PURPOSE: Find the largest number of a list.
     #
-    # INPUT:
-    #     First argument - Address of the list. The
-    #     list ends with a 0.
-    #
-    # OUTPUT:
-    #     %eax - The largest number (0 if the list
-    #     is empty).
+    # INPUT:   %rdi - Address of a list of quads
+    #                 that ends with a 0.
+    # OUTPUT:  %rax - The largest number.
     #
     # VARIABLES:
-    #     %edx - Address of the current item.
-    #     %ecx - Current item.
+    #     %rdi - Address of the current item.
+    #     %rcx - Current item.
     #
-        .type _maximum, @function
-_maximum:
-    pushl %ebp
-    movl  %esp, %ebp
+    .type maximum, @function
+maximum:
+    pushq %rbp
+    movq  %rsp, %rbp
 
-    movl  8(%ebp), %edx      # Address of item 0.
-    movl  (%edx), %eax       # Largest so far.
+    movq  (%rdi), %rax       # Largest so far.
 
-_maximum_loop:
-    movl  (%edx), %ecx       # Current item.
-    cmpl  $0, %ecx           # End of the list?
-    je    _maximum_end
-    cmpl  %eax, %ecx
-    jle   _maximum_next
-    movl  %ecx, %eax         # New largest value.
-_maximum_next:
-    addl  $4, %edx           # Next item.
-    jmp   _maximum_loop
+maximum_loop:
+    movq  (%rdi), %rcx       # Current item.
+    cmpq  $0, %rcx           # End of the list?
+    je    maximum_end
+    cmpq  %rax, %rcx
+    jle   maximum_next
+    movq  %rcx, %rax         # New largest value.
 
-_maximum_end:
-    movl  %ebp, %esp
-    popl  %ebp
+maximum_next:
+    addq  $8, %rdi           # Next item.
+    jmp   maximum_loop
+
+maximum_end:
+    movq  %rbp, %rsp
+    popq  %rbp
     ret

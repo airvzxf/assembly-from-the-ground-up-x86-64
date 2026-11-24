@@ -1,44 +1,38 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
     # PURPOSE:
     #     Solution to Chapter 4, "Use the Concepts":
-    #     a `_square` function and a program that
-    #     tests it with the number 12.
+    #     a `square` function and a program to test
+    #     it.
     #
     # OUTPUT:
-    #     Exit status code 144 (12 * 12).
+    #     Exit status 144 (the square of 12).
     #
+    .section .note.GNU-stack,"",@progbits
+
     .section .data
 
     .section .text
         .globl _start
 
 _start:
-    pushl $12                # Argument.
-    call  _square
-    addl  $4, %esp           # Remove the argument.
+    movq  $12, %rdi          # Argument.
+    call  square
+    movq  %rax, %rdi         # Result as the status.
+    movq  $60, %rax          # exit()
+    syscall
 
-    movl  %eax, %ebx         # Result as the status.
-    movl  $1, %eax           # exit()
-    int   $0x80
-
-    # PURPOSE:
-    #     Return the square of a number.
+    # PURPOSE: Return the square of a number.
     #
-    # INPUT:
-    #     First argument - The number.
+    # INPUT:   %rdi - The number.
+    # OUTPUT:  %rax - The number times itself.
     #
-    # OUTPUT:
-    #     %eax - The number multiplied by itself.
-    #
-        .type _square, @function
-_square:
-    pushl %ebp               # Standard function
-    movl  %esp, %ebp         # prologue.
+    .type square, @function
+square:
+    pushq %rbp               # Standard function
+    movq  %rsp, %rbp         # prologue.
 
-    movl  8(%ebp), %eax      # %eax = argument.
-    imull %eax, %eax         # %eax = %eax * %eax.
+    movq  %rdi, %rax         # %rax = argument.
+    imulq %rax, %rax         # %rax = %rax * %rax.
 
-    movl  %ebp, %esp         # Standard function
-    popl  %ebp               # epilogue.
+    movq  %rbp, %rsp         # Standard function
+    popq  %rbp               # epilogue.
     ret

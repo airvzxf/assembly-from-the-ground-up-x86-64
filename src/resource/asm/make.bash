@@ -108,8 +108,13 @@ link64 003-01-exit 003-01-exit.o
 link64 003-02-maximum 003-02-maximum.o
 link64 003-03-maximum-absolute 003-03-maximum-absolute.o
 
-# ----- Appendix K, Chapter 3 -----
-for SOURCE in 0AK-03-*.s; do
+# ----- Chapter 4 -----
+assemble64 004-01-power 004-02-factorial
+link64 004-01-power 004-01-power.o
+link64 004-02-factorial 004-02-factorial.o
+
+# ----- Appendix K, Chapters 3 and 4 -----
+for SOURCE in 0AK-03-*.s 0AK-04-*.s; do
   assemble64 "${SOURCE%.s}"
   link64 "${SOURCE%.s}" "${SOURCE%.s}.o"
 done
@@ -126,8 +131,6 @@ echo ""
 # -----------------------------------------------------
 
 FILES=(
-  004-01-power
-  004-02-factorial
   005-01-toupper
   006-01-add-year
   006-01-count-chars
@@ -163,8 +166,6 @@ echo ""
 # -----------------------------------------------------
 
 GENERIC_FILES=(
-  004-01-power
-  004-02-factorial
   005-01-toupper
   008-01-hello-world-nolib
   009-01-memory-layout
@@ -263,7 +264,7 @@ gcc -o "011-01-hello-world-c-bin" "011-01-hello-world.c"
 
 for SOURCE in 0AK-*.s
 do
-    [[ "${SOURCE}" == 0AK-03-* ]] && continue  # 64-bit.
+    [[ "${SOURCE}" == 0AK-0[34]-* ]] && continue  # 64-bit.
     echo "Assembling: ${SOURCE%.s}"
     as -o "${SOURCE%.s}.o" "${SOURCE}" --32 --gstabs+
 done
@@ -279,7 +280,7 @@ link_solution() {
 LIBC=(--library c --library-path /usr/lib32/
       -dynamic-linker /usr/lib32/ld-linux.so.2)
 
-for SOURCE in 0AK-04-*.s 0AK-05-03-*.s
+for SOURCE in 0AK-05-03-*.s
 do
     link_solution "${SOURCE%.s}"
 done

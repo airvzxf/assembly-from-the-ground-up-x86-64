@@ -75,7 +75,7 @@ material. This file records the decisions and tracks the work, one block
   `gcc-multilib` is removed in block 11.
 - [x] **2. Chapters 1–3 and Appendix C** (system call table), solutions
   for Chapters 2 and 3. Programs: exit, maximum; 6 solutions.
-- [ ] **3. Chapter 4** (System V convention, frames, alignment, recursion),
+- [x] **3. Chapter 4** (System V convention, frames, alignment, recursion),
   solutions. Programs: power, factorial; 4 solutions.
 - [ ] **4. Chapter 5** (files, argv, buffers), solutions. Programs: toupper;
   5 solutions.
