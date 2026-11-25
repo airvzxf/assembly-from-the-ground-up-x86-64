@@ -47,7 +47,8 @@ The computer only has two fingers. So that means all of the groups are
 groups of two. So, let\'s count in binary - 0 (zero), 1 (one), 10 (two -
 one group of two), 11 (three - one group of two and one left over), 100
 (four - two groups of two), 101 (five - two groups of two and one left
-over), 110 (six - two groups of two and one group of two), and so on. In
+over), 110 (six - two groups of two, one more group of two and none left
+over), and so on. In
 base two, moving the decimal one digit to the right multiplies by two,
 and moving it to the left divides by two. Base two is also
 referred to as binary.
@@ -365,10 +366,12 @@ movw  $5, %bx           # %rbx is 0xffffffffffff0005.
     (gdb) p/x $rbx
     $2 = 0xffffffffffff0005
 
-This is also why the `int` parameters and results of the C library
-(see
-[Chapter 8](08-sharing-functions-with-code-libraries.qmd#finding-information-about-libraries))
-only use the lower half of a register: the upper half may hold anything.
+Keep this rule in mind with the `int` parameters and results of the C
+library (see
+[Chapter 8](08-sharing-functions-with-code-libraries.qmd#finding-information-about-libraries)):
+they are 4 bytes, so they only use the lower half of a register, and
+the calling convention says nothing about the upper half, which may
+hold anything.
 
 We\'ll discuss speed more in
 [Chapter 12. Optimization](12-optimization.qmd#chapter-12-optimization), but I want you to
@@ -797,7 +800,7 @@ significant digits, enough to show exactly which `double` we have. Run
 `print(0.1 + 0.2)` in Python and you will get the same
 `0.30000000000000004`: Python adds the same two `double`s.
 
-References to understand in deep how the computer handle the floating points.
+To understand in depth how computers handle floating-point numbers, see:
 
 - [Fixed Point and Floating Point][10-fixed-point-and-floating].
 
@@ -817,7 +820,8 @@ language, see the chapter \"Programming with Intel SSE2\" of the
 
 How would you think that negative numbers on a computer
 might be represented? (The examples in this section use 32 bits, to keep
-the lines short; 64-bit numbers work in exactly the same way.) One thought might be to use the first digit of a
+the lines short; 64-bit numbers work in exactly the same way.) One
+thought might be to use the first digit of a
 number as the sign, so `00000000000000000000000000000001` would
 represent the number 1, and `10000000000000000000000000000001` would
 represent -1. This makes a lot of sense, and in fact some old processors
@@ -936,8 +940,8 @@ gives no permissions, 6 (110) gives read and write permission, and 5
 for the three different sets of permissions - the owner, the group, and
 everyone else. The number 0644 means read and write for the first
 permission set, and read-only for the second and third set. The first
-permission set is for the owner of the file. The third permission set is
-for the group owner of the file. The last permission set is for everyone
+permission set is for the owner of the file. The second permission set
+is for the group owner of the file. The last permission set is for everyone
 else. So, `0751` means that the owner of the file can read, write, and
 execute the file, the group members can read and execute the file, and
 everyone else can only execute the file.
@@ -950,8 +954,8 @@ decimal. The beginning zero is what differentiates the two. So, *be
 careful not to put any leading zeroes in front of decimal numbers, or
 they will be interpreted as octal numbers*!
 
-Hexadecimal numbers (also called just \"hex\") use the numbers 1-15 for
-each digit. however, since 10-15 don\'t have their own numbers,
+Hexadecimal numbers (also called just \"hex\") use the numbers 0-15 for
+each digit. However, since 10-15 don\'t have their own numbers,
 hexadecimal uses the letters `a` through `f` to represent them. For
 example, the letter `a` represents 10, the letter `b` represents 11, and
 so on. 10 in hexadecimal is 16 in decimal. In octal, each digit
@@ -1211,10 +1215,10 @@ Review {#review-8}
     work on many numbers at once.
 
 
-[10-Davs]: http://david.carybros.com/html/endian_faq.html
+[10-Davs]: https://web.archive.org/web/20230519220613/http://david.carybros.com/html/endian_faq.html
 [10-holy-war]: https://dcc.ufrj.br/~gabriel/progpar/danny_co.pdf
 [10-fixed-point-and-floating]: https://www.tutorialspoint.com/fixed-point-and-floating-point-number-representations
-[10-floating-point-tutorial]: https://www.rfwireless-world.com/Tutorials/floating-point-tutorial.html
+[10-floating-point-tutorial]: https://web.archive.org/web/20250217213712/https://rfwireless-world.com/Tutorials/floating-point-tutorial.html
 [10-IEEE-standard-for-floating]: https://en.wikipedia.org/wiki/IEEE_754
 [10-single-precision-floating]: https://en.wikipedia.org/wiki/Single-precision_floating-point_format
 [10-Intel-SDM]: https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
