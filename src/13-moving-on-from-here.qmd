@@ -41,9 +41,12 @@ severe, but still, it is best to always be learning.
 
 These books were selected because of their content and the amount of
 respect they have in the computer science world. Each of them brings
-something unique. There are many books here. The best way to start would
-be to look through online reviews of several of the books, and find a
-starting point that interests you.
+something unique. There are many books here, old and new: the classics
+are still worth reading, and the newer ones cover the 64-bit machines,
+the languages and the tools of today. Several of them can be read for
+free online. The best way to start would be to look through online
+reviews of several of the books, and find a starting point that
+interests you.
 
 From the Bottom Up {#from-the-bottom-up}
 ------------------
@@ -51,19 +54,33 @@ From the Bottom Up {#from-the-bottom-up}
 This list is in the best reading order I could find. It\'s not
 necessarily easiest to hardest, but based on subject matter.
 
--   [Programming from the Ground Up][13-PGU] by Jonathan Bartlett.
+-   [Programming from the Ground Up][13-PGU] by Jonathan Bartlett, the
+    original 32-bit edition of this book.
+
+-   [Computer Systems: A Programmer\'s Perspective][13-CSAPP] by Randal
+    E. Bryant and David R. O\'Hallaron. The best next step after this
+    book: x86-64 machine code, memory, linking, processes and
+    performance, from the programmer\'s side.
 
 -   [Introduction to Algorithms][13-Introduction-Algorithms]
-    by Thomas H. Cormen, Charles E. Leiserson, and Ronald L. Rivest.
+    by Thomas H. Cormen, Charles E. Leiserson, Ronald L. Rivest, and
+    Clifford Stein.
 
 -   [The Art of Computer Programming][13-Art-of-computer]
     by Donald Knuth (3 volume set - volume 1 is the most important).
 
 -   [Programming Languages][13-Programming-languages] by Samuel N. Kamin.
 
+-   [Operating Systems: Three Easy Pieces][13-OSTEP] by Remzi H.
+    Arpaci-Dusseau and Andrea C. Arpaci-Dusseau (free online).
+
 -   [Modern Operating Systems][13-Modern-OS] by Andrew Tanenbaum.
 
 -   [Linkers and Loaders][13-Linkers-loaders] by John Levine.
+
+-   [What Every Programmer Should Know About Memory][13-Drepper] by
+    Ulrich Drepper (free online): caches, memory and why locality of
+    reference matters.
 
 -   [Computer Organization and Design: The Hardware/Software Interface][13-COD]
     by David Patterson and John Hennessy.
@@ -80,8 +97,9 @@ can be read in any order you feel comfortable with.
 -   [Simply Scheme: An Introduction to Computer Science][13-Simply-scheme]
     by Brian Harvey and Matthew Wright.
 
--   [How to Think Like a Computer Scientist: Learning with Python][13-Python]
-    by Allen Downey, Jeff Elkner, and Chris Meyers.
+-   [Think Python][13-Python] by Allen B. Downey (free online), the
+    successor of *How to Think Like a Computer Scientist: Learning with
+    Python*.
 
 -   [Structure and Interpretation of Computer Programs][13-Structure-and-interpretation]
     by Harold Abelson and Gerald Jay Sussman with Julie Sussman.
@@ -96,6 +114,10 @@ can be read in any order you feel comfortable with.
 
 -   [Programming Language Pragmatics][13-Pragmatics] by Michael Scott.
 
+-   [Crafting Interpreters][13-Crafting-interpreters] by Robert Nystrom
+    (free online): build an interpreter and a bytecode virtual machine,
+    like the one of Python that we saw in Chapter 11.
+
 -   [Essentials of Programming Languages][13-Essentials-of-programming]
     by Daniel P. Friedman, Mitchell Wand, and Christopher T. Haynes.
 
@@ -104,6 +126,14 @@ From the Middle Out {#from-the-middle-out}
 
 Each of these is the best book on its subject. If you need to know these
 languages, these will tell you all you need to know.
+
+-   [The Rust Programming Language][13-Rust-book] by Steve Klabnik,
+    Carol Nichols, and Chris Krycho (free online, as \"the book\").
+
+-   [Programming Rust][13-Programming-Rust] by Jim Blandy, Jason
+    Orendorff, and Leonora F. S. Tindall.
+
+-   [Fluent Python][13-Fluent-Python] by Luciano Ramalho.
 
 -   [Programming Perl][13-Programming-Perl] by Larry Wall, Tom
     Christiansen, and Jon Orwant.
@@ -119,11 +149,12 @@ languages, these will tell you all you need to know.
 
 -   [The C++ Programming Language][13-C-Plus-Plus] by Bjarne Stroustrup.
 
--   [Thinking in Java][13-Thinking-in-Java] by Bruce Eckel.
+-   [Effective Java][13-Effective-Java] by Joshua Bloch.
 
 -   [The Scheme Programming Language][13-The-scheme-PL] by Kent Dybvig.
 
--   [Linux Assembly Language Programming][13-LALP] by Bob Neveln.
+-   [Linux Assembly Language Programming][13-LALP] by Bob Neveln (32-bit
+    x86).
 
 Specialized Topics {#specialized-topics}
 ------------------
@@ -146,6 +177,17 @@ several outside of the areas you normally program in.
 
 -   UNIX Programming - [Advanced Programming in the UNIX
     Environment][13-Advanced-programming-UNIX] by W. Richard Stevens.
+
+-   Linux Programming - [The Linux Programming Interface][13-TLPI] by
+    Michael Kerrisk, the author of many of the Linux man pages: every
+    system call, explained.
+
+-   Performance - [Systems Performance][13-Systems-performance] by
+    Brendan Gregg, which covers `perf` and much more.
+
+-   Concurrency - [Rust Atomics and Locks][13-Atomics] by Mara Bos (free
+    online): threads, atomic instructions and memory ordering, down to
+    the machine code of x86-64 and ARM.
 
 -   Network Programming - [UNIX Network Programming (2 volumes)
     ][13-UNIX-network-programming] by W. Richard Stevens.
@@ -189,16 +231,31 @@ Further Resources on Assembly Language {#further-resources-on-assembly-language}
 
 In assembly language, your best resources are on the web.
 
+-   [Intel\'s manuals][13-Intel-manuals] for their processors, the
+    final word on every instruction.
+
+-   The [System V AMD64 psABI][13-ABI], which defines the calling
+    convention, the stack at process start-up, and the formats used by
+    the linker.
+
+-   The manual of the [GNU Assembler][13-GAS], with every directive.
+
+-   Félix Cloutier\'s [x86 and amd64 instruction reference][13-Cloutier],
+    the Intel manuals as one web page per instruction.
+
+-   [Compiler Explorer][13-Godbolt], to see the assembly language that
+    compilers generate.
+
+-   [Agner Fog\'s optimization manuals][13-Agner] and
+    [uops.info][13-uops], on how fast each instruction runs.
+
 -   [Sandpile][13-Sandpile] - A repository of reference material on
     x86, x86-64, and compatible processors.
 
--   Dr. Dobb\'s - [Journal Microprocessor Resources][13-Dr-Dobb].
-
--   Dr. Paul Carter\'s [PC Assembly Language][13-PC-Assembly] Page.
+-   Dr. Paul Carter\'s [PC Assembly Language][13-PC-Assembly] Page
+    (32-bit x86).
 
 -   [The Art of Assembly][13-Art-of-Assembly] Home Page.
-
--   [Intel\'s manuals][13-Intel-manuals] for their processors.
 
 -   Jan Wagemaker\'s [Linux assembly language examples][13-Wagemaker].
 
@@ -206,7 +263,24 @@ In assembly language, your best resources are on the web.
 
 
 [13-Epigrams-in-programming]: http://www.cs.yale.edu/homes/perlis-alan/quotes.html
-[13-Introduction-Algorithms]: https://mitpress.mit.edu/books/introduction-algorithms-third-edition
+[13-CSAPP]: http://csapp.cs.cmu.edu/
+[13-Introduction-Algorithms]: https://mitpress.mit.edu/9780262046305/introduction-to-algorithms/
+[13-OSTEP]: https://pages.cs.wisc.edu/~remzi/OSTEP/
+[13-Drepper]: https://people.freebsd.org/~lstewart/articles/cpumemory.pdf
+[13-Crafting-interpreters]: https://craftinginterpreters.com/
+[13-Rust-book]: https://doc.rust-lang.org/book/
+[13-Programming-Rust]: https://openlibrary.org/isbn/9781492052593
+[13-Fluent-Python]: https://openlibrary.org/isbn/9781492056355
+[13-Effective-Java]: https://openlibrary.org/isbn/9780134685991
+[13-TLPI]: https://man7.org/tlpi/
+[13-Systems-performance]: https://www.brendangregg.com/systems-performance-2nd-edition-book.html
+[13-Atomics]: https://marabos.nl/atomics/
+[13-ABI]: https://gitlab.com/x86-psABIs/x86-64-ABI
+[13-GAS]: https://sourceware.org/binutils/docs/as/
+[13-Cloutier]: https://www.felixcloutier.com/x86/
+[13-Godbolt]: https://godbolt.org/
+[13-Agner]: https://www.agner.org/optimize/
+[13-uops]: https://uops.info/
 [13-Art-of-computer]: https://en.wikipedia.org/wiki/The_Art_of_Computer_Programming
 [13-Programming-languages]: https://wiki.c2.com/?ProgrammingLanguagesAnInterpreterBasedApproach
 [13-Modern-OS]: https://www.pearson.com/store/p/modern-operating-systems/P100001963021/9780133591620
@@ -215,7 +289,7 @@ In assembly language, your best resources are on the web.
 [13-PGU]: https://savannah.nongnu.org/projects/pgubook/
 [13-Design-programs]: https://htdp.org/
 [13-Simply-scheme]: https://people.eecs.berkeley.edu/~bh/ss-toc2.html
-[13-Python]: https://greenteapress.com/wp/learning-with-python/
+[13-Python]: https://allendowney.github.io/ThinkPython/
 [13-Structure-and-interpretation]: https://mitpress.mit.edu/sites/default/files/sicp/index.html
 [13-Design-patterns]: https://www.pearson.com/us/higher-education/program/Gamma-Design-Patterns-Elements-of-Reusable-Object-Oriented-Software/PGM14333.html
 [13-Rules]: https://www.goodreads.com/book/show/1551485.What_Not_How
@@ -228,7 +302,6 @@ In assembly language, your best resources are on the web.
 [13-C-Programming-Language]: https://openlibrary.org/isbn/9780131103627
 [13-The-Waite]: https://www.pearsonhighered.com/assets/samplechapter/1/5/7/1/1571691618.pdf
 [13-C-Plus-Plus]: https://www.stroustrup.com/4th.html
-[13-Thinking-in-Java]: https://openlibrary.org/isbn/9780131872486
 [13-The-scheme-PL]: https://www.scheme.com/tspl4/
 [13-LALP]: https://www.oreilly.com/library/view/linux-assembly-language/0130879401/
 [13-Programming-Pearls-and-more]: https://openlibrary.org/isbn/9780201657883
@@ -248,9 +321,8 @@ In assembly language, your best resources are on the web.
 [13-CatB]: http://www.catb.org/~esr/writings/cathedral-bazaar/cathedral-bazaar/
 [13-Architecture]: https://openlibrary.org/isbn/9780128119051
 [13-Sandpile]: https://www.sandpile.org/
-[13-Dr-Dobb]: https://www.drdobbs.com/
 [13-PC-Assembly]: https://pacman128.github.io/pcasm/
 [13-Art-of-Assembly]: https://www.plantation-productions.com/Webster/
-[13-Intel-manuals]: https://www.intel.com/content/www/us/en/design/resource-design-center.html
+[13-Intel-manuals]: https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
 [13-Wagemaker]: https://www.janwagemakers.be/eng.html
 [13-x86-Assembly-page]: http://www.azillionmonkeys.com/qed/asm.html

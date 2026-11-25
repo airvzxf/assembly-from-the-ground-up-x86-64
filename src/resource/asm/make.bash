@@ -99,6 +99,18 @@ link64_shared() {
   check_elf64 "${library}"
 }
 
+# rust64 <program> <source> [rustc option]...: compile <program>-bin.
+rust64() {
+  local program="$1" source="$2"
+  shift 2
+  echo "Compiling (Rust): ${program}"
+  rustc --edition 2024 "$@" -o "${program}-bin" "${source}"
+  check_elf64 "${program}-bin"
+}
+
+command -v rustc >/dev/null \
+  || fail_build "rustc is not installed (see scripts/install-deps.bash)"
+
 # The 64-bit programs are added here, chapter by chapter, as they replace
 # the 32-bit programs below.
 
@@ -142,12 +154,7 @@ link64_shared librecord.so 006-01-read-record.o 006-01-write-record.o
 link64 008-03-write-records 006-01-write-records.o -L . -l record \
   -dynamic-linker /lib64/ld-linux-x86-64.so.2
 link64_shared libbook.so 006-01-count-chars.o 008-04-call-count.o
-command -v rustc >/dev/null \
-  || fail_build "rustc is not installed (see scripts/install-deps.bash)"
-echo "Compiling (Rust): 008-05-use-library"
-rustc --edition 2024 -L . -l book -o 008-05-use-library-bin \
-  008-05-use-library.rs
-check_elf64 008-05-use-library-bin
+rust64 008-05-use-library 008-05-use-library.rs -L . -l book
 
 # ----- Chapter 9 -----
 assemble64 009-01-memory-layout 009-02-alloc 009-02-read-records
@@ -162,6 +169,14 @@ link64 010-01-shift-bit 010-01-shift-bit.o
 link64 010-02-conversion-program 010-02-conversion-program.o \
   010-02-integer-to-string.o 006-01-count-chars.o 006-01-write-newline.o
 link64 010-03-floating-point 010-03-floating-point.o "${LIBC[@]}"
+
+# ----- Chapter 11 -----
+rust64 011-01-hello-world 011-01-hello-world.rs
+rust64 011-02-maximum 011-02-maximum.rs -C opt-level=2
+
+# ----- Chapter 12 -----
+assemble64 012-01-allocate-many
+link64 012-01-allocate-many 012-01-allocate-many.o 009-02-alloc.o
 
 # ----- Appendix K, Chapters 3 and 4 -----
 for SOURCE in 0AK-03-*.s 0AK-04-*.s; do
@@ -235,6 +250,9 @@ link64 0AK-10-04-number2integer 0AK-10-04-number2integer.o \
 link64 0AK-10-05-likes 0AK-10-05-likes.o
 link64 0AK-10-06-celsius 0AK-10-06-celsius.o "${LIBC[@]}"
 
+# ----- Appendix K, Chapter 11 -----
+rust64 0AK-11-01-toupper 0AK-11-01-toupper.rs -C opt-level=2
+
 echo ""
 
 # =====================================================
@@ -246,17 +264,6 @@ echo ""
 
 echo "Assembling (32-bit): 0AA-01-gnome-example"
 as --32 --gstabs+ -o 0AA-01-gnome-example.o 0AA-01-gnome-example.s
-
-echo ""
-
-# =====================================================
-# C programs (Chapter 11 and its solutions).
-# =====================================================
-
-echo "Compiling (C): 011-01-hello-world-c"
-gcc -o 011-01-hello-world-c-bin 011-01-hello-world.c
-echo "Compiling (C): 0AK-11-01-maximum-c"
-gcc -o 0AK-11-01-maximum-c-bin 0AK-11-01-maximum.c
 
 echo ""
 

@@ -90,7 +90,7 @@ material. This file records the decisions and tracks the work, one block
   memory manager with 16-byte headers), solutions.
 - [x] **8. Chapter 10** (64-bit integers, `divq`/`cqto`, SSE2 floating
   point), solutions.
-- [ ] **9. Chapters 11–13** (Rust and Python compared with assembly,
+- [x] **9. Chapters 11–13** (Rust and Python compared with assembly,
   `rustc --emit asm`, `perf`, the frame-pointer note, an updated reading
   list), solutions.
 - [ ] **10. Appendices B, E and F, then A** (instructions, high-level

@@ -44,7 +44,7 @@ echo "==> Downloads"
 # Only the example sources (no build artifacts). `zip` may be missing (for
 # example on Cloudflare Pages); Python can do it too.
 SOURCES=(resource/asm/*.s resource/asm/*.c resource/asm/*.py
-         resource/asm/*.rs resource/asm/*.pl resource/asm/*.bash
+         resource/asm/*.rs resource/asm/*.bash
          resource/asm/*.md)
 if command -v zip >/dev/null; then
   zip -q -9 -D -j "${RELEASE_LATEST_PATH}/resource.zip" "${SOURCES[@]}"
