@@ -1,5 +1,5 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
+    .section .note.GNU-stack,"",@progbits
+
     .include "006-01-linux.s"      # Linux Definitions.
     .include "006-01-record-def.s" # Record definitions
 
@@ -33,7 +33,7 @@
             .byte 0
             .endr
 
-            .long 45
+            .quad 45
 
         record2:
             .ascii "Marilyn\0"
@@ -52,7 +52,7 @@
             .byte 0
             .endr
 
-            .long 29
+            .quad 29
 
         record3:
             .ascii "Derrick\0"
@@ -71,60 +71,75 @@
             .byte 0
             .endr
 
-            .long 36
+            .quad 36
+        records_end:
+
+        # Check that every record is exactly
+        # RECORD_SIZE bytes long. If one is not,
+        # the assembler stops with this message.
+        #
+        .if (record2 - record1) != RECORD_SIZE
+        .error "record1 is not RECORD_SIZE bytes"
+        .endif
+        .if (record3 - record2) != RECORD_SIZE
+        .error "record2 is not RECORD_SIZE bytes"
+        .endif
+        .if (records_end - record3) != RECORD_SIZE
+        .error "record3 is not RECORD_SIZE bytes"
+        .endif
 
         file_name:
                             # This is the name of the
                             # file we will write to.
             .ascii "test.dat\0"
 
-
-        .equ ST_FILE_DESCRIPTOR,  -4
+    .section .text
+        .equ ST_FILE_DESCRIPTOR,  -8
 
         .globl _start
 
 _start:
-    movl  %esp, %ebp        # Copy the stack pointer to
-                            # %ebp.
-    subl  $4, %esp          # Allocate space to hold
+    movq  %rsp, %rbp        # Copy the stack pointer to
+                            # %rbp.
+    subq  $16, %rsp         # Allocate space to hold
                             # the file descriptor.
 
-    movl  $SYS_OPEN, %eax   # Open the file.
-    movl  $file_name, %ebx
-    movl  $0101, %ecx       # This says to create if it
-                            # does not exist, and open
-                            # for writing.
-    movl  $0666, %edx
-    int   $LINUX_SYSCALL
+    movq  $SYS_OPENAT, %rax # Open the file.
+    movq  $AT_FDCWD, %rdi
+    leaq  file_name(%rip), %rsi
+    movq  $O_CREAT_WRONLY_TRUNC, %rdx
+                            # This says to create if it
+                            # does not exist, empty it
+                            # if it does, and open for
+                            # writing.
+    movq  $0666, %r10
+    syscall
 
                             # Store the file descriptor
                             # away.
-    movl  %eax, ST_FILE_DESCRIPTOR(%ebp)
+    movq  %rax, ST_FILE_DESCRIPTOR(%rbp)
 
                             # Write the first record.
-    pushl ST_FILE_DESCRIPTOR(%ebp)
-    pushl $record1
-    call  _write_record
-    addl  $8, %esp
+    movq  ST_FILE_DESCRIPTOR(%rbp), %rdi
+    leaq  record1(%rip), %rsi
+    call  write_record
 
                             # Write the second record.
-    pushl ST_FILE_DESCRIPTOR(%ebp)
-    pushl $record2
-    call  _write_record
-    addl  $8, %esp
+    movq  ST_FILE_DESCRIPTOR(%rbp), %rdi
+    leaq  record2(%rip), %rsi
+    call  write_record
 
                             # Write the third record.
-    pushl ST_FILE_DESCRIPTOR(%ebp)
-    pushl $record3
-    call  _write_record
-    addl  $8, %esp
+    movq  ST_FILE_DESCRIPTOR(%rbp), %rdi
+    leaq  record3(%rip), %rsi
+    call  write_record
 
                             # Close the file descriptor
-    movl  $SYS_CLOSE, %eax
-    movl  ST_FILE_DESCRIPTOR(%ebp), %ebx
-    int   $LINUX_SYSCALL
+    movq  $SYS_CLOSE, %rax
+    movq  ST_FILE_DESCRIPTOR(%rbp), %rdi
+    syscall
 
                             # Exit the program.
-    movl  $SYS_EXIT, %eax
-    movl  $0, %ebx
-    int   $LINUX_SYSCALL
+    movq  $SYS_EXIT, %rax
+    movq  $0, %rdi
+    syscall

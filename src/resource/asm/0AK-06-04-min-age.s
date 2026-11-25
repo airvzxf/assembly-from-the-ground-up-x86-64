@@ -1,4 +1,3 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
     # Link with `006-01-read-record.o`.
     #
     # PURPOSE:
@@ -9,9 +8,12 @@
     #     `006-01-write-records`.
     #
     # VARIABLES:
-    #     %esi - File descriptor.
-    #     %edi - smallest age so far.
+    #     %r12 - File descriptor.
+    #     %r13 - smallest age so far.
+    #     %r14 - 1 until the first record is read.
     #
+    .section .note.GNU-stack,"",@progbits
+
     .include "006-01-linux.s"
     .include "006-01-record-def.s"
 
@@ -26,39 +28,36 @@
         .globl _start
 
 _start:
-    movl  $SYS_OPEN, %eax
-    movl  $file_name, %ebx
-    movl  $0, %ecx           # Read only.
-    movl  $0666, %edx
-    int   $LINUX_SYSCALL
-    movl  %eax, %esi
+    movq  $SYS_OPENAT, %rax
+    movq  $AT_FDCWD, %rdi
+    leaq  file_name(%rip), %rsi
+    movq  $O_RDONLY, %rdx
+    movq  $0666, %r10
+    syscall
+    movq  %rax, %r12
+    movq  $0, %r13           # 0 if there are no
+    movq  $1, %r14           # records.
 
-    movl  $0, %edi           # 0 if there are no
-    movl  $1, %ebx           # records; %ebx = 1
-                             # marks the first one.
-_record_loop:
-    pushl %esi
-    pushl $record_buffer
-    call  _read_record
-    addl  $8, %esp
-    cmpl  $RECORD_SIZE, %eax
-    jne   _finished
+record_loop:
+    movq  %r12, %rdi
+    leaq  record_buffer(%rip), %rsi
+    call  read_record
+    cmpq  $RECORD_SIZE, %rax
+    jne   finished
+    movq  record_buffer + RECORD_AGE(%rip), %rax
+    cmpq  $1, %r14           # First record: it is
+    je    new_value          # the smallest so far.
+    cmpq  %r13, %rax
+    jge   record_loop       # Not smaller.
+new_value:
+    movq  %rax, %r13
+    movq  $0, %r14
+    jmp   record_loop
 
-    movl  record_buffer + RECORD_AGE, %eax
-    cmpl  $1, %ebx           # First record: it is
-    je    _new_value         # the smallest so far.
-    cmpl  %edi, %eax
-    jge   _record_loop       # Not smaller.
-_new_value:
-    movl  %eax, %edi
-    movl  $0, %ebx
-    jmp   _record_loop
-
-_finished:
-    movl  $SYS_CLOSE, %eax
-    movl  %esi, %ebx
-    int   $LINUX_SYSCALL
-
-    movl  $SYS_EXIT, %eax
-    movl  %edi, %ebx         # The age is the
-    int   $LINUX_SYSCALL     # status code.
+finished:
+    movq  $SYS_CLOSE, %rax
+    movq  %r12, %rdi
+    syscall
+    movq  $SYS_EXIT, %rax
+    movq  %r13, %rdi         # The age is the
+    syscall                  # status code.

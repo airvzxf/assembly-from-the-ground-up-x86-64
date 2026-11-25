@@ -1,4 +1,3 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
     # Link with `006-01-write-record.o`.
     #
     # PURPOSE:
@@ -7,8 +6,10 @@
     #     with a loop.
     #
     # OUTPUT:
-    #     A file of 30 * 324 = 9720 bytes.
+    #     A file of 30 * 328 = 9840 bytes.
     #
+    .section .note.GNU-stack,"",@progbits
+
     .include "006-01-linux.s"
     .include "006-01-record-def.s"
 
@@ -22,33 +23,32 @@
             .space 40 - 9
             .ascii "4242 S Prairie\nTulsa, OK 55555\0"
             .space 240 - 31
-            .long 45
+            .quad 45
 
     .section .text
         .globl _start
         .equ RECORD_COUNT, 30
 
 _start:
-    movl  $SYS_OPEN, %eax
-    movl  $file_name, %ebx
-    movl  $03101, %ecx       # Create, write, truncate.
-    movl  $0666, %edx
-    int   $LINUX_SYSCALL
-    movl  %eax, %esi         # File descriptor.
+    movq  $SYS_OPENAT, %rax
+    movq  $AT_FDCWD, %rdi
+    leaq  file_name(%rip), %rsi
+    movq  $O_CREAT_WRONLY_TRUNC, %rdx
+    movq  $0666, %r10
+    syscall
+    movq  %rax, %r12         # File descriptor.
+    movq  $RECORD_COUNT, %r13    # Loop counter.
 
-    movl  $RECORD_COUNT, %edi    # Loop counter.
-_write_loop:
-    pushl %esi
-    pushl $record
-    call  _write_record
-    addl  $8, %esp
-    decl  %edi
-    jnz   _write_loop        # Until %edi = 0.
+write_loop:
+    movq  %r12, %rdi
+    leaq  record(%rip), %rsi
+    call  write_record
+    decq  %r13
+    jnz   write_loop         # Until %r13 = 0.
 
-    movl  $SYS_CLOSE, %eax
-    movl  %esi, %ebx
-    int   $LINUX_SYSCALL
-
-    movl  $SYS_EXIT, %eax
-    movl  $0, %ebx
-    int   $LINUX_SYSCALL
+    movq  $SYS_CLOSE, %rax
+    movq  %r12, %rdi
+    syscall
+    movq  $SYS_EXIT, %rax
+    movq  $0, %rdi
+    syscall

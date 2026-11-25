@@ -1,41 +1,54 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
+    # PURPOSE:
+    #     Write an error code and an error message to
+    #     STDERR, and exit with status 1.
     #
+    # INPUT:
+    #     %rdi - The address of the error code (a
+    #            null-terminated string).
+    #     %rsi - The address of the error message (a
+    #            null-terminated string).
+    #
+    # OUTPUT:
+    #     It never returns.
+    #
+    .section .note.GNU-stack,"",@progbits
+
     .include "006-01-linux.s"      # Linux Definitions.
 
-        .equ ST_ERROR_CODE,  8
-        .equ ST_ERROR_MSG,   12
+    .section .text
+        .globl error_exit
+        .type  error_exit,   @function
 
-        .globl _error_exit
-        .type  _error_exit,   @function
-
-_error_exit:
-    pushl %ebp
-    movl  %esp, %ebp
+error_exit:
+    pushq %rbp
+    movq  %rsp, %rbp
+    pushq %rbx              # Keep the parameters in
+    pushq %r12              # callee-saved registers:
+    movq  %rdi, %rbx        # count_chars may change
+    movq  %rsi, %r12        # %rdi and %rsi.
 
                             # Write out error code.
-    movl  ST_ERROR_CODE(%ebp), %ecx
-    pushl %ecx
-    call  _count_chars
-    popl  %ecx
-    movl  %eax, %edx
-    movl  $STDERR, %ebx
-    movl  $SYS_WRITE, %eax
-    int   $LINUX_SYSCALL
+    movq  %rbx, %rdi
+    call  count_chars
+    movq  %rax, %rdx
+    movq  %rbx, %rsi
+    movq  $STDERR, %rdi
+    movq  $SYS_WRITE, %rax
+    syscall
 
                             # Write out error message.
-    movl  ST_ERROR_MSG(%ebp), %ecx
-    pushl %ecx
-    call  _count_chars
-    popl  %ecx
-    movl  %eax, %edx
-    movl  $STDERR, %ebx
-    movl  $SYS_WRITE, %eax
-    int   $LINUX_SYSCALL
+    movq  %r12, %rdi
+    call  count_chars
+    movq  %rax, %rdx
+    movq  %r12, %rsi
+    movq  $STDERR, %rdi
+    movq  $SYS_WRITE, %rax
+    syscall
 
-    pushl $STDERR
-    call  _write_newline
+    movq  $STDERR, %rdi
+    call  write_newline
 
                             # Exit with status 1.
-    movl  $SYS_EXIT, %eax
-    movl  $1, %ebx
-    int   $LINUX_SYSCALL
+    movq  $SYS_EXIT, %rax
+    movq  $1, %rdi
+    syscall

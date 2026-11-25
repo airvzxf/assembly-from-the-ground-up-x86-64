@@ -1,53 +1,43 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
     # PURPOSE:
-    #     `_read_record` and `_write_record` for the
+    #     `read_record` and `write_record` for the
     #     record with a phone number. The code is the
     #     same as in `006-01-read-record.s` and
     #     `006-01-write-record.s`; only RECORD_SIZE
     #     changes, so they must be reassembled.
     #
     # INPUT (both functions):
-    #     First argument  - Address of the buffer.
-    #     Second argument - File descriptor.
+    #     %rdi - File descriptor.
+    #     %rsi - Address of the buffer.
     #
     # OUTPUT:
-    #     %eax - Result of the read/write call.
+    #     %rax - Result of the read/write call.
     #
+    .section .note.GNU-stack,"",@progbits
+
     .include "006-01-linux.s"
     .include "0AK-06-01-record-def.s"
-        .equ ST_BUFFER,   8
-        .equ ST_FILEDES,  12
 
     .section .text
-        .globl _read_record
-        .type  _read_record, @function
-_read_record:
-    pushl %ebp
-    movl  %esp, %ebp
-    pushl %ebx
-    movl  ST_FILEDES(%ebp), %ebx
-    movl  ST_BUFFER(%ebp), %ecx
-    movl  $RECORD_SIZE, %edx
-    movl  $SYS_READ, %eax
-    int   $LINUX_SYSCALL
-    popl  %ebx
-    movl  %ebp, %esp
-    popl  %ebp
+        .globl read_record
+        .type  read_record, @function
+read_record:
+    pushq %rbp
+    movq  %rsp, %rbp
+    movq  $RECORD_SIZE, %rdx
+    movq  $SYS_READ, %rax
+    syscall
+    movq  %rbp, %rsp
+    popq  %rbp
     ret
 
-        .globl _write_record
-        .type  _write_record, @function
-_write_record:
-    pushl %ebp
-    movl  %esp, %ebp
-    pushl %ebx
-    movl  ST_FILEDES(%ebp), %ebx
-    movl  ST_BUFFER(%ebp), %ecx
-    movl  $RECORD_SIZE, %edx
-    movl  $SYS_WRITE, %eax
-    int   $LINUX_SYSCALL
-    popl  %ebx
-    movl  %ebp, %esp
-    popl  %ebp
+        .globl write_record
+        .type  write_record, @function
+write_record:
+    pushq %rbp
+    movq  %rsp, %rbp
+    movq  $RECORD_SIZE, %rdx
+    movq  $SYS_WRITE, %rax
+    syscall
+    movq  %rbp, %rsp
+    popq  %rbp
     ret

@@ -1,5 +1,5 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
+    .section .note.GNU-stack,"",@progbits
+
     .include "006-01-linux.s"      # Linux Definitions.
     .include "006-01-record-def.s" # Record definitions
 
@@ -15,35 +15,36 @@
 
         # --- Stack offsets of local variables --- #
         #
-        .equ ST_INPUT_DESCRIPTOR,  -4
-        .equ ST_OUTPUT_DESCRIPTOR, -8
+        .equ ST_INPUT_DESCRIPTOR,  -8
+        .equ ST_OUTPUT_DESCRIPTOR, -16
 
     .section .text
         .globl _start
 
 _start:
-    movl  %esp, %ebp        # Copy stack pointer and
-    subl  $8, %esp          # make room for local
+    movq  %rsp, %rbp        # Copy stack pointer and
+    subq  $16, %rsp         # make room for local
                             # variables.
 
-    movl  $SYS_OPEN, %eax   # Open file for reading.
-    movl  $input_file_name, %ebx
-    movl  $0, %ecx
-    movl  $0666, %edx
-    int   $LINUX_SYSCALL
+    movq  $SYS_OPENAT, %rax # Open file for reading.
+    movq  $AT_FDCWD, %rdi
+    leaq  input_file_name(%rip), %rsi
+    movq  $O_RDONLY, %rdx
+    movq  $0666, %r10
+    syscall
 
-    movl  %eax, ST_INPUT_DESCRIPTOR(%ebp)
+    movq  %rax, ST_INPUT_DESCRIPTOR(%rbp)
 
-                    # This will test and see if %eax is
+                    # This will test and see if %rax is
                     # negative.  If it is not negative,
                     # it will jump to
-                    # _continue_processing. Otherwise
+                    # continue_processing. Otherwise
                     # it will handle the error
                     # condition that the negative
                     # number represents.
                     #
-    cmpl  $0, %eax
-    jge   _continue_processing
+    cmpq  $0, %rax
+    jge   continue_processing
 
     # ----- SEND THE ERROR ----- #
     #
@@ -54,45 +55,44 @@ _start:
             .ascii "Can't Open Input File.\0"
 
     .section .text
-    pushl $no_open_file_msg
-    pushl $no_open_file_code
-    call  _error_exit
+    leaq  no_open_file_code(%rip), %rdi
+    leaq  no_open_file_msg(%rip), %rsi
+    call  error_exit
 
-_continue_processing:
+continue_processing:
 
-    movl  $SYS_OPEN, %eax   # Open file for writing.
-    movl  $output_file_name, %ebx
-    movl  $0101, %ecx
-    movl  $0666, %edx
-    int   $LINUX_SYSCALL
+    movq  $SYS_OPENAT, %rax # Open file for writing.
+    movq  $AT_FDCWD, %rdi
+    leaq  output_file_name(%rip), %rsi
+    movq  $O_CREAT_WRONLY_TRUNC, %rdx
+    movq  $0666, %r10
+    syscall
 
-    movl  %eax, ST_OUTPUT_DESCRIPTOR(%ebp)
+    movq  %rax, ST_OUTPUT_DESCRIPTOR(%rbp)
 
-_loop_begin:
-    pushl ST_INPUT_DESCRIPTOR(%ebp)
-    pushl $record_buffer
-    call  _read_record
-    addl  $8, %esp
+loop_begin:
+    movq  ST_INPUT_DESCRIPTOR(%rbp), %rdi
+    leaq  record_buffer(%rip), %rsi
+    call  read_record
 
     # Returns the number of bytes read. If it is not
     # the same number we requested, then it is either
     # an end-of-file, or an error, so we are quitting.
     #
-    cmpl  $RECORD_SIZE, %eax
-    jne   _loop_end
+    cmpq  $RECORD_SIZE, %rax
+    jne   loop_end
 
                             # Increment the age.
-    incl  record_buffer + RECORD_AGE
+    incq  record_buffer + RECORD_AGE(%rip)
 
                             # Write the record out.
-    pushl ST_OUTPUT_DESCRIPTOR(%ebp)
-    pushl $record_buffer
-    call  _write_record
-    addl  $8, %esp
+    movq  ST_OUTPUT_DESCRIPTOR(%rbp), %rdi
+    leaq  record_buffer(%rip), %rsi
+    call  write_record
 
-    jmp   _loop_begin
+    jmp   loop_begin
 
-_loop_end:
-    movl  $SYS_EXIT, %eax
-    movl  $0, %ebx
-    int   $LINUX_SYSCALL
+loop_end:
+    movq  $SYS_EXIT, %rax
+    movq  $0, %rdi
+    syscall

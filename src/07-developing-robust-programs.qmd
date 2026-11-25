@@ -44,8 +44,11 @@ to work anyway. It doesn\'t report any error message so the user won\'t
 even know that they typed in the name wrong. Let\'s say that the
 destination file is on a network drive, and the network temporarily
 fails. The operating system is returning a status code to us
-in _%eax_, but we aren\'t checking it. Therefore, if a failure
-occurs, the user is totally unaware. This program is definitely not
+in _%rax_, but we aren\'t checking it. Therefore, if a failure
+occurs, the user is totally unaware. (The solutions of Chapter 5, in
+[Appendix K](appendix-k-solutions-to-the-review-questions.qmd#chapter-5.-dealing-with-files),
+show it with `strace`: with a missing input file, the calls after
+`openat` fail, and the program still exits with status 0.) This program is definitely not
 robust. As you can see, even in a simple program there are a lot of
 things that can go wrong that a programmer must contend with.
 
@@ -257,17 +260,24 @@ will do to recover is to print the error and exit. The code
 ```{.gnuassembler .numberLines include=resource/asm/007-01-error-exit.s}
 ```
 
-Enter it in a file called `007-01-error-exit.s`. To call it, you just need to
-push the address of an error message, and then an error code onto the
-stack, and call the function.
+Enter it in a file called `007-01-error-exit.s`. To call it, you just
+need to put the address of an error code in _%rdi_ and the address of
+an error message in _%rsi_ (both of them null-terminated strings), and
+call the function. Notice that the function keeps its parameters in
+_%rbx_ and _%r12_ while it works: it calls `count_chars`, which may
+overwrite _%rdi_ and _%rsi_, but must leave the callee-saved registers
+alone. Since _%rbx_ and _%r12_ are callee-saved for `error_exit` too, it
+saves their old values on the stack first. The function never returns,
+so it never restores them, but following the convention everywhere costs
+little and avoids surprises.
 
 Now let\'s look for potential error spots in our `006-01-add-year` program.
-First of all, we don\'t check to see if either of our `open` system
+First of all, we don\'t check to see if either of our `openat` system
 calls actually complete properly. Linux returns its status code in
-_%eax_, so we need to check and see if there is an error. This new version
+_%rax_, so we need to check and see if there is an error. This new version
 is called `007-01-add-year.s`:
 
-```{.gnuassembler .numberLines include=resource/asm/007-01-add-year.s startLine=29 endLine=67}
+```{.gnuassembler .numberLines include=resource/asm/007-01-add-year.s startLine=29 endLine=62}
 ```
 
 So, after calling the system call, we check and see if we have an error
@@ -281,25 +291,16 @@ error checking and handling code.
 To assemble and link the files, do:
 
 ```{.bash}
-as -o 007-01-add-year.o    --32 \
-                           --gstabs+ \
-                           007-01-add-year.s
-
-as -o 007-01-error-exit.o  --32 \
-                           --gstabs+ \
-                           007-01-error-exit.s
-
-ld -o 007-01-add-year      -m elf_i386 \
-                           006-01-count-chars.o \
-                           006-01-read-record.o \
-                           006-01-write-newline.o \
-                           006-01-write-record.o \
-                           007-01-add-year.o \
-                           007-01-error-exit.o
+as -g -o 007-01-add-year.o 007-01-add-year.s
+as -g -o 007-01-error-exit.o 007-01-error-exit.s
+ld -o 007-01-add-year 006-01-count-chars.o 006-01-read-record.o \
+  006-01-write-newline.o 006-01-write-record.o \
+  007-01-add-year.o 007-01-error-exit.o
 ```
 
 Now try to run it without the necessary files. It now exits cleanly and
-gracefully!
+gracefully, with the message `0001: Can't Open Input File.` and the exit
+status 1!
 
 Review {#review-5}
 ------

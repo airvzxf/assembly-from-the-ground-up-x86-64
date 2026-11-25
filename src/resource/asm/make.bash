@@ -117,6 +117,19 @@ link64 004-02-factorial 004-02-factorial.o
 assemble64 005-01-toupper
 link64 005-01-toupper 005-01-toupper.o
 
+# ----- Chapters 6 and 7 -----
+assemble64 006-01-count-chars 006-01-read-record 006-01-write-record \
+  006-01-write-newline 006-01-write-records 006-01-read-records \
+  006-01-add-year 007-01-error-exit 007-01-add-year
+link64 006-01-write-records 006-01-write-records.o 006-01-write-record.o
+link64 006-01-read-records 006-01-read-records.o 006-01-read-record.o \
+  006-01-count-chars.o 006-01-write-newline.o
+link64 006-01-add-year 006-01-add-year.o 006-01-read-record.o \
+  006-01-write-record.o
+link64 007-01-add-year 007-01-add-year.o 007-01-error-exit.o \
+  006-01-read-record.o 006-01-write-record.o 006-01-count-chars.o \
+  006-01-write-newline.o
+
 # ----- Appendix K, Chapters 3 and 4 -----
 for SOURCE in 0AK-03-*.s 0AK-04-*.s; do
   assemble64 "${SOURCE%.s}"
@@ -135,27 +148,64 @@ link64 0AK-05-03-heynow 0AK-05-03-heynow.o
 link64 0AK-05-04-toupper-checked 0AK-05-04-toupper-checked.o \
   0AK-05-00-convert-to-upper.o
 
+# ----- Appendix K, Chapters 6 and 7 -----
+for SOURCE in 0AK-06-*.s 0AK-07-*.s; do
+  [[ "${SOURCE}" == 0AK-06-01-record-def.s ]] && continue  # Included.
+  assemble64 "${SOURCE%.s}"
+done
+link64 0AK-06-01-write-records 0AK-06-01-write-records.o \
+  0AK-06-01-record-io.o
+link64 0AK-06-01-read-records 0AK-06-01-read-records.o \
+  0AK-06-01-record-io.o 006-01-count-chars.o 006-01-write-newline.o
+link64 0AK-06-02-write-30-records 0AK-06-02-write-30-records.o \
+  006-01-write-record.o
+link64 0AK-06-03-max-age 0AK-06-03-max-age.o 006-01-read-record.o
+link64 0AK-06-04-min-age 0AK-06-04-min-age.o 006-01-read-record.o
+link64 0AK-06-05-add-year-in-place 0AK-06-05-add-year-in-place.o \
+  006-01-read-record.o 006-01-write-record.o
+link64 0AK-06-07-find-records 0AK-06-07-find-records.o \
+  0AK-06-06-compare-strings.o 006-01-read-record.o \
+  006-01-count-chars.o 006-01-write-newline.o
+link64 0AK-07-01-add-year-robust 0AK-07-01-add-year-robust.o \
+  006-01-read-record.o 006-01-write-record.o 007-01-error-exit.o \
+  006-01-count-chars.o 006-01-write-newline.o
+
 echo ""
 
 # =====================================================
 # 32-bit programs inherited from the x86 32-bit edition.
 # =====================================================
 # Each chapter of the x86-64 edition removes its programs from here.
+#
+# legacy32/ holds the 32-bit versions of the files that are already
+# 64-bit but that these programs still need (for example
+# 006-01-linux.s and 006-01-count-chars.s). The 32-bit sources are
+# assembled from inside legacy32/, because `as` looks for the files of
+# `.include` in the current directory first: there it finds the 32-bit
+# definitions. legacy32/ is deleted when the last 32-bit program goes.
+
+# as32 <name>: assemble ../<name>.s (a source of this directory) into
+# <name>.o, from inside legacy32/.
+as32() {
+  echo "Assembling (32-bit): $1"
+  (cd legacy32 && as --32 --gstabs+ -o "../$1.o" "../$1.s")
+}
+
+# The 32-bit copies of the files that are 64-bit now.
+for SOURCE in legacy32/*.s; do
+  NAME="$(basename "${SOURCE%.s}")"
+  case "${NAME}" in
+    006-01-linux|006-01-record-def) continue ;;  # Included.
+  esac
+  echo "Assembling (32-bit): legacy32/${NAME}"
+  (cd legacy32 && as --32 --gstabs+ -o "${NAME}.o" "${NAME}.s")
+done
 
 # -----------------------------------------------------
 # Compile all the files.
 # -----------------------------------------------------
 
 FILES=(
-  006-01-add-year
-  006-01-count-chars
-  006-01-read-record
-  006-01-read-records
-  006-01-write-newline
-  006-01-write-record
-  006-01-write-records
-  007-01-error-exit
-  007-01-add-year
   008-01-hello-world-lib
   008-01-hello-world-nolib
   008-02-printf-example
@@ -170,8 +220,7 @@ FILES=(
 
 for FILE in "${FILES[@]}"
 do
-    echo "Assembling: ${FILE}"
-    as -o "${FILE}.o" "${FILE}.s" --32 --gstabs+
+    as32 "${FILE}"
 done
 
 echo ""
@@ -198,33 +247,6 @@ echo ""
 # Linked special files.
 # -----------------------------------------------------
 
-echo "Linking #2: 006-01-write-records"
-ld -o "006-01-write-records-bin" -m elf_i386 \
-  "006-01-write-record.o" \
-  "006-01-write-records.o"
-
-echo "Linking #2: 006-01-read-records"
-ld -o "006-01-read-records-bin" -m elf_i386 \
-  "006-01-count-chars.o" \
-  "006-01-read-record.o" \
-  "006-01-read-records.o" \
-  "006-01-write-newline.o"
-
-echo "Linking #2: 006-01-add-year"
-ld -o "006-01-add-year-bin" -m elf_i386 \
-  "006-01-add-year.o" \
-  "006-01-read-record.o" \
-  "006-01-write-record.o"
-
-echo "Linking #2: 007-01-add-year"
-ld -o "007-01-add-year-bin" -m elf_i386 \
-  "006-01-count-chars.o" \
-  "006-01-read-record.o" \
-  "006-01-write-newline.o" \
-  "006-01-write-record.o" \
-  "007-01-add-year.o" \
-  "007-01-error-exit.o"
-
 echo "Linking #2: 008-01-hello-world-lib"
 ld -o "008-01-hello-world-lib-bin" -m elf_i386 \
   "008-01-hello-world-lib.o" \
@@ -242,28 +264,28 @@ ld -o "008-02-printf-example-bin" -m elf_i386 \
 echo "Linking #2: librecord.so"
 ld -o "librecord.so" -m elf_i386 \
   -shared \
-  "006-01-read-record.o" \
-  "006-01-write-record.o"
+  "legacy32/006-01-read-record.o" \
+  "legacy32/006-01-write-record.o"
 
 echo "Linking #2: 008-03-write-records"
 ld -o "008-03-write-records-bin" -m elf_i386 \
-  "006-01-write-records.o" \
+  "legacy32/006-01-write-records.o" \
   --library record \
   --library-path . \
   -dynamic-linker /usr/lib32/ld-linux.so.2
 
 echo "Linking #2: 009-02-read-records"
 ld -o "009-02-read-records-bin" -m elf_i386 \
-  "006-01-count-chars.o" \
-  "006-01-read-record.o" \
-  "006-01-write-newline.o" \
+  "legacy32/006-01-count-chars.o" \
+  "legacy32/006-01-read-record.o" \
+  "legacy32/006-01-write-newline.o" \
   "009-02-alloc.o" \
   "009-02-read-records.o"
 
 echo "Linking #2: 010-02-conversion-program"
 ld -o "010-02-conversion-program-bin" -m elf_i386 \
-  "006-01-count-chars.o" \
-  "006-01-write-newline.o" \
+  "legacy32/006-01-count-chars.o" \
+  "legacy32/006-01-write-newline.o" \
   "010-02-conversion-program.o" \
   "010-02-integer-to-string.o"
 
@@ -278,9 +300,8 @@ gcc -o "011-01-hello-world-c-bin" "011-01-hello-world.c"
 
 for SOURCE in 0AK-*.s
 do
-    [[ "${SOURCE}" == 0AK-0[345]-* ]] && continue  # 64-bit.
-    echo "Assembling: ${SOURCE%.s}"
-    as -o "${SOURCE%.s}.o" "${SOURCE}" --32 --gstabs+
+    [[ "${SOURCE}" == 0AK-0[34567]-* ]] && continue  # 64-bit.
+    as32 "${SOURCE%.s}"
 done
 
 # Link a solution: link_solution <program> [extra objects/options...]
@@ -293,27 +314,6 @@ link_solution() {
 
 LIBC=(--library c --library-path /usr/lib32/
       -dynamic-linker /usr/lib32/ld-linux.so.2)
-
-# TEMPORARY (until block 6): the 32-bit convert_to_upper for
-# 0AK-08-03-toupper-libc.
-echo "Assembling: legacy32/0AK-05-00-convert-to-upper"
-as -o legacy32/0AK-05-00-convert-to-upper.o --32 --gstabs+ \
-  legacy32/0AK-05-00-convert-to-upper.s
-
-link_solution 0AK-06-01-write-records 0AK-06-01-record-io.o
-link_solution 0AK-06-01-read-records 0AK-06-01-record-io.o \
-  006-01-count-chars.o 006-01-write-newline.o
-link_solution 0AK-06-02-write-30-records 006-01-write-record.o
-link_solution 0AK-06-03-max-age 006-01-read-record.o
-link_solution 0AK-06-04-min-age 006-01-read-record.o
-link_solution 0AK-06-05-add-year-in-place \
-  006-01-read-record.o 006-01-write-record.o
-link_solution 0AK-06-07-find-records 0AK-06-06-compare-strings.o \
-  006-01-read-record.o 006-01-count-chars.o 006-01-write-newline.o
-
-link_solution 0AK-07-01-add-year-robust \
-  006-01-read-record.o 006-01-write-record.o 007-01-error-exit.o \
-  006-01-count-chars.o 006-01-write-newline.o
 
 echo "Linking #4: libfactorial.so"
 ld -shared -m elf_i386 -o libfactorial.so 0AK-08-01-factorial-lib.o
@@ -332,10 +332,10 @@ ld -o 0AK-09-02-alloc-test-book-bin -m elf_i386 \
 link_solution 0AK-09-03-alloc-auto-init 0AK-09-01-alloc.o
 
 link_solution 0AK-10-02-print-numbers 0AK-10-01-integer2string-base.o \
-  0AK-08-01-factorial-lib.o 006-01-write-newline.o
+  0AK-08-01-factorial-lib.o legacy32/006-01-write-newline.o
 link_solution 0AK-10-03-is-negative
 link_solution 0AK-10-04-number2integer \
-  0AK-10-01-integer2string-base.o 006-01-write-newline.o
+  0AK-10-01-integer2string-base.o legacy32/006-01-write-newline.o
 link_solution 0AK-10-05-likes
 
 echo "Linking #4: 0AK-11-01-maximum-c"
