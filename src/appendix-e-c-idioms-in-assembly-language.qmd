@@ -342,10 +342,11 @@ example:
 static GLOBAL_DATA: i64 = 30;
 ```
 
-In assembly language, this would be:
+In assembly language, this would be (in `.rodata`, because a `static`
+without `mut` can\'t change):
 
 ```{.gnuassembler}
-.section .data
+.section .rodata
     global_data:
         .quad 30
 ```
