@@ -277,8 +277,8 @@ Inline Functions:
     involve the overhead of moving arguments into registers, saving the
     registers that the caller needs, setting up the stack frame and
     doing the jumps (remember locality of reference - your code may be
-    swapped out on disk instead of in memory). For high level languages, it\'s
-    often impossible for compilers to do optimizations across
+    swapped out on disk instead of in memory). For high level languages,
+    it\'s often impossible for compilers to do optimizations across
     function-call boundaries. However, some languages support inline
     functions or function macros. These functions
     look, smell, taste, and act like real functions, except the compiler
@@ -321,7 +321,8 @@ Addressing Modes:
     one cycle more on some of them); what takes time is the memory
     itself. A value in the processor\'s cache arrives in a few cycles,
     and one that has to come from the main memory can take dozens of
-    times longer, up to a hundred, which is what `perf annotate` showed above. So keep
+    times longer, up to a hundred. In `perf annotate` above, most of the
+    samples fell on the instructions that read memory. So keep
     the values you use most in registers, and the rest close together
     in memory.
 
@@ -363,8 +364,9 @@ maximum:
 	testq	%rsi, %rsi
 ```
 
-The benefits of omitting it are two instructions less in every
-function, and one more register, _%rbp_, for the program\'s own values
+The benefits of omitting it are up to three fewer instructions in every
+function (`pushq %rbp` and `movq %rsp, %rbp` at the start, `popq %rbp`
+at the end), and one more register, _%rbp_, for the program\'s own values
 (x86-64 has fifteen, besides _%rsp_, so one more is a few percent).
 
 The cost appears when you need to know *who called whom*. With frame

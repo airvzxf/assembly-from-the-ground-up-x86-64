@@ -1632,8 +1632,9 @@ Chapter 12. Optimization {#chapter-12.-optimization}
     each function, and `perf annotate` in each instruction.
 
 -   **What are the benefits and the costs of omitting the frame
-    pointer?** Benefits: two instructions less in each function and one
-    more register (_%rbp_) for the program\'s values. Costs: the chain
+    pointer?** Benefits: up to three fewer instructions in each function
+    (`pushq %rbp`, `movq %rsp, %rbp` and `popq %rbp`) and one more
+    register (_%rbp_) for the program\'s values. Costs: the chain
     of saved _%rbp_ values no longer exists, so debuggers and profilers
     can\'t find the callers by following it; they need the unwind
     tables, which are slower to use, and profiling with call graphs
