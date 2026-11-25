@@ -5,9 +5,22 @@
     the Modified Version to *Assembly from the Ground Up: x86-64
     Edition*, as required by the GNU Free Documentation License, and
     pointed the copyright page, the links and the website to this
-    edition. The text and the examples are being ported to 64-bit Linux
+    edition. Rewrote every chapter and appendix for 64-bit Linux
     programs: AT&T syntax with the GNU Assembler, the `syscall`
-    instruction and the System V AMD64 calling convention.
+    instruction, the System V AMD64 calling convention, data reached
+    relative to `%rip` (so every program also works as a PIE), `.quad`
+    numbers and a non-executable stack. The records of Chapter 6 grew to
+    328 bytes. New material: `strace` (Chapter 5), calling the C library
+    with `@PLT`, position-independent code and calling assembly from
+    Rust and Python (Chapter 8), the memory map, ASLR, `mmap` and a
+    memory manager with 16-byte headers (Chapter 9), `divq`/`cqto` and
+    SSE2 floating point (Chapter 10), `rustc --emit asm` and Python
+    bytecode (Chapter 11), `perf` and the frame pointer (Chapter 12),
+    an updated reading list (Chapter 13), 64-bit instruction tables
+    (Appendix B), Rust idioms (Appendix E), gdb sessions of the 64-bit
+    programs (Appendix F) and a GTK 4 example (Appendix A). The
+    solutions of Appendix K were rewritten and extended, and every
+    example program is built and tested by the scripts of the book.
 
 -   11/23/2026 - Version 3.0 - Israel Roldan (AirvZxf). Renamed the
     Modified Version to *Assembly from the Ground Up: x86 32-bit

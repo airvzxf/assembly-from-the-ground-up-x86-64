@@ -49,7 +49,6 @@ if [[ "${USER_MODE}" == 0 ]]; then
     build-essential \
     ca-certificates \
     curl \
-    gcc-multilib \
     gir1.2-gtk-4.0 \
     libgtk-4-dev \
     python3 \
