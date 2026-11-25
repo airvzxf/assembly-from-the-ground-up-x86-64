@@ -225,6 +225,55 @@ expect_output "0AK-07-01-add-year-robust (output error)" \
   sh -c "cd '${C7}' && '${PWD}/0AK-07-01-add-year-robust-bin' 2>&1"
 
 # ----- Chapter 8 -----
+DYNAMIC_LINKER=/lib64/ld-linux-x86-64.so.2
+expect_output 008-01-hello-world-nolib "hello world" \
+  ./008-01-hello-world-nolib-bin
+expect_output 008-01-hello-world-lib "hello world" \
+  ./008-01-hello-world-lib-bin
+# The program that uses the C library also links and runs as PIE.
+if ld --fatal-warnings -pie -o "${TMP_DIR}/hello-pie" \
+     008-01-hello-world-lib.o -l c -dynamic-linker "${DYNAMIC_LINKER}"
+then
+  expect_output "008-01-hello-world-lib (PIE)" "hello world" \
+    "${TMP_DIR}/hello-pie"
+else
+  fail "008-01-hello-world-lib (PIE): can't be linked as PIE"
+fi
+expect_output 008-02-printf-example \
+  "Hi! Jonathan is the person number #3." ./008-02-printf-example-bin
+# Code with absolute addresses can't go in a shared library.
+if ld -shared -o "${TMP_DIR}/absolute.so" 003-03-maximum-absolute.o \
+     2>"${TMP_DIR}/shared.err"; then
+  fail "003-03-maximum-absolute (shared): linked, but it shouldn't"
+elif grep -q "R_X86_64_32S.*can not be used when making a shared object" \
+       "${TMP_DIR}/shared.err"; then
+  pass "003-03-maximum-absolute (shared): rejected by ld"
+else
+  fail "003-03-maximum-absolute (shared): unexpected error"
+fi
+# 008-03-write-records writes the same file as 006-01-write-records,
+# with the functions of librecord.so.
+C8="${TMP_DIR}/c8"
+mkdir -p "${C8}"
+(cd "${C8}" && "${OLDPWD}/006-01-write-records-bin" && mv test.dat ref.dat)
+(cd "${C8}" && LD_LIBRARY_PATH="${OLDPWD}" \
+   "${OLDPWD}/008-03-write-records-bin")
+if cmp -s "${C8}/test.dat" "${C8}/ref.dat"; then
+  pass "008-03-write-records: same test.dat as 006-01-write-records"
+else
+  fail "008-03-write-records: different test.dat"
+fi
+expect_output "008-03-write-records (without LD_LIBRARY_PATH)" \
+  "librecord.so: cannot open shared object file" \
+  sh -c "env -u LD_LIBRARY_PATH ./008-03-write-records-bin 2>&1 \
+         | grep -o 'librecord.so: cannot open shared object file'"
+LIBRARY_OUTPUT="$(printf '%s\n' 'count_chars("hello world") = 11' \
+  'call_count() = 1' 'call_count() = 2' 'call_count() = 3')"
+expect_output "008-05-use-library (Rust)" "${LIBRARY_OUTPUT}" \
+  env LD_LIBRARY_PATH=. ./008-05-use-library-bin
+expect_output "008-06-use-library.py (Python)" "${LIBRARY_OUTPUT}" \
+  python3 008-06-use-library.py
+
 expect_output 0AK-08-02-factorial-printf "The factorial of 5 is 120." \
   env LD_LIBRARY_PATH=. ./0AK-08-02-factorial-printf-bin
 ./0AK-08-03-toupper-libc-bin "${TMP_DIR}/in.txt" "${TMP_DIR}/out3.txt"
@@ -232,13 +281,18 @@ expect_file 0AK-08-03-toupper-libc "${TMP_DIR}/out3.txt" \
   "THE COW JUMPED OVER THE MOON; THE LITTLE DOG LAUGHED."
 expect_output "0AK-08-03-toupper-libc (missing file)" \
   "Error: can't open the files" \
-  ./0AK-08-03-toupper-libc-bin /no/such/file "${TMP_DIR}/x"
+  sh -c "./0AK-08-03-toupper-libc-bin /no/such/file '${TMP_DIR}/x' 2>&1"
+expect_output "0AK-08-03-toupper-libc (one argument)" \
+  "Error: can't open the files" \
+  sh -c "./0AK-08-03-toupper-libc-bin only-one 2>&1"
 # Through a pipe, stdout is fully buffered and this `exit` doesn't flush
 # it, so only the message remains: the text of printf is lost.
 expect_output 0AK-08-04-exit-message "exit() called: bye!" \
   sh -c "LD_PRELOAD=./libexitmsg.so ./008-02-printf-example-bin 2>&1"
-expect_output "008-02-printf-example (without LD_PRELOAD)" \
-  "Hi! Jonathan is the person number #3." ./008-02-printf-example-bin
+expect_output 0AK-08-05-factorial.py \
+  "$(printf '%s\n' '5! = 120' '10! = 3628800' \
+     '20! = 2432902008176640000' '21! = -4249290049419214848')" \
+  python3 0AK-08-05-factorial.py
 
 # ----- Chapter 9 -----
 expect 0AK-09-02-alloc-test 0

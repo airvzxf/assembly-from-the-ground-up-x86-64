@@ -82,7 +82,7 @@ material. This file records the decisions and tracks the work, one block
 - [x] **5. Chapters 6 and 7** (records of 328 bytes, robust programs),
   solutions. Programs: the record library, add-year, error-exit;
   9 solutions.
-- [ ] **6. Chapter 8** (libc, shared libraries, PIC, calling assembly from
+- [x] **6. Chapter 8** (libc, shared libraries, PIC, calling assembly from
   Rust and Python), solutions. Adds pinned Rust to the build, and
   removes from `src/resource/asm/legacy32/` the 32-bit copies that only
   Chapter 8 needs.

@@ -1,15 +1,14 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
-    .include "006-01-linux.s"      # Linux Definitions.
-
     # PURPOSE:
     #     This program writes the message
     #     "hello world" and exits.
     #
+    .section .note.GNU-stack,"",@progbits
+
+    .include "006-01-linux.s"      # Linux Definitions.
+
     .section .data
         helloworld:
             .ascii "hello world\n"
-
         helloworld_end:
             .equ length, helloworld_end - helloworld
 
@@ -17,12 +16,12 @@
         .globl _start
 
 _start:
-    movl  $STDOUT, %ebx
-    movl  $helloworld, %ecx
-    movl  $length, %edx
-    movl  $SYS_WRITE, %eax
-    int   $LINUX_SYSCALL
+    movq  $SYS_WRITE, %rax
+    movq  $STDOUT, %rdi
+    leaq  helloworld(%rip), %rsi
+    movq  $length, %rdx
+    syscall
 
-    movl  $0, %ebx
-    movl  $SYS_EXIT, %eax
-    int   $LINUX_SYSCALL
+    movq  $SYS_EXIT, %rax
+    movq  $0, %rdi
+    syscall

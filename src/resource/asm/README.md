@@ -33,5 +33,10 @@ program breaks one of these rules:
 - Every program and library is a 64-bit x86-64 ELF file with a
   non-executable stack.
 
+Chapter 8 also calls assembly functions from other languages: its Rust
+program is compiled with `rustc` (the version is pinned in
+`scripts/install-deps.bash`), and its Python programs run with
+`python3`.
+
 Every 64-bit program also needs a test in `test.bash` before it is
 included in the book.

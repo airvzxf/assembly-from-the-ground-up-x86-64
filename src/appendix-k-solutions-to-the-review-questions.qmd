@@ -959,14 +959,17 @@ Chapter 8. Sharing Functions with Code Libraries {#chapter-8.-sharing-functions-
 
 -   **What are the advantages and disadvantages of shared libraries?**
     Advantages: programs are smaller, the code is in memory only once
-    for all the programs that use it, and fixing a bug in the library
-    fixes it in every program. Disadvantages: the program depends on
-    the right version of the library being installed, a change in the
-    library can break programs, and loading and linking at run time
+    for all the programs that use it, fixing a bug in the library
+    fixes it in every program, and programs written in different
+    languages can use the same code. Disadvantages: the program depends
+    on the right version of the library being installed, a change in
+    the library can break programs, and loading and linking at run time
     takes a little time.
 
 -   **Given a library named \'foo\', what would the library\'s filename
-    be?** `libfoo.so` (and `libfoo.a` for a static library).
+    be?** `libfoo.so` (and `libfoo.a` for a static library). Installed
+    libraries usually also have a version number, such as
+    `libfoo.so.1`.
 
 -   **What does the `ldd` command do?** It lists the shared libraries
     that an executable needs, and where the dynamic linker would find
@@ -976,30 +979,35 @@ Chapter 8. Sharing Functions with Code Libraries {#chapter-8.-sharing-functions-
     \'kramer\'?**
 
     ```bash
-    ld -m elf_i386 -o program foo.o bar.o -l kramer \
-      -dynamic-linker /usr/lib32/ld-linux.so.2
+    ld -o program foo.o bar.o -l kramer \
+      -dynamic-linker /lib64/ld-linux-x86-64.so.2
     ```
 
+    Add `-L <directory>` if `libkramer.so` is not in a system
+    directory, and `-l c` if the program also uses the C library.
+
 -   **What is *typedef* for?** It gives a new name to a C type, for
-    example `typedef int myowntype;`. It doesn\'t create a new type;
+    example `typedef long myowntype;`. It doesn\'t create a new type;
     it makes declarations shorter and easier to read.
 
 -   **What are *struct*s for?** They group several variables into one
     record, like the person records of Chapter 6. In assembly language,
     a struct is a block of memory and each member is at a fixed offset.
 
--   **What is the difference between *int* and *int \**?** An *int*
-    holds a number. An *int \** holds the address of a number. To use
-    an *int*, you read the memory where it is (`movl value, %eax`). To
-    use the number an *int \** points to, you read the pointer first,
-    and then read the memory at that address
-    (`movl pointer, %ebx` and `movl (%ebx), %eax`).
+-   **What is the difference between *long* and *long \**?** A *long*
+    holds a number (8 bytes). A *long \** holds the address of a number
+    (also 8 bytes). To use a *long*, you read the memory where it is
+    (`movq value(%rip), %rax`). To use the number a *long \** points
+    to, you read the pointer first, and then read the memory at that
+    address (`movq pointer(%rip), %rbx` and `movq (%rbx), %rax`). To
+    pass a *long \** to a function, you pass the address of the
+    number: `leaq value(%rip), %rdi`.
 
 -   **What would be the command to create a shared library called
     \'bar\' from `foo.o`?**
 
     ```bash
-    ld -shared -m elf_i386 -o libbar.so foo.o
+    ld -shared -o libbar.so foo.o
     ```
 
 -   **What is the purpose of LD_LIBRARY_PATH?** It is a list of extra
@@ -1007,9 +1015,29 @@ Chapter 8. Sharing Functions with Code Libraries {#chapter-8.-sharing-functions-
     before the standard ones, for example to use libraries that are not
     installed in the system.
 
+-   **What two rules must a program follow before it calls `printf`?**
+    _%rsp_ must be a multiple of 16 when the `call` runs, and _%al_
+    must hold the number of vector registers used for parameters (0
+    when there are no floating-point parameters), because `printf`
+    takes a variable number of parameters.
+
+-   **What are the PLT and the GOT for?** They let a program (or a
+    library) call functions and use variables whose addresses are only
+    known when the program runs. The GOT is a table of addresses that
+    the dynamic linker fills in; each entry of the PLT is a small piece
+    of code that jumps to the address in a GOT slot. The code itself is
+    never changed, so it can be shared and read-only.
+
+-   **Why must the code of a shared library be position-independent?**
+    Because the library is loaded at a different address in each
+    program (and, with ASLR, in each run). An absolute address in the
+    code would only be right at one place. Code that reaches its data
+    relative to _%rip_, and other libraries through the PLT and the
+    GOT, works at any address.
+
 ### Use the Concepts {#use-the-concepts-17}
 
-**Make a shared library with the `_factorial` function, link the main
+**Make a shared library with the `factorial` function, link the main
 program with it dynamically, also link it with the C library, and
 display the result with `printf`, with an exit status of 0.** First,
 the library:
@@ -1017,33 +1045,60 @@ the library:
 ```{.gnuassembler .numberLines include=resource/asm/0AK-08-01-factorial-lib.s}
 ```
 
-Then the program, which calls `_factorial` from the library and
+Then the program, which calls `factorial` from the library and
 `printf` and `exit` from the C library:
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-08-02-factorial-printf.s}
 ```
 
 ```bash
-as --32 -o 0AK-08-01-factorial-lib.o 0AK-08-01-factorial-lib.s
-ld -shared -m elf_i386 -o libfactorial.so \
-  0AK-08-01-factorial-lib.o
-as --32 -o 0AK-08-02-factorial-printf.o \
+as --64 -g -o 0AK-08-01-factorial-lib.o 0AK-08-01-factorial-lib.s
+ld -shared -o libfactorial.so 0AK-08-01-factorial-lib.o
+as --64 -g -o 0AK-08-02-factorial-printf.o \
   0AK-08-02-factorial-printf.s
-ld -m elf_i386 -o 0AK-08-02-factorial-printf \
-  0AK-08-02-factorial-printf.o -L . -l factorial -l c \
-  -dynamic-linker /usr/lib32/ld-linux.so.2
+ld -o 0AK-08-02-factorial-printf 0AK-08-02-factorial-printf.o \
+  -L . -l factorial -l c \
+  -dynamic-linker /lib64/ld-linux-x86-64.so.2
 LD_LIBRARY_PATH=. ./0AK-08-02-factorial-printf
 ```
 
 It prints `The factorial of 5 is 120.` and exits with status 0.
 
+**Call `factorial` from Python with `ctypes`.** The function receives
+and returns a 64-bit signed number, `ctypes.c_int64`:
+
+```{.python .numberLines include=resource/asm/0AK-08-05-factorial.py}
+```
+
+```bash
+python3 0AK-08-05-factorial.py
+```
+
+It prints:
+
+    5! = 120
+    10! = 3628800
+    20! = 2432902008176640000
+    21! = -4249290049419214848
+
+20! is the biggest factorial that fits in 64 bits. 21! is too big:
+`imulq` keeps only the lower 64 bits of the result, and Python shows
+them as a negative number. Chapter 10 explains why.
+
 **Rewrite `005-01-toupper` with the C library file functions.**
 `fopen`, `fread`, `fwrite` and `fclose` replace the system calls. They
-return a `FILE` pointer (or `NULL`) and the number of items
-transferred:
+return a `FILE` pointer (or `NULL`, 0, when they fail) and the number
+of items transferred. The error message goes to `stderr` with `fputs`:
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-08-03-toupper-libc.s}
 ```
+
+`stderr` is not a function but a variable of the C library, which holds
+a `FILE *`. Its address is only known when the program runs, so the
+program reads it from the GOT: `stderr@GOTPCREL(%rip)` is the GOT slot,
+the first `movq` loads the address of the variable from that slot, and
+the second `movq` loads the variable itself, the `FILE *` that `fputs`
+wants.
 
 ### Going Further {#going-further-17}
 
@@ -1065,7 +1120,7 @@ transferred:
     files (just the raw code, limited to 64 KB, with no header at all).
 
 -   **Find a library for an area you are interested in and use it.**
-    This exercise is yours. The GNOME example in Appendix A shows how
+    This exercise is yours. The GUI example in Appendix A shows how
     to call a graphics library from assembly language.
 
 -   **Use `LD_PRELOAD` with a library that contains the `exit`
@@ -1083,10 +1138,11 @@ transferred:
     In a terminal it prints `Hi! Jonathan is the person number #3.`
     and then `exit() called: bye!`. When the output goes to a pipe or a
     file, only the second line appears: the C library keeps the text of
-    `printf` in a buffer, and the real `exit` writes that buffer before
-    ending the program, but this `exit` doesn\'t. Programs that don\'t
-    call `exit` (such as the ones that use the system call directly)
-    are not affected, and 64-bit programs ignore this 32-bit library.
+    `printf` in a buffer (in a terminal, it writes each complete line
+    at once), and the real `exit` writes that buffer before ending the
+    program, but this `exit` doesn\'t. Programs that don\'t call `exit`
+    (such as the ones that use the system call directly) are not
+    affected.
 
 Chapter 9. Intermediate Memory Topics {#chapter-9.-intermediate-memory-topics-1}
 -------------------------------------
