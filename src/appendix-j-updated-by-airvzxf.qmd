@@ -2,11 +2,13 @@
 
 I\'m [Israel Roldan][AJ-IsraelRoldan] and I try to learn the GNU Assembler (`as` or `gas`) and I didn't find many resources but this book is great.
 
-This is the x86-64 edition of the book, for 64-bit programs. It is
-based on the [x86 32-bit edition][AJ-X86-32Edition], which is
-maintained in its own repository.
+This is the x86-64 edition of the book, for 64-bit programs. It started
+from the [x86 32-bit edition][AJ-X86-32Edition], which is maintained in
+its own repository, but it was rewritten as a new book: it teaches how
+64-bit Linux programs are written today, compares them with Rust and
+Python, and never needs the 32-bit material.
 
-All the information is in my [GitHub repository][AJ-MyGitHubRepository]. To check the advance on this project and the pending reviews go to the [TO-DO\'s][AJ-MyTodoList] list. I added some script to compile the [source files][AJ-AsmSourceCode], emulating to i386/x86.
+All the information is in my [GitHub repository][AJ-MyGitHubRepository]. To check the advance on this project and the pending reviews go to the [TO-DO\'s][AJ-MyTodoList] list. The scripts `make.bash` and `test.bash` assemble, link and test every one of the [example programs][AJ-AsmSourceCode], including the solutions of Appendix K, and the build checks that they follow the rules of the book: a non-executable stack and no absolute addresses.
 
 Motivations {#motivations}
 -----------

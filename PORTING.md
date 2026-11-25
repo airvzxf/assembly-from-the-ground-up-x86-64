@@ -99,4 +99,7 @@ material. This file records the decisions and tracks the work, one block
   `gcc-multilib`, every 32-bit program (`src/resource/asm/legacy32/`
   already went in block 8, when no 32-bit program used it any more),
   PDF and ePUB, release tag,
-  custom domain `asm64.rovisoft.net` on Cloudflare Pages.
+  custom domain `asm64.rovisoft.net` on Cloudflare Pages. Done in a
+  pull request: Chapter 1, Appendices J and G, README, `gcc-multilib`,
+  the 32-bit programs, PDF and ePUB. Pending, outside a pull request:
+  the release tag and the custom domain.

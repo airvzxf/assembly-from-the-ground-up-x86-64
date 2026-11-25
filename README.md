@@ -2,7 +2,7 @@
 
 An updated Linux edition of [_Programming from the Ground Up_](https://savannah.nongnu.org/projects/pgubook) by Jonathan Bartlett, maintained by Israel Roldan (AirvZxf).
 
-- This is the **x86-64 edition**, for 64-bit Linux programs: AT&T syntax with the GNU Assembler, the `syscall` instruction and the System V AMD64 calling convention. It starts from version 3.0 of the [x86 32-bit edition](https://github.com/airvzxf/assembly-from-the-ground-up-x86-32) ([asm32.rovisoft.net](https://asm32.rovisoft.net/)), and the port of the text and the examples is in progress: until it is finished, parts of the book still describe 32-bit programs.
+- This is the **x86-64 edition**, for 64-bit Linux programs: AT&T syntax with the GNU Assembler, the `syscall` instruction and the System V AMD64 calling convention. It started from version 3.0 of the [x86 32-bit edition](https://github.com/airvzxf/assembly-from-the-ground-up-x86-32) ([asm32.rovisoft.net](https://asm32.rovisoft.net/)), but it is a new book: every chapter, appendix and example was rewritten for 64-bit Linux, with comparisons with Rust and Python, and every example program is assembled, linked and tested by `src/resource/asm/make.bash` and `test.bash`. `PORTING.md` records the decisions.
 - Read online and download the PDF and ePUB: <https://asm64.rovisoft.net/>
 - Downloads for every version: [GitHub releases](https://github.com/airvzxf/assembly-from-the-ground-up-x86-64/releases).
 
@@ -15,6 +15,8 @@ podman build -t pgu-book .                 # or docker
 podman run --rm -v "$PWD:/data:Z" pgu-book -c 'bash src/make.bash'
 podman run --rm -v "$PWD:/data:Z" pgu-book -c 'bash src/resource/asm/make.bash && bash src/resource/asm/test.bash'
 ```
+
+The container also has the tools of the examples: Rust (pinned like Quarto), GTK 4 and PyGObject for Appendix A, and Xvfb and xdotool to test the GUI example without a screen.
 
 The output is in `release/latest/`: the PDF, the ePUB, `resource.zip` with the example programs, and `site/`, the website. To preview the website while you write, run `quarto preview` in `src/`.
 
@@ -29,7 +31,7 @@ The website is published by the Cloudflare Pages project `assembly-from-the-grou
 
 I try to learn the GNU Assembler (`as` or `gas`) and I didn't find many resources but this book is great.
 
-This is a 60% of the WIP (work in progress) for the project `Programming from the ground up`.
+The x86-64 edition of `Programming from the ground up` is complete.
 
 Goals:
 
@@ -40,7 +42,7 @@ Goals:
 - [ ] Programming under hood.
   - [ ] Convert the original _LaTeX_ to a _Markdown_ then with [pandoc](https://pandoc.org/) then convert it to _ePUB_, _MOBI_ and _PDF_.
 - [ ] Final version.
-  - [ ] Create a version for x64 architecture.
+  - [x] Create a version for x64 architecture.
 - [ ] Create my own book based in the experience that I gained in this project. It should will in a new GitHub repository.
 
 You're able to find my documents about assembly in my GitHub repository [airvzxf/assembly](https://github.com/airvzxf/assembly) also I was working in some assembler scripts that I wrote based on the [exercises of this book](https://github.com/airvzxf/assembly/tree/master/linux/gas/programmingGroundUp). It contains a Linux shell script to make all the binaries straightforward.
