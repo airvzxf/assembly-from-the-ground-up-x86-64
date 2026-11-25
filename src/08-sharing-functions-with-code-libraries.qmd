@@ -201,9 +201,10 @@ one of the ways Linux avoids \"DLL hell\".
 When the `008-01-hello-world-lib` program begins, the file
 `/lib64/ld-linux-x86-64.so.2` is loaded first. This is the dynamic
 linker. This looks at our `008-01-hello-world-lib` program and sees that
-it needs `libc.so.6` to run. So, it searches for that file in the
-standard places (the directories listed in `/etc/ld.so.conf`, and in the
-contents of the `LD_LIBRARY_PATH` environment variable), then looks in
+it needs `libc.so.6` to run. So, it searches for that file: first in
+the directories of the `LD_LIBRARY_PATH` environment variable, if it is
+set, then in the directories listed in `/etc/ld.so.conf`, and finally in
+the system directories, such as `/lib` and `/usr/lib`. Then it looks in
 it for all the needed symbols (`printf` and `exit` in this case), and
 then loads the library into the program\'s virtual memory. Finally, it
 connects every use of `printf` in the program with the actual location
@@ -424,8 +425,9 @@ later in this chapter:
 
 `float`:
 
-:   A `float` is a floating-point number of 4 bytes. Floating-point
-    numbers will be explained in more depth in
+:   A `float` is a floating-point number of 4 bytes (Rust `f32`;
+    Python `ctypes.c_float`). Floating-point numbers will be explained
+    in more depth in
     [Floating-point Numbers](10-counting-like-a-computer.qmd#floating-point-numbers).
 
 `double`:
@@ -789,7 +791,13 @@ Programs can be position-independent too. Such a program is called a
 *position-independent executable*, or PIE, and Linux loads it at a
 random address, like a library. Compilers produce PIE programs by
 default today, and `ld -pie` links ours that way: since all of our
-data is reached relative to _%rip_, they work without changes. Your
+data is reached relative to _%rip_, they work without changes. One
+detail: unless you tell it otherwise, `ld -pie` writes into the program
+the name of a dynamic linker that Linux distributions don\'t have, and
+the program fails with `cannot execute: required file not found`. Name
+the real one with `-dynamic-linker /lib64/ld-linux-x86-64.so.2`, as for
+the programs that use the C library, or, for a program that uses no
+library at all, add `--no-dynamic-linker` (Chapter 9 does this). Your
 first PIE program is in the next section.
 
 Calling Assembly from Rust and Python {#calling-assembly-from-rust-and-python}
@@ -1028,8 +1036,9 @@ Review {#review-6}
     tells the dynamic linker to fill every slot before the program
     starts, and with `-z relro`, which makes the GOT read-only after
     that, so that an attacker who can write to memory can\'t redirect a
-    library call. You can ask for the same with the environment variable
-    `LD_BIND_NOW=1`.
+    library call. The environment variable `LD_BIND_NOW=1` asks for the
+    first part, filling every slot before the program starts, in any
+    program.
 
 
 [8-GNU-Libc]: https://www.gnu.org/software/libc/manual/
@@ -1039,7 +1048,7 @@ Review {#review-6}
 [8-Elf-Makan-01]: https://blog.k3170makan.com/2018/09/introduction-to-elf-format-elf-header.html
 [8-Elf-Makan-02]: https://blog.k3170makan.com/2018/09/introduction-to-elf-format-part-ii.html
 [8-Elf-Makan-03]: https://blog.k3170makan.com/2018/09/introduction-to-elf-file-format-part.html
-[8-Elf-Makan-04]: https://blog.k3170makan.com/2018/10/introduction-to-elf-format-part-vi-more.html
+[8-Elf-Makan-04]: https://blog.k3170makan.com/2018/10/introduction-to-elf-format-part-iv.html
 [8-Elf-Makan-05]: https://blog.k3170makan.com/2018/10/introduction-to-elf-format-part-v.html
 [8-Elf-Makan-06-01]: https://blog.k3170makan.com/2018/10/introduction-to-elf-format-part-vi.html
 [8-Elf-Makan-06-02]: https://blog.k3170makan.com/2018/10/introduction-to-elf-format-part-vi_18.html

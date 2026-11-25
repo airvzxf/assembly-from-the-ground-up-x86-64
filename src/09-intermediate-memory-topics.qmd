@@ -130,9 +130,9 @@ strings, Linux puts a table of numbers for the C library (the
 Read from the stack pointer upwards, the stack holds: the number of
 arguments, the address of each argument, a 0, the address of each
 environment variable, another 0, and then the auxiliary vector. When
-the program begins, _%rsp_ points to the number of arguments. This is what gdb shows at `_start` when
-`009-01-memory-layout` (the program of the next section) runs with one
-argument, `hello`:
+the program begins, _%rsp_ points to the number of arguments. This is
+what gdb shows at `_start` when `009-01-memory-layout` (the program of
+the next section) runs with one argument, `hello`:
 
     (gdb) x/6gx $rsp
     0x7ffeba0cac10: 0x0000000000000002      0x00007ffeba0cbef2
@@ -937,11 +937,12 @@ Another performance problem is the number of times we\'re calling the
 `brk` system call. System calls take a long time. They aren\'t like
 functions, because the processor has to switch modes. Your program
 isn\'t allowed to map itself memory, but the Linux kernel is. So, the
-processor has to switch into *kernel mode*, then Linux maps
-the memory, and then switches back to *user mode* for your
-application to continue running. This is also called a *context
-switch*. Context switches are relatively slow on x86-64
-processors. Generally, you should avoid calling the kernel unless you
+processor has to switch into *kernel mode*, then Linux checks the
+request and maps the memory, and then the processor switches back to
+*user mode* for your application to continue running. These switches
+cost much more than a function call. (They are not a *context switch*:
+that is when Linux stops one program to run another, which is slower
+still.) Generally, you should avoid calling the kernel unless you
 really need to.
 
 Our `allocate` calls `brk` for every region that doesn\'t fit, even
