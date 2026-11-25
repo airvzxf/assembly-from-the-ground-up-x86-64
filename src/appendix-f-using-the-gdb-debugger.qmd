@@ -27,96 +27,75 @@ An Example Debugging Session {#an-example-debugging-session}
 The best way to explain how a debugger works is by using it. The program
 we will be using the debugger on is the `003-02-maximum` program used in
 [Chapter 3. Your First Programs](03-your-first-programs.qmd#chapter-3-your-first-programs).
-Let\'s say that you entered the program perfectly,
-except that you left out the line:
+Let\'s say that you entered the program perfectly, except that you left
+out the line:
 
 ```{.gnuassembler}
-incl %edi
+incq %rcx               # Increment %rcx by 1.
 ```
 
 When you run the program, it just goes in an infinite loop - it never
 exits. To determine the cause, you need to run the program under GDB.
 However, to do this, you need to have the assembler include debugging
 information in the executable. All you need to do to enable this is to
-add the `--gstabs+` option to the `as` command. So, you would assemble it
-like this:
+add the `-g` option to the `as` command, as we have done in every
+program of this book. So, you would assemble it like this:
 
 ```{.bash}
-as -o 003-02-maximum.o  --32 \
-                        --gstabs+ \
-                        003-02-maximum.s
-
-ld -o 003-02-maximum    -m elf_i386 \
-                        003-02-maximum.o
+as --64 -g -o 003-02-maximum.o 003-02-maximum.s
+ld -o 003-02-maximum 003-02-maximum.o
 ```
 
-Linking would be the same as normal. \"stabs\" is the debugging format
-used by GDB. The `plus(+)` means that it provides the GNU extension
-which is the location of the current working directory.
-Now, to run the program under the debugger, you would type
-in `gdb ./003-02-maximum`. Be sure that the source files are in the current
-directory. The output should look similar to this:
+Linking would be the same as normal. The debugging information (in the
+DWARF format, which gdb reads) tells the debugger which line of the
+source file each instruction comes from. Now, to run the program under
+the debugger, you would type in `gdb ./003-02-maximum`. Be sure that the
+source files are in the current directory. GDB prints its version and a
+few lines about its license and its help, and then:
 
-    GNU gdb (GDB) 10.1
-    Copyright (C) 2020 Free Software Foundation, Inc.
-    License GPLv3+: GNU GPL version 3 or later.
-    This GDB was configured as "x86_64-pc-linux-gnu".
-    Type "show configuration" for configuration details.
-    For help, type "help".
-    Type "apropos word" to search for commands related to "word".
-    Debugger response to a program call of fork or vfork is "parent".
-    Whether gdb will detach the child of a fork is off.
-    Reading symbols from `./003-02-maximum`...
+    Reading symbols from ./003-02-maximum...
     (gdb)
 
-Depending on which version of GDB you are running, this output may
-vary slightly. At this point, the program is loaded, but is not running
-yet. The debugger is waiting your command. To run your program, just
-type in `run`. This will not return, because the program is running
-in an infinite loop. To stop the program, hit `control-c`. The screen will
+The sessions in this appendix were made with GDB 15.1 on Ubuntu 24.04.
+Depending on which version of GDB you are running, the output may vary
+slightly. At this point, the program is loaded, but is not running yet.
+The debugger is waiting your command. To run your program, just type in
+`run`. This will not return, because the program is running in an
+infinite loop. To stop the program, hit `control-c`. The screen will
 then say this:
 
-    Starting program: /home/johnnyb/003-02-maximum
-    ^C
     Program received signal SIGINT, Interrupt.
-    _start_loop () at 003-02-maximum.s:31
-    31          cmpl %ebx, %eax
+    _start_loop () at 003-02-maximum.s:40
+    40      cmpq %rdi, %rax         # Compare values.
     (gdb)
 
-This tells you that the program was interrupted by the SIGINT
-signal (from your `control-c`), and was within the section labelled
-`_start_loop`, and was executing on line 31 when it stopped. It gives you
-the code that it is about to execute. Depending on exactly when you hit
-`control-c`, it may have stopped on a different line or a different
-instruction than the example.
+This tells you that the program was interrupted by the SIGINT signal
+(from your `control-c`), and was within the section labelled
+`_start_loop`, and was executing on line 40 when it stopped (the line
+numbers are one less than in the book\'s file after the `incq` line,
+because that line is missing). It gives you the code that it is about to
+execute. Depending on exactly when you hit `control-c`, it may have
+stopped on a different line or a different instruction than the
+example.
 
 One of the best ways to find bugs in a program is to follow the flow of
 the program to see where it is branching incorrectly. To follow the flow
 of this program, keep on entering `stepi` (for \"step instruction\"),
-which will cause the computer to execute one instruction at a time. If you
-do this several times, your output will look something like this:
-
-    27          cmpl $0, %eax
+which will cause the computer to execute one instruction at a time. If
+you do this several times, your output will look something like this:
 
     (gdb) stepi
-    28          je _loop_exit
-
+    41      jle _start_loop         # Jump to loop beginning if
     (gdb) stepi
-    29          incl %edi
-
+    37      cmpq $0, %rax           # Check to see if we have
     (gdb) stepi
-    30          movl data_items(,%edi,4), %eax
-
+    38      je _loop_exit           # hit the end.
     (gdb) stepi
-    31          cmpl %ebx, %eax
-
+    39      movq (%rbx,%rcx,8), %rax  # Load next value.
     (gdb) stepi
-    32          jle _start_loop
-
+    40      cmpq %rdi, %rax         # Compare values.
     (gdb) stepi
-    27          cmpl $0, %eax
-
-    (gdb)
+    41      jle _start_loop         # Jump to loop beginning if
 
 As you can tell, it has looped. In general, this is good, since we wrote
 it to loop. However, the problem is that it is *never stopping*.
@@ -124,96 +103,105 @@ Therefore, to find out what the problem is, let\'s look at the point in
 our code where we should be exiting the loop:
 
 ```{.gnuassembler}
-cmpl  $0, %eax
-je    _loop_exit
+cmpq $0, %rax
+je   _loop_exit
 ```
 
-Basically, it is checking to see if _%eax_ hits zero. If so, it should exit
-the loop. There are several things to check here. First of all, you may
-have left this piece out altogether. It is not uncommon for a programmer
-to forget to include a way to exit a loop. However, this is not the case
-here. Second, you should make sure that `_loop_exit` actually is outside
-the loop. If we put the label in the wrong place, strange things would
-happen. However, again, this is not the case.
+Basically, it is checking to see if _%rax_ hits zero. If so, it should
+exit the loop. There are several things to check here. First of all, you
+may have left this piece out altogether. It is not uncommon for a
+programmer to forget to include a way to exit a loop. However, this is
+not the case here. Second, you should make sure that `_loop_exit`
+actually is outside the loop. If we put the label in the wrong place,
+strange things would happen. However, again, this is not the case.
 
 Neither of those potential problems are the culprit. So, the next option
-is that perhaps _%eax_ has the wrong value. There are two ways to check the
-contents of register in GDB. The first one is the command
-`info register`. This will display the contents of all
-registers in hexadecimal. However, we are only interested in _%eax_ at this
-point. To just display _%eax_ we can do `print $eax` to print it in
-hexadecimal, or do `print/d $eax` to print it in decimal. Notice
-that in GDB, registers are prefixed with dollar signs rather than
-percent signs. Your screen should have this on it:
+is that perhaps _%rax_ has the wrong value. There are two ways to check
+the contents of register in GDB. The first one is the command
+`info registers`. This will display the contents of all registers in
+hexadecimal and in decimal. However, we are only interested in _%rax_ at
+this point. To just display _%rax_ we can do `print $rax`, and add a
+format to choose how it is shown: `print/d $rax` prints it in decimal,
+`print/x $rax` in hexadecimal, and so on. Notice that in GDB, registers
+are prefixed with dollar signs rather than percent signs. Your screen
+should have this on it:
 
-    (gdb) print $eax        # Default print.
+    (gdb) print $rax
     $1 = 3
-    (gdb) print/d $eax      # Print as a decimal.
+    (gdb) print/d $rax
     $2 = 3
-    (gdb) print/t $eax      # Print as a binary.
+    (gdb) print/t $rax
     $3 = 11
-    (gdb) print/o $eax      # Print as a octal
+    (gdb) print/o $rax
     $4 = 03
-    (gdb) print/x $eax      # Print as a hexadecimal.
+    (gdb) print/x $rax
     $5 = 0x3
-    (gdb) print/f $eax      # Print as a floating.
-    $6 = 4.20389539e-45
-    (gdb) print/s $eax      # Print as a string.
-    $7 = 3
-    (gdb) print/c $eax      # Print as a character.
-    $8 = 3 '\003'
-    (gdb) print/a $eax      # Print as an address.
-    $9 = 0x3
+    (gdb) print/c $rax
+    $6 = 3 '\003'
 
-This means that the result of your first inquiry is 3. Every inquiry you
-make will be assigned a number prefixed with a dollar sign. Now, if you
-look back into the code, you will find that 3 is the first number in the
-list of numbers to search through. If you step through the loop a few
-more times, you will find that in every loop iteration _%eax_ has the
-number 3. This is not what should be happening. _%eax_ should go to the
-next value in the list in every iteration.
+The formats are `d` (decimal), `t` (binary), `o` (octal), `x`
+(hexadecimal) and `c` (character). This means that the result of your
+first inquiry is 3. Every inquiry you make will be assigned a number
+prefixed with a dollar sign, which you can use in later commands. Now,
+if you look back into the code, you will find that 3 is the first
+number in the list of numbers to search through. You can see the whole
+list with the `x` command, which examines memory: `x/9gd &data_items`
+shows 9 giant words (`g`, 8 bytes each) in decimal (`d`), starting at
+the address of `data_items`:
 
-Okay, now we know that _%eax_ is being loaded with the same value over and
-over again. Let\'s search to see where _%eax_ is being loaded from. The
-line of code is this:
+    (gdb) x/9gd &data_items
+    0x402000:       3       67
+    0x402010:       34      222
+    0x402020:       45      22
+    0x402030:       11      125
+    0x402040:       0
+
+If you step through the loop a few more times, you will find that in
+every loop iteration _%rax_ has the number 3. This is not what should be
+happening. _%rax_ should go to the next value in the list in every
+iteration.
+
+Okay, now we know that _%rax_ is being loaded with the same value over
+and over again. Let\'s search to see where _%rax_ is being loaded from.
+The line of code is this:
 
 ```{.gnuassembler}
-movl data_items(,%edi,4), %eax
+movq (%rbx,%rcx,8), %rax  # Load next value.
 ```
 
 So, step until this line of code is ready to execute. Now, this code
-depends on two values - `data_items` and _%edi_. `data_items` is a symbol,
-and therefore constant. It\'s a good idea to check your source code to
-make sure the label is in front of the right data, but in our case it
-is. Therefore, we need to look at _%edi_. So, we need to print it out. It
-will look like this:
+depends on two values - _%rbx_ and _%rcx_. _%rbx_ holds the address of
+`data_items`, which the program loaded with `leaq` at the beginning and
+never changes. It\'s a good idea to check your source code to make sure
+the label is in front of the right data, but in our case it is.
+Therefore, we need to look at _%rcx_. `info registers` can also show
+only the registers you name:
 
-    (gdb) print $edi
-    $1 = 0
+    (gdb) info registers rax rbx rcx rdi rip
+    rax            0x3                 3
+    rbx            0x402000            4202496
+    rcx            0x0                 0
+    rdi            0x3                 3
+    rip            0x401022            0x401022 <_start_loop+13>
 
-This indicates that _%edi_ is set to zero, which is why it keeps on loading
-the first element of the array. This should cause you to ask yourself
-two questions - what is the purpose of _%edi_, and how should its value be
-changed? To answer the first question, we just need to look in the
-comments. _%edi_ is holding the current index of `data_items`. Since our
-search is a sequential search through the list of numbers in
-`data_items`, it would make sense that _%edi_ should be incremented with
+This indicates that _%rcx_ is set to zero, which is why it keeps on
+loading the first element of the list. This should cause you to ask
+yourself two questions - what is the purpose of _%rcx_, and how should
+its value be changed? To answer the first question, we just need to look
+in the comments. _%rcx_ is holding the current index of `data_items`.
+Since our search is a sequential search through the list of numbers in
+`data_items`, it would make sense that _%rcx_ should be incremented with
 every loop iteration.
 
-Scanning the code, there is no code which alters _%edi_ at all. Therefore,
-we should add a line to increment _%edi_ at the beginning of every loop
-iteration. This happens to be exactly the line we tossed out at the
-beginning. Assembling, linking, and running the program again will show
-that it now works correctly.
+Scanning the code, there is no code which alters _%rcx_ at all.
+Therefore, we should add a line to increment _%rcx_ at the beginning of
+every loop iteration. This happens to be exactly the line we tossed out
+at the beginning. Assembling, linking, and running the program again
+will show that it now works correctly.
 
-Let's finish the execution typing `quit`, it will show a warning about
-kill the process because it is an infinite loop and the program never exit
-properly, type `y` to kill and exit from GDB:
-
-    (gdb) quit
-    A debugging session is active.
-            Inferior 1 [process 682240] will be killed.
-    Quit anyway? (y or n) y
+Let\'s finish the execution typing `quit`. It will ask before killing
+the process, because the program is still running (it never exits on
+its own); type `y` to kill it and exit from GDB.
 
 Hopefully this exercise provided some insight into using GDB to help you
 find errors in your programs.
@@ -222,186 +210,154 @@ Breakpoints and Other GDB Features {#breakpoints-and-other-gdb-features}
 ----------------------------------
 
 The program we entered in the last section had an infinite loop, and
-could be easily stopped using `control-c`. Other programs may simply abort
-or finish with errors. In these cases, `control-c` doesn\'t help, because
-by the time you press `control-c`, the program is already finished. To fix
-this, you need to set *breakpoints*. A breakpoint is a place
-in the source code that you have marked to indicate to the debugger that
-it should stop the program when it hits that point.
+could be easily stopped using `control-c`. Other programs may simply
+abort or finish with errors. In these cases, `control-c` doesn\'t help,
+because by the time you press `control-c`, the program is already
+finished. To fix this, you need to set *breakpoints*. A breakpoint is a
+place in the source code that you have marked to indicate to the
+debugger that it should stop the program when it hits that point.
 
-To set breakpoints you have to set them up before you run the
-program. Before issuing the `run` command, you can set up breakpoints
-using the `break` command. For example, to break on line 25, issue
-the command `break 25`. Then, when the program crosses line 25, it will
-stop running, and print out the current line and instruction. You can
-then step through the program from that point and examine registers and
+To set breakpoints you have to set them up before you run the program.
+Before issuing the `run` command, you can set up breakpoints using the
+`break` command. For example, to break on line 27, issue the command
+`break 27`. Then, when the program crosses line 27, it will stop
+running, and print out the current line and instruction. You can then
+step through the program from that point and examine registers and
 memory. To look at the lines and line numbers of your program, you can
-simply use the command `l`. This will print out your program with line
-numbers a screen at a time.
+simply use the command `list` (or `l`). This will print out your
+program with line numbers, ten lines at a time; `list 25,29` prints
+those lines. Let\'s try it with the factorial program of
+[Chapter 4. All About Functions](04-all-about-functions.qmd#chapter-4-all-about-functions):
 
-    GNU gdb (GDB) 10.1
-    For help, type "help".
-    Reading symbols from ./003-02-maximum...
-
-    (gdb) break 25
-    Breakpoint 1 at 0x401005: file 003-02-maximum.s, line 25.
-
+    (gdb) break 27
+    Breakpoint 1 at 0x401007: file 004-02-factorial.s, line 27.
     (gdb) run
-    Starting program: /home/johnnyb/003-02-maximum
-    Breakpoint 1, _start () at 003-02-maximum.s:25
-    warning: Source file is more recent than executable.
-    25          movl data_items(,%edi,4), %eax   # Load the first byte of data.
-
-    (gdb) l
-    20          .section .text
-    21              .globl _start
-    22
-    23      _start:
-    24          movl $0, %edi       # Move 0 into the index register.
-    25          movl data_items(,%edi,4), %eax  # Load first byte of data.
-    26          movl %eax, %ebx     # Since this is the first item,
-    27                              # %eax is the biggest.
-    28      _start_loop:            # Start loop.
-    29          cmpl $0, %eax       # Check to see if we've hit the end.
-
-When dealing with functions, you can also break on the function names.
-For example, in the factorial program in
-[Chapter 4. All About Functions](04-all-about-functions.qmd#chapter-4-all-about-functions), we
-could set a breakpoint for the factorial function by typing in
-`break factorial`. This will cause the debugger to break immediately
-after the function call and the function setup (it skips the pushing of
-_%ebp_ and the copying of _%esp_). To send arguments through the GDB is
-necessary to type `set args` and the arguments same as we usually do in
-the command line.
-
-```{.bash}
-as -o 004-02-factorial.o  --32 \
-                          --gstabs+ \
-                          004-02-factorial.s
-
-ld -o 004-02-factorial    -m elf_i386 \
-                          004-02-factorial.o
-```
-
-    $ gdb ./004-02-factorial
-    GNU gdb (GDB) 10.1
-    For help, type "help".
-
-    (gdb) set args 55
-
-    (gdb) break factorial
-    Breakpoint 1 at 0x401013: file 004-02-factorial.s, line 34.
+    Breakpoint 1, _start () at 004-02-factorial.s:27
+    27          call factorial          # Run the factorial
+    (gdb) list 25,29
+    25                                  # want a factorial of. It
+    26                                  # goes in %rdi.
+    27          call factorial          # Run the factorial
+    28                                  # function.
+    29
 
 When stepping through code, you often don\'t want to have to step
 through every instruction of every function. Well-tested functions are
 usually a waste of time to step through except on rare occasion.
-Therefore, if you use the `nexti` command instead of the
-`stepi` command, GDB will wait until completion of the function
-before going on. Otherwise, with `stepi`, GDB would step you through
-every instruction within every called function.
+Therefore, if you use the `nexti` command instead of the `stepi`
+command, GDB will wait until completion of the function before going
+on. Otherwise, with `stepi`, GDB would step you through every
+instruction within every called function. Here, `nexti` runs the whole
+calculation, with all its recursive calls, and stops after the `call`:
 
+    (gdb) nexti
+    30          movq %rax, %rdi         # factorial returns the
+    (gdb) print $rax
+    $1 = 24
+
+The commands `step` and `next` do the same as `stepi` and `nexti`, but
+one source line at a time instead of one instruction at a time. In
+assembly language, almost every line is one instruction, so they behave
+almost the same; in a high-level language, one line can be many
+instructions.
+
+When dealing with functions, you can also break on the function names.
+In the factorial program, we could set a breakpoint for the factorial
+function by typing in `break factorial`. This will cause the debugger to
+break every time the function is called, before its first instruction.
+To pass arguments to a program, type them after `run`, or use
+`set args` before it, as you would on the command line. Let\'s use the
+breakpoint to watch the recursion:
+
+    (gdb) break factorial
+    Breakpoint 1 at 0x401018: file 004-02-factorial.s, line 44.
     (gdb) run
-    Starting program: /home/johnnyb/004-02-factorial
-    Breakpoint 1, factorial () at 004-02-factorial.s:34
-    34          pushl %ebp
+    Breakpoint 1, factorial () at 004-02-factorial.s:44
+    44          pushq %rbp              # Standard function stuff
+    (gdb) print $rdi
+    $1 = 4
+    (gdb) print (long)$rsp % 16
+    $2 = 8
 
-    (gdb) nexti
-    37          movl  %esp, %ebp
+The parameter is 4, in _%rdi_. The second command checks the alignment
+rule of Chapter 4: when a function starts, the `call` has just pushed
+the 8-byte return address, so _%rsp_ is 8 more than a multiple of 16.
+Now type `continue` three times: each time the program runs until the
+next call to `factorial`, and prints the same two lines as the first
+breakpoint (we show them only once). Then print _%rdi_ again, and ask
+for a *backtrace*, the list of functions that are waiting for a return:
 
-    (gdb) nexti
-    40          movl  8(%ebp), %eax
+    (gdb) continue
+    Breakpoint 1, factorial () at 004-02-factorial.s:44
+    44          pushq %rbp              # Standard function stuff
+    (gdb) print $rdi
+    $3 = 1
+    (gdb) backtrace
+    #0  factorial () at 004-02-factorial.s:44
+    #1  0x0000000000401035 in factorial () at 004-02-factorial.s:66
+    #2  0x0000000000401035 in factorial () at 004-02-factorial.s:66
+    #3  0x0000000000401035 in factorial () at 004-02-factorial.s:66
+    #4  0x000000000040100c in _start () at 004-02-factorial.s:27
 
-    (gdb) nexti
-    Program received signal SIGSEGV, Segmentation fault.
-    factorial () at 004-02-factorial.s:40
-    40          movl  8(%ebp), %eax
+This is the recursion of Chapter 4, seen from inside: `_start` called
+`factorial(4)`, which called `factorial(3)`, which called
+`factorial(2)`, which called `factorial(1)`, where we are now. Each line
+shows the return address of one frame (`0x401035` is the instruction
+after the recursive `call`), and gdb finds them by following the chain
+of saved _%rbp_ values (see
+[The Frame Pointer](12-optimization.qmd#the-frame-pointer)). `finish`
+runs until the current function returns, and stops in its caller:
 
-    (gdb) nexti
-    Program terminated with signal SIGSEGV, Segmentation fault.
-    The program no longer exists.
+    (gdb) finish
+    factorial () at 004-02-factorial.s:68
+    68          imulq -8(%rbp), %rax    # Multiply our number by
+    (gdb) print $rax
+    $4 = 1
+    (gdb) info frame
+    Stack level 0, frame at 0x7fffffffecd0:
+     rip = 0x401035 in factorial (004-02-factorial.s:68); saved rip = 0x401035
+     called by frame at 0x7fffffffecf0
+     source language asm.
+     Arglist at 0x7fffffffecc0, args:
+     Locals at 0x7fffffffecc0, Previous frame's sp is 0x7fffffffecd0
+     Saved registers:
+      rbp at 0x7fffffffecc0, rip at 0x7fffffffecc8
+
+`factorial(1)` returned 1, and we are back in `factorial(2)`, about to
+multiply. `info frame` describes the current frame: where the caller\'s
+_%rbp_ and the return address are saved, 0 and 8 bytes above our _%rbp_.
+Notice the addresses near 0x7fffffffffff: gdb turns ASLR off by default
+(see
+[Chapter 9](09-intermediate-memory-topics.qmd#address-space-layout-randomization)),
+so they are the same in every session.
+
+### The Text User Interface {#the-text-user-interface}
+
+GDB can also divide the terminal into windows, to show the source code
+(or the instructions) and the registers while you step. Start it with
+`gdb -tui`, or type these commands in a session:
+
+-   `layout src` shows the source code, with the current line marked.
+
+-   `layout asm` shows the instructions, as `objdump -d` would.
+
+-   `layout regs` adds a window with the registers, which highlights the
+    ones that the last instruction changed.
+
+-   `tui disable` goes back to the normal mode, and `control-l` redraws
+    the screen if the program\'s output messed it up.
 
 ---
 
-> **Warning!**
+> **TIP.**
 >
-> One problem that GDB has is with handling interrupts. Often times GDB
-  will miss the instruction that immediately follows an interrupt. The
-  instruction is actually executed, but GDB doesn\'t step through it.
-  This should not be a problem - just be aware that it may happen.
+> GDB uses the AT&T syntax by default, like this book. If you prefer
+  the Intel syntax, type `set disassembly-flavor intel` (see
+  [Appendix B](appendix-b-common-x86-instructions.qmd#differences-in-other-syntaxes-and-terminology)).
+  Floating-point registers are printed with `print $xmm0`, and
+  `print $xmm0.v2_double[0]` shows the `double` in its lowest 8 bytes.
 
 ---
-
-Let\'s see the differences between `step`, `next` and `until`. The intention is not to show every output from the GDB. It shows the executed
-functions:
-
-```{.bash}
-gdb ./004-02-factorial
-```
-
-`next`:
-
-    Breakpoint 1, _start () at 004-02-factorial.s:21
-    _factorial () at 004-02-factorial.s:50
-    _end_factorial () at 004-02-factorial.s:77
-    _end_factorial () at 004-02-factorial.s:78
-    _end_factorial () at 004-02-factorial.s:80
-    _start () at 004-02-factorial.s:27
-    [Inferior 1 (process 7536) exited with code 030]
-    # Instructions executed: 18
-
-`until`:
-
-    Breakpoint 1, _start () at 004-02-factorial.s:21
-    _factorial () at 004-02-factorial.s:50
-    _end_factorial () at 004-02-factorial.s:77
-    _end_factorial () at 004-02-factorial.s:80
-    _factorial () at 004-02-factorial.s:66
-    _end_factorial () at 004-02-factorial.s:77
-    _end_factorial () at 004-02-factorial.s:78
-    _end_factorial () at 004-02-factorial.s:80
-    _factorial () at 004-02-factorial.s:66
-    _end_factorial () at 004-02-factorial.s:77
-    _end_factorial () at 004-02-factorial.s:78
-    _end_factorial () at 004-02-factorial.s:80
-    _factorial () at 004-02-factorial.s:66
-    _end_factorial () at 004-02-factorial.s:77
-    _end_factorial () at 004-02-factorial.s:78
-    _end_factorial () at 004-02-factorial.s:80
-    _start () at 004-02-factorial.s:27
-    [Inferior 1 (process 7660) exited with code 030]
-    # Instructions executed: 31
-
-`step`:
-
-    Breakpoint 1, _start () at 004-02-factorial.s:21
-    _factorial () at 004-02-factorial.s:50
-    _factorial () at 004-02-factorial.s:41
-    _factorial () at 004-02-factorial.s:41
-    _factorial () at 004-02-factorial.s:41
-    _end_factorial () at 004-02-factorial.s:77
-    _end_factorial () at 004-02-factorial.s:80
-    _factorial () at 004-02-factorial.s:66
-    _end_factorial () at 004-02-factorial.s:77
-    _end_factorial () at 004-02-factorial.s:78
-    _end_factorial () at 004-02-factorial.s:80
-    _factorial () at 004-02-factorial.s:66
-    _end_factorial () at 004-02-factorial.s:77
-    _end_factorial () at 004-02-factorial.s:78
-    _end_factorial () at 004-02-factorial.s:80
-    _factorial () at 004-02-factorial.s:66
-    _end_factorial () at 004-02-factorial.s:77
-    _end_factorial () at 004-02-factorial.s:78
-    _end_factorial () at 004-02-factorial.s:80
-    _start () at 004-02-factorial.s:27
-    [Inferior 1 (process 8304) exited with code 030]
-    # Instructions executed: 52
-
-The command `next` goes inside of the `_factorial` function only one
-time then it never goes inside, the total number of executed instructions
-was 18. The command `until` and `step` goes inside of every `_factorial` function,
-the difference is that `until` step program until past the current line or past
-a location, and the `step` until it reaches a different source line. The
-differences about instructions executed are 31 versus 52 respectively.
 
 GDB Quick-Reference {#gdb-quick-reference}
 -------------------
@@ -517,32 +473,44 @@ stepi
 
 > \"Step into\" the next instruction (follows function calls).
 
+next, step
+
+> The same as `nexti` and `stepi`, one source line at a time.
+
 finish
 
 > \"Step out\" of the current function.
 
+layout src, layout asm, layout regs
+
+> Show the source, the instructions or the registers in windows of
+  the text user interface (`tui disable` closes them).
+
 ### Examining Registers and Memory {#examining-registers-and-memory}
 
-info registers
+info registers \[_reg1_\] \[_reg2_\]...
 
-> Print the contents of all registers.
+> Print the contents of all registers, or only of the given ones (for
+  example `info registers rax rdi`).
 
 print/_f_ _$reg_
 
-> Print the contents of register _$reg_ using format _f_.The format
-  can be _x_ (hexadecimal), _u_ (unsigned decimal), _o_ (octal), _a_
-  (address), _c_ (character), _s_ (string), or _f_ (floating point).
+> Print the contents of register _$reg_ using format _f_. The format
+  can be _x_ (hexadecimal), _d_ (decimal), _u_ (unsigned decimal), _t_
+  (binary), _o_ (octal), _a_ (address), _c_ (character), _s_ (string),
+  or _f_ (floating point).
 
 x/_rsf_ _addr_
 
 > Print the contents of memory address _addr_ using repeat count _r_,
-  size _s_, and format _f_.  Repeat count defaults to 1 if not
-  specified. Size can be _b_ (byte), _h_ (halfword), _w_ (word), or
-  _g_ (double word). Size defaults to word if not specified. Format
-  is the same as for print, with the additions of _s_ (string) and
-  _i_ (instruction). For example `x/5i $eip` should display 5
-  instructions or `x/4bs 0x56559004` it will be display four bits in
-  this specific memory address.
+  size _s_, and format _f_. Repeat count defaults to 1 if not
+  specified. Size can be _b_ (byte), _h_ (halfword, 2 bytes), _w_
+  (word, 4 bytes), or _g_ (giant, 8 bytes). Size defaults to the last
+  one used. Format is the same as for print, with the additions of _s_
+  (string) and _i_ (instruction). For example `x/5i $rip` displays the
+  next 5 instructions, `x/8xb $rsp` the 8 bytes at the top of the
+  stack in hexadecimal, and `x/s $rsi` the string that _%rsi_ points
+  to.
 
 info display
 
@@ -568,6 +536,11 @@ undisplay _displaynum_
 > Remove _displaynum_ from the display list.
 
 ### Examining the Call Stack {#examining-the-call-stack}
+
+info frame
+
+> Print where the current frame saved the registers and the return
+  address.
 
 where
 

@@ -93,7 +93,7 @@ material. This file records the decisions and tracks the work, one block
 - [x] **9. Chapters 11–13** (Rust and Python compared with assembly,
   `rustc --emit asm`, `perf`, the frame-pointer note, an updated reading
   list), solutions.
-- [ ] **10. Appendices B, E and F, then A** (instructions, high-level
+- [x] **10. Appendices B, E and F, then A** (instructions, high-level
   language idioms, gdb sessions captured from the 64-bit programs, GTK 4).
 - [ ] **11. Close-out**: Chapter 1, Appendices J and G, README, remove
   `gcc-multilib`, every 32-bit program (`src/resource/asm/legacy32/`

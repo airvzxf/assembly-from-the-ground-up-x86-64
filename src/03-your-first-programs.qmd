@@ -4,7 +4,7 @@ In this chapter you will learn the process for writing and building
 Linux assembly-language programs. In addition, you will learn the
 structure of assembly-language programs, and a few assembly-language
 commands. As you go through this chapter, you may want to refer also to
-[Appendix B. Common x86 Instructions](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions)
+[Appendix B. Common x86-64 Instructions](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions)
 and
 [Appendix F. Using the GDB Debugger](appendix-f-using-the-gdb-debugger.qmd#appendix-f-using-the-gdb-debugger).
 
@@ -223,7 +223,7 @@ the _%rax_ register. In assembly language, many instructions have
 destination is the _%rax_ register. Operands can be numbers, memory
 location references, or registers. Different instructions allow
 different types of operands. See
-[Appendix B. Common x86 Instructions](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions)
+[Appendix B. Common x86-64 Instructions](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions)
 for more
 information on which instructions take which kinds of operands.
 
@@ -782,7 +782,7 @@ many jump statements that you can use:
     comparison.
 
 The complete list is documented in
-[Appendix B. Common x86 Instructions](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions).
+[Appendix B. Common x86-64 Instructions](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions).
 In this
 case, we are jumping if _%rax_ holds the value of zero. If so, we are done
 and we go to `_loop_exit`.[^3-13]
@@ -1086,7 +1086,7 @@ _%rax_, but only partly, which is even more confusing. Basically, it\'s
 wise to only use a register for one size at a time.
 
 For a more comprehensive list of instructions, see
-[Appendix B. Common x86 Instructions](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions).
+[Appendix B. Common x86-64 Instructions](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions).
 
 Review {#review-1}
 ------

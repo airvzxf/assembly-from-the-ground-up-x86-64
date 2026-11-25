@@ -4,8 +4,9 @@
 # Used by the Dockerfile and by the GitHub Actions workflow so both build
 # with exactly the same versions. Quarto (which includes Pandoc and Typst)
 # comes from its official GitHub release, and Rust (rustc and its standard
-# library, used by the examples of Chapter 8) from static.rust-lang.org.
-# Both are verified by SHA-256.
+# library, used by the examples of Chapters 8 and 11) from
+# static.rust-lang.org. Both are verified by SHA-256. GTK 4, PyGObject,
+# Xvfb and xdotool build and test the GUI example of Appendix A.
 #
 # Usage:
 #   sudo bash scripts/install-deps.bash         System packages (apt),
@@ -49,7 +50,13 @@ if [[ "${USER_MODE}" == 0 ]]; then
     ca-certificates \
     curl \
     gcc-multilib \
+    gir1.2-gtk-4.0 \
+    libgtk-4-dev \
     python3 \
+    python3-gi \
+    xauth \
+    xdotool \
+    xvfb \
     xz-utils \
     zip
   rm -rf /var/lib/apt/lists/*

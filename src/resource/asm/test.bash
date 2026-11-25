@@ -394,4 +394,51 @@ done
 # ----- Chapter 12 -----
 expect 012-01-allocate-many 0
 
+# ----- Appendix A -----
+# Run the GTK 4 example in a virtual X server: click the button, answer
+# No (Escape: it keeps running), click again and answer Yes (Return: it
+# ends with status 0).
+gui_test() {
+  local name="$1" pid status=0
+  shift
+  "$@" 2>"${TMP_DIR}/gui.err" &
+  pid=$!
+  if gui_click && xdotool key Escape && sleep 1 && kill -0 "${pid}" \
+     && gui_click && xdotool key Return && sleep 1 \
+     && ! kill -0 "${pid}" 2>/dev/null; then
+    wait "${pid}" || status=$?
+    if [[ "${status}" == 0 ]] && ! grep -q CRITICAL "${TMP_DIR}/gui.err"
+    then
+      pass "${name}: No, then Yes, status 0"
+      return
+    fi
+  fi
+  kill "${pid}" 2>/dev/null || true
+  fail "${name}: the dialog didn't work"
+}
+# gui_click: click in the middle of the window, on the button.
+gui_click() {
+  local window="" i X Y WIDTH HEIGHT SCREEN WINDOW
+  for i in $(seq 50); do
+    window="$(xdotool search --name '^GTK Example Program$' 2>/dev/null \
+              | head -1)" && [[ -n "${window}" ]] && break
+    sleep 0.2
+  done
+  [[ -n "${window}" ]] || return 1
+  eval "$(xdotool getwindowgeometry --shell "${window}")"
+  xdotool mousemove $((X + WIDTH / 2)) $((Y + HEIGHT / 2)) click 1
+  sleep 1
+}
+if command -v Xvfb >/dev/null && command -v xdotool >/dev/null; then
+  Xvfb :97 -screen 0 1024x768x24 >/dev/null 2>&1 &
+  XVFB_PID=$!
+  trap 'kill "${XVFB_PID}" 2>/dev/null; rm -rf "${TMP_DIR}"' EXIT
+  sleep 1
+  export DISPLAY=:97 GDK_BACKEND=x11
+  gui_test 0AA-01-gtk-example ./0AA-01-gtk-example-bin
+  gui_test 0AA-01-gtk-example.py python3 0AA-01-gtk-example.py
+else
+  fail "0AA-01-gtk-example: Xvfb and xdotool are needed"
+fi
+
 exit "${FAILED}"
