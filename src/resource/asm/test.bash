@@ -366,13 +366,32 @@ expect_output 0AK-10-06-celsius \
   ./0AK-10-06-celsius-bin
 
 # ----- Chapter 11 -----
-expect 0AK-11-01-maximum-c 222
-if command -v python3 >/dev/null; then
-  STATUS=0
-  python3 0AK-11-01-maximum.py || STATUS=$?
-  if [[ "${STATUS}" == 222 ]]; then pass "0AK-11-01-maximum.py: status 222"
-  else fail "0AK-11-01-maximum.py: expected status 222, got ${STATUS}"; fi
+expect_output 011-01-hello-world.rs "Hello World!" ./011-01-hello-world-bin
+expect_output 011-01-hello-world.py "Hello World!" \
+  python3 011-01-hello-world.py
+expect 011-02-maximum 222
+STATUS=0
+python3 011-02-maximum.py || STATUS=$?
+if [[ "${STATUS}" == 222 ]]; then pass "011-02-maximum.py: status 222"
+else fail "011-02-maximum.py: expected status 222, got ${STATUS}"; fi
+# The assembly language of `rustc --emit asm` defines `maximum`.
+if rustc --edition 2024 -C opt-level=2 --emit asm \
+     -o "${TMP_DIR}/maximum.s" 011-02-maximum.rs \
+   && grep -q '^maximum:' "${TMP_DIR}/maximum.s"; then
+  pass "011-02-maximum: rustc --emit asm"
+else
+  fail "011-02-maximum: rustc --emit asm"
 fi
+for PROGRAM in ./0AK-11-01-toupper-bin "python3 0AK-11-01-toupper.py"; do
+  rm -f "${TMP_DIR}/upper.txt"
+  ${PROGRAM} 005-01-toupper.s "${TMP_DIR}/upper.txt"
+  expect_file "0AK-11-01-toupper (${PROGRAM})" "${TMP_DIR}/upper.txt" \
+    "$(tr 'a-z' 'A-Z' < 005-01-toupper.s)"
+  expect_output "0AK-11-01-toupper (${PROGRAM}, missing file)" 1 \
+    sh -c "${PROGRAM} /no/such/file '${TMP_DIR}/x' 2>/dev/null; echo \$?"
+done
 
+# ----- Chapter 12 -----
+expect 012-01-allocate-many 0
 
 exit "${FAILED}"

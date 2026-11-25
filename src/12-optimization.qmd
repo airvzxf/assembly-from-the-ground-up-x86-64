@@ -73,11 +73,110 @@ Once you have determined that you have a performance issue you need to
 determine where in the code the problems occur. You can do this by
 running a *profiler*. A profiler is a program that will let you
 run your program, and it will tell you how much time is spent in each
-function, and how many times they are run. `gprof` is the standard
-GNU/Linux profiling tool, but a discussion of using profilers is outside
-the scope of this text. After running a profiler, you can determine
-which functions are called the most or have the most time spent in them.
-These are the ones you should focus your optimization efforts on.
+function, and how many times they are run. After running a profiler,
+you can determine which functions are called the most or have the most
+time spent in them. These are the ones you should focus your
+optimization efforts on.
+
+### Measuring with perf {#measuring-with-perf}
+
+On Linux, the standard profiler is `perf`. It uses counters inside the
+processor, which count events such as cycles, instructions and branches
+while the program runs, and it works on any program, written in any
+language, without recompiling it. Most distributions package it (on
+Ubuntu, `linux-tools-generic`). Let\'s use it on the memory manager of
+[Chapter 9](09-intermediate-memory-topics.qmd#performance-issues-and-other-problems),
+which we said was slow. `012-01-allocate-many.s` calls `allocate` 20,000
+times without freeing anything:
+
+```{.gnuassembler .numberLines include=resource/asm/012-01-allocate-many.s}
+```
+
+```{.bash}
+as --64 -g -o 012-01-allocate-many.o 012-01-allocate-many.s
+ld -o 012-01-allocate-many 012-01-allocate-many.o 009-02-alloc.o
+perf stat ./012-01-allocate-many
+```
+
+`perf stat` runs the program and counts. This is what it reported on
+the computer used to test this book (perf 6.8; the numbers will be
+different on yours, and the `:u` means that only the instructions of
+the program were counted, not those of the kernel):
+
+```
+ Performance counter stats for './012-01-allocate-many':
+
+            490.83 msec task-clock:u                     #    0.827 CPUs utilized
+                 0      context-switches:u               #    0.000 /sec
+                 0      cpu-migrations:u                 #    0.000 /sec
+               159      page-faults:u                    #  323.942 /sec
+        1568505146      cycles:u                         #    3.196 GHz
+        1600461909      instructions:u                   #    1.02  insn per cycle
+         600111896      branches:u                       #    1.223 G/sec
+             25779      branch-misses:u                  #    0.00% of all branches
+
+       0.593712062 seconds time elapsed
+```
+
+1.6 billion instructions to hand out 20,000 small blocks. The count
+agrees with what we predicted: call number *n* looks at the *n* - 1
+regions before it, so the calls look at 20,000 × 19,999 / 2, about 200
+million regions in total, with 8 instructions for each one. The time
+grows with the square of the number of allocations: twice as many would
+take four times as long.
+
+`perf record` samples the program while it runs (about 4,000 times per
+second by default, it stops the program for an instant and notes where
+it was), and `perf report` shows where the samples fell:
+
+```{.bash}
+perf record ./012-01-allocate-many
+perf report --stdio
+```
+
+```
+# Overhead  Command          Shared Object         Symbol
+# ........  ...............  ....................  ......................
+#
+    84.46%  012-01-allocate  012-01-allocate-many  [.] alloc_loop_begin
+    15.31%  012-01-allocate  012-01-allocate-many  [.] next_location
+     0.15%  012-01-allocate  [unknown]             [k] 0000000000000000
+     0.08%  012-01-allocate  012-01-allocate-many  [.] move_break
+```
+
+`perf` names the code by the closest symbol, and our labels are symbols
+(the assembler only leaves out labels that start with `.L`, like the
+ones that `rustc` generated in Chapter 11), so we get the loop of
+`allocate` divided in its parts. Almost all of the time is in the loop
+that walks through the regions; the `brk` system calls of `move_break`
+don\'t even appear, because they run in the kernel. `perf annotate`
+goes down to the instructions, and shows our source code next to them:
+
+```{.bash}
+perf annotate --stdio -s alloc_loop_begin
+```
+
+```
+         : 11     cmpq  %rsi, %rax        # Need more memory if these
+   16.21 :   40108c: cmp    %rsi,%rax
+         : 13     je    move_break        # are equal.
+    0.00 :   40108f: je     4010b9 <move_break>
+         : 16     movq  HDR_SIZE_OFFSET(%rax), %r8
+    0.36 :   401091: mov    0x8(%rax),%r8
+         : 21     cmpq  $UNAVAILABLE, HDR_AVAIL_OFFSET(%rax)
+   67.55 :   401095: cmpq   $0x0,(%rax)
+         : 24     je    next_location     # unavailable, go to the
+   15.88 :   401099: je     4010a0 <next_location>
+```
+
+Two thirds of the samples are on the instructions that read the
+headers from memory. The samples tend to land on the instruction just
+after the one that is waiting, so read the percentages as a guide to
+the area, not as exact costs. The lesson is clear anyway: the time goes
+into visiting every region, and making those instructions faster would
+help much less than not visiting the regions at all, for example by
+keeping a list of the free regions. That is a global optimization, as
+we will see.
 
 If a program only spends 1% of its time in a given function, then no
 matter how much you speed it up you will only achieve a *maximum* of a
@@ -175,9 +274,10 @@ Inline Functions:
 :   Functions are great from the point of view of program management -
     they make it easy to break up your program into independent,
     understandable, and reusable parts. However, function calls do
-    involve the overhead of pushing arguments onto the stack and doing
-    the jumps (remember locality of reference - your code may be swapped
-    out on disk instead of in memory). For high level languages, it\'s
+    involve the overhead of moving arguments into registers, saving the
+    registers that the caller needs, setting up the stack frame and
+    doing the jumps (remember locality of reference - your code may be
+    swapped out on disk instead of in memory). For high level languages, it\'s
     often impossible for compilers to do optimizations across
     function-call boundaries. However, some languages support inline
     functions or function macros. These functions
@@ -186,7 +286,10 @@ Inline Functions:
     called. This makes the program faster, but it also increases the
     size of the code. There are also many functions, like recursive
     functions, which cannot be inlined because they call themselves
-    either directly or indirectly.
+    either directly or indirectly. In
+    [Chapter 11](11-high-level-languages.qmd#what-the-compiler-generates)
+    we saw `rustc` inline the functions that make a slice and step
+    through it.
 
 Optimized Instructions:
 
@@ -197,39 +300,108 @@ Optimized Instructions:
     need to see the user\'s manual that is provided for the specific
     chip you are using. As an example, let\'s look at the process of
     loading the number 0 into a register. On most processors, doing a
-    `movl $0, %eax` is not the quickest way. The quickest way is to
-    exclusive-or the register with itself, `xorl %eax, %eax`. This is
-    because it only has to access the register, and doesn\'t have to
-    transfer any data. For users of high-level languages, the compiler
-    handles this kind of optimizations for you. For assembly-language
-    programmers, you need to know your processor well.
+    `movq $0, %rax` is not the quickest way. The quickest way is to
+    exclusive-or the register with itself, `xorl %eax, %eax`, which is
+    shorter, and which the processor recognizes and handles without
+    even computing anything (see
+    [Chapter 10](10-counting-like-a-computer.qmd#truth-falsehood-and-binary-numbers)).
+    Another example is the `cmovg` of Chapter 11, which avoids a jump.
+    For users of high-level languages, the compiler handles this kind
+    of optimizations for you. For assembly-language programmers, you
+    need to know your processor well. [Agner Fog\'s optimization
+    manuals][12-Agner] and the tables of [uops.info][12-uops] list how long each
+    instruction takes on each processor.
 
 Addressing Modes:
 
-:   Different addressing modes work at different speeds.
-    The fastest are the immediate mode addressing and register
-    addressing modes. Direct addressing mode is the next fastest,
-    indirect is next, and base pointer addressing mode and
-    indexed indirect addressing mode are the slowest.
-    Try to use the faster addressing modes, when possible. One
-    interesting consequence of this is that when you have a structured
-    piece of memory that you are accessing using base pointer
-    addressing, the first element can be accessed the quickest. Since
-    its offset is 0, you can access it using indirect addressing instead
-    of base pointer addressing, which makes it faster.
+:   The fastest operands are immediate values and registers, because
+    they don\'t need memory at all. On current processors, the
+    addressing modes that do use memory all take about the same time to
+    compute the address (indexed addressing, `(%rbx,%rdi,8)`, can cost
+    one cycle more on some of them); what takes time is the memory
+    itself. A value in the processor\'s cache arrives in a few cycles,
+    and one that has to come from the main memory can take dozens of
+    times longer, up to a hundred, which is what `perf annotate` showed above. So keep
+    the values you use most in registers, and the rest close together
+    in memory.
 
 Data Alignment:
 
-:   Some processors can access data on word-aligned memory
-    boundaries (i.e. - addresses divisible by the word size) faster than
-    non-aligned data. So, when setting up structures in memory, it is
-    best to keep it word-aligned. Some non-x86 processors, in fact,
-    cannot access non-aligned data in some modes.
+:   Processors access data faster when its address is a multiple of its
+    size (8 for a `.quad`), and some instructions, such as `movaps`,
+    refuse to work otherwise, as we saw in
+    [Chapter 8](08-sharing-functions-with-code-libraries.qmd#two-rules-for-calling-library-functions).
+    So, when setting up structures in memory, it is best to keep each
+    item aligned to its size. That is why the record of Chapter 6 puts
+    the age at offset 320, and why the memory manager of Chapter 9 uses
+    16-byte headers. Some non-x86 processors, in fact, cannot access
+    non-aligned data at all.
 
 These are just a smattering of examples of the kinds of local
 optimizations possible. However, remember that the maintainability and
 readability of code is much more important except under extreme
 circumstances.
+
+### The Frame Pointer {#the-frame-pointer}
+
+Every function in this book starts with `pushq %rbp` and
+`movq %rsp, %rbp`, and ends by restoring them. As we saw in
+[Chapter 4](04-all-about-functions.qmd#chapter-4-all-about-functions),
+_%rbp_ gives each function a fixed point from which to find its local
+variables and parameters, even while it pushes and pops. Compilers
+usually don\'t do this: in Chapter 11, `rustc` reached everything
+relative to _%rsp_, because it always knows how far _%rsp_ has moved.
+Omitting the frame pointer is an optimization, which C compilers do
+with `-fomit-frame-pointer` (GCC enables it from `-O1` up), and Rust
+does by default; `-C force-frame-pointers=yes` turns it
+off. With it, the `maximum` of Chapter 11 starts like this:
+
+```{.gnuassembler}
+maximum:
+	pushq	%rbp
+	movq	%rsp, %rbp
+	testq	%rsi, %rsi
+```
+
+The benefits of omitting it are two instructions less in every
+function, and one more register, _%rbp_, for the program\'s own values
+(x86-64 has fifteen, besides _%rsp_, so one more is a few percent).
+
+The cost appears when you need to know *who called whom*. With frame
+pointers, the stack is a chain: _%rbp_ points to the place where the
+function saved the caller\'s _%rbp_, and right above it is the return
+address into the caller. This is what gdb shows inside `count_chars`,
+called from `009-02-read-records` (the return address goes back into
+`record_read_loop`, the loop of `_start`):
+
+    (gdb) x/2gx $rbp
+    0x7ffcdaf1a720: 0x00007ffcdaf1a740      0x0000000000401078
+    (gdb) info symbol *(long *)($rbp+8)
+    record_read_loop + 40 in section .text of /tmp/w/009-02-read-records
+
+Following the saved _%rbp_ values from one frame to the next, a
+debugger or a profiler finds every function that is waiting for a
+return, in a few memory reads. `perf record --call-graph fp` does that
+at every sample, so it can say not only that the time is spent in
+`allocate`, but also which callers made it spend that time. Without
+frame pointers, the tools have to use the *unwind tables* that
+compilers write in the file (the `.cfi` lines we removed in
+Chapter 11), which describe how to find the caller from every
+instruction. They are reliable, but too slow to use at every sample, so
+`perf record --call-graph dwarf` copies a part of the stack at every
+sample instead, which makes the files much bigger and the profiling
+slower. For this reason, several distributions have gone back to
+compiling their packages with frame pointers, for example Fedora since
+version 38 and Ubuntu since 24.04: they decided that profiling every
+program easily is worth the small cost.
+
+A related trick is the *red zone*: the System V convention promises
+that the 128 bytes below _%rsp_ won\'t be changed by signals or
+interrupts, so a function that calls nothing (a *leaf* function) can
+keep its local variables there without moving _%rsp_ at all. The
+kernel itself can\'t use it, because the processor writes to the stack
+of the kernel when an interrupt arrives; it is compiled with
+`-mno-red-zone`.
 
 Global Optimization {#global-optimization}
 -------------------
@@ -306,6 +478,10 @@ Review {#review-10}
 
 -   How do you determine what parts of your program need optimization?
 
+-   What does `perf stat` count, and what does `perf record` show?
+
+-   What are the benefits and the costs of omitting the frame pointer?
+
 -   At what level of importance is optimization compared to the other
     priorities in programming? Why do you think I repeated that
     question?
@@ -314,6 +490,11 @@ Review {#review-10}
 
 -   Go back through each program in this book and try to make
     optimizations according to the procedures outlined in this chapter.
+
+-   Make `012-01-allocate-many` faster without changing it, by changing
+    the memory manager: for example, make `allocate` start its search
+    where the last search found a free region, or keep a separate list
+    of the free regions. Measure it with `perf stat` before and after.
 
 -   Pick a program from the previous exercise and try to calculate the
     performance impact on your code under specific inputs.[^12-2]
@@ -326,7 +507,7 @@ Review {#review-10}
 
 -   Find an open-source program that you find particularly slow, and try
     to imagine the reasons for the slowness. Then, download the code and
-    try to profile it using `gprof` or similar tool. Find where the code
+    try to profile it using `perf` or a similar tool. Find where the code
     is spending the majority of the time and try to optimize it. Was the
     reason for the slowness different than you imagined?
 
@@ -345,3 +526,6 @@ Review {#review-10}
     noticeable performance problems, looping through the program
     thousands of times will exaggerate the time it takes to run enough
     to make calculations.
+
+[12-Agner]: https://www.agner.org/optimize/
+[12-uops]: https://uops.info/

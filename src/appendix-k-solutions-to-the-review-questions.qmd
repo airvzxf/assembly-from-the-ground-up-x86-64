@@ -1488,25 +1488,51 @@ Chapter 11. High-Level Languages {#chapter-11.-high-level-languages}
     another language solves much better, the libraries available, or
     just to learn new ways of thinking about problems.
 
+-   **What is bytecode?** The instructions of a virtual machine, a
+    processor that only exists as a program. A language such as Python
+    compiles the source code into bytecode first, because the
+    interpreter can run it much faster than it could read the source,
+    and then the interpreter runs it, one instruction at a time. Java
+    and C# work the same way, but their virtual machines also compile
+    the most used parts into real machine code while the program runs
+    (*just-in-time* compilation).
+
 ### Use the Concepts {#use-the-concepts-20}
 
--   **Re-code one of the programs in another language.** Here is the
-    maximum program of Chapter 3 in C and in Python:
+-   **Re-code one of the programs in another language.** The chapter
+    already shows the maximum program in Rust and in Python. Here is
+    `005-01-toupper`, the program of Chapter 5 that converts a file to
+    uppercase, in Rust:
 
-    ```{.c .numberLines include=resource/asm/0AK-11-01-maximum.c}
+    ```{.rust .numberLines include=resource/asm/0AK-11-01-toupper.rs}
     ```
 
-    ```{.python .numberLines include=resource/asm/0AK-11-01-maximum.py}
+    And in Python:
+
+    ```{.python .numberLines include=resource/asm/0AK-11-01-toupper.py}
     ```
 
-    Both return `222`, like `003-02-maximum`.
+    ```bash
+    rustc --edition 2024 -C opt-level=2 -o 0AK-11-01-toupper \
+      0AK-11-01-toupper.rs
+    ./0AK-11-01-toupper 005-01-toupper.s upper.txt
+    python3 0AK-11-01-toupper.py 005-01-toupper.s upper.txt
+    ```
 
--   **What was automated?** In C: the registers (the compiler chooses
-    them), the stack frame, the loop structure and the comparisons, and
-    the program\'s start and exit (the C library calls `main` and
-    passes its return value to `exit`). In Python, also the type and
-    size of each value, the length of the list (no terminating 0), the
-    search for the maximum (`max`), and the memory management.
+    Both write the same file as `005-01-toupper`, and both exit with
+    status 1 and a message if a file can\'t be opened.
+
+-   **What was automated?** In both languages: the registers and the
+    stack frames, the command-line arguments (a list of strings instead
+    of addresses on the stack), opening, reading, writing and closing
+    the files, the buffer (`fs::read` and `read()` read the whole file
+    into memory of the right size, which the memory manager gives and
+    takes back), the conversion itself (`to_ascii_uppercase` and
+    `upper`), and the errors: instead of a negative number in _%rax_
+    that is easy to forget, a failure is a value (`Err` in Rust) or an
+    exception (`OSError` in Python) that the program must handle, with
+    a message that says what went wrong. Rust checks the types when it
+    compiles; Python checks them while it runs.
 
 -   **Run each program 10,000 times and compare with `time`.** Measure
     it yourself, because the numbers depend on the machine. For
@@ -1514,14 +1540,24 @@ Chapter 11. High-Level Languages {#chapter-11.-high-level-languages}
 
     ```bash
     time (for i in $(seq 10000); do ./003-02-maximum; done)
-    time (for i in $(seq 10000); do python3 0AK-11-01-maximum.py; done)
+    time (for i in $(seq 10000); do ./011-02-maximum; done)
+    time (for i in $(seq 10000); do python3 011-02-maximum.py; done)
     ```
 
     The assembly language version should come out ahead, and the Python
     version far behind. With such a small list, almost all the time is
     spent starting each process: the assembly program is tiny and makes
-    a single system call, a C program also loads the C library, and
-    Python has to start the whole interpreter before running one line.
+    a single system call, the Rust program also loads the C library and
+    runs its start-up code, and Python has to start the whole
+    interpreter before running one line.
+
+-   **See the assembly language of a Rust function with `rustc --emit
+    asm`.** This exercise is yours. Mark the function with
+    `#[unsafe(no_mangle)]` and `#[inline(never)]`, as in
+    `011-02-maximum.rs`, so that you can find it, and look for the
+    calling convention (the parameters in _%rdi_, _%rsi_, \...), the
+    missing `%rbp` frame, the checks that Rust adds (a call to a
+    function whose name contains `panic`) and the loops.
 
 -   **How do the input/output methods of the language differ from the
     Linux system calls?** They are built on top of the same system
@@ -1583,10 +1619,27 @@ Chapter 12. Optimization {#chapter-12.-optimization}
     addressing modes well, and aligning data in memory.
 
 -   **How do you determine what parts of your program need
-    optimization?** By measuring with a profiler (such as `gprof` or
-    `perf`), which shows where the program spends its time. Optimize
-    those parts only, and measure again to confirm that the change
-    helped.
+    optimization?** By measuring with a profiler, such as `perf`, which
+    shows where the program spends its time. Optimize those parts only,
+    and measure again to confirm that the change helped.
+
+-   **What does `perf stat` count, and what does `perf record` show?**
+    `perf stat` runs the program and counts events with the counters of
+    the processor: time, cycles, instructions, branches, mispredicted
+    branches, page faults, and others you can choose with `-e`.
+    `perf record` samples the program while it runs, noting where it
+    was each time; `perf report` then shows the share of samples in
+    each function, and `perf annotate` in each instruction.
+
+-   **What are the benefits and the costs of omitting the frame
+    pointer?** Benefits: two instructions less in each function and one
+    more register (_%rbp_) for the program\'s values. Costs: the chain
+    of saved _%rbp_ values no longer exists, so debuggers and profilers
+    can\'t find the callers by following it; they need the unwind
+    tables, which are slower to use, and profiling with call graphs
+    (`perf record --call-graph dwarf`) becomes slower and its files
+    bigger. That is why some distributions compile everything with
+    frame pointers again.
 
 -   **The same question again: why repeat it?** Because it is the most
     important lesson of the chapter, and the most forgotten one:
@@ -1596,11 +1649,22 @@ Chapter 12. Optimization {#chapter-12.-optimization}
 ### Use the Concepts {#use-the-concepts-21}
 
 -   **Optimize the programs in this book.** This exercise is yours.
-    Some ideas: keep loop variables in registers instead of memory (as
-    `_power` does with -4(%ebp)), replace the recursive factorial with
-    the loop of `0AK-04-03-factorial-loop.s`, use a bigger buffer in
-    `005-01-toupper`, and replace `imull` by a power of 2 with a shift
-    (`shll`).
+    Some ideas: keep values in registers instead of local variables in
+    memory (as `power` does with -8(%rbp)), replace the recursive
+    factorial with the loop of `0AK-04-03-factorial-loop.s`, use a
+    bigger buffer in `005-01-toupper`, replace `imulq` by a power of 2
+    with a shift (`shlq`), and use `xorl` to set registers to 0.
+
+-   **Make `012-01-allocate-many` faster by changing the memory
+    manager.** This exercise is yours. The simplest change is to keep,
+    in a new variable, the address of the first region that may be
+    free: `allocate` starts its search there, and `deallocate` moves it
+    back when it frees a region below it. In `012-01-allocate-many`
+    nothing is ever freed, so every search would start at the end of
+    the heap, and the 200 million regions visited would become none.
+    Check it with `perf stat`: the number of instructions should fall
+    from more than a billion to well under a million (an estimate:
+    20,000 calls of a few dozen instructions each, plus the start-up).
 
 -   **Calculate the performance impact on your code under specific
     inputs.** This exercise is yours. Count how many times each
@@ -1612,10 +1676,11 @@ Chapter 12. Optimization {#chapter-12.-optimization}
 ### Going Further {#going-further-21}
 
 -   **Ask the developers of a fast program about its optimizations**,
-    and **profile a slow program.** These exercises are yours. To
-    profile a C program with `gprof`, compile it with `gcc -pg`, run it
-    once, and then run `gprof program gmon.out`. On Linux, `perf record`
-    and `perf report` work without recompiling.
+    and **profile a slow program.** These exercises are yours. On Linux,
+    `perf record` and `perf report` work on any program without
+    recompiling it. Programs compiled with frame pointers, or with
+    debugging information (`-g`), give better call graphs and let
+    `perf annotate` show the source code.
 
 -   **Has the compiler eliminated the need for local optimizations?**
     Mostly, yes: modern compilers do register allocation, inlining,
