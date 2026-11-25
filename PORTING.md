@@ -86,7 +86,7 @@ material. This file records the decisions and tracks the work, one block
   Rust and Python), solutions. Adds pinned Rust to the build, and
   removes from `src/resource/asm/legacy32/` the 32-bit copies that only
   Chapter 8 needs.
-- [ ] **7. Chapter 9** (64-bit memory map, ASLR, `brk` and `mmap`, the
+- [x] **7. Chapter 9** (64-bit memory map, ASLR, `brk` and `mmap`, the
   memory manager with 16-byte headers), solutions.
 - [ ] **8. Chapter 10** (64-bit integers, `divq`/`cqto`, SSE2 floating
   point), solutions.

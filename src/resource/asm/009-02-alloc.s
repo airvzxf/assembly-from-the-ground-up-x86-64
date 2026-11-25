@@ -1,53 +1,58 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
     # PURPOSE:
     #     Program to manage memory usage - allocates
     #     and deallocates memory as requested.
     #
     # NOTES:
     #     The programs using these routines will ask
-    #     for a certain size of memory.  We actually
-    #     use more than that size, but we put it at the
-    #     beginning, before the pointer we hand back.
-    #     We add a size field and an
-    #     AVAILABLE/UNAVAILABLE marker.  So, the memory
-    #     looks like this.
+    #     for a certain size of memory. We actually
+    #     use more than that size, but we put it at
+    #     the beginning, before the pointer we hand
+    #     back. We add a size field and an
+    #     AVAILABLE/UNAVAILABLE marker. So, the memory
+    #     looks like this:
     #
-    ###################################################
-    # - Available  -#-  Size of  -#-  Actual memory  -#
-    # -  Marker    -#-  memory   -#-   locations     -#
-    ###################################################
-    #                             ^--Returned pointer
-    #                                points here.
+    # #########################################
+    # #Available Marker#Size of memory#Actual memory#
+    # #########################################
+    #                                  ^--Returned
+    #                                     pointer
+    #                                     points
+    #                                     here.
     #
-    # The pointer we return only points to the actual
-    # locations requested to make it easier for the
-    # calling program.  It also allows us to change our
-    # structure without the calling program having to
-    # change at all.
+    #     The pointer we return only points to the
+    #     actual locations requested to make it
+    #     easier for the calling program. It also
+    #     allows us to change our structure without
+    #     the calling program having to change at
+    #     all. Every size is rounded up to a multiple
+    #     of 16, so every pointer we return is a
+    #     multiple of 16, like the ones of the C
+    #     library's malloc.
     #
+    .section .note.GNU-stack,"",@progbits
+
+    .include "006-01-linux.s"      # Linux Definitions.
+
     .section .data
         # ----- GLOBAL VARIABLES ----- #
         #
         heap_begin:         # This points to the
-            .long  0        # beginning of the memory
+            .quad 0         # beginning of the memory
                             # we are managing.
 
         current_break:      # This points to one
-            .long  0        # location past the memory
+            .quad 0         # location past the memory
                             # we are managing.
 
         # ----- STRUCTURE INFORMATION ----- #
         #
-        .equ HEADER_SIZE,      8    # Size of space for
+        .equ HEADER_SIZE,      16   # Size of space for
                                     # memory region
                                     # header.
-
         .equ HDR_AVAIL_OFFSET, 0    # Location of the
                                     # "available" flag
                                     # in the header.
-
-        .equ HDR_SIZE_OFFSET,  4    # Location of the
+        .equ HDR_SIZE_OFFSET,  8    # Location of the
                                     # size field in the
                                     # header.
 
@@ -58,7 +63,6 @@
                                     # use to mark space
                                     # that has been
                                     # given out.
-
         .equ AVAILABLE,      1      # This is the
                                     # number we will
                                     # use to mark space
@@ -67,345 +71,259 @@
                                     # available for
                                     # giving.
 
-        .equ SYS_BRK,        45     # System call
-                                    # number for the
-                                    # break system
-                                    # call.
-
-        .equ LINUX_SYSCALL,  0x80   # Make system calls
-                                    # easier to read.
-
     .section .text
     # ----- FUNCTIONS ----- #
     #
-    # ----- FUNCTION: _allocate_init ----- #
+    # allocate_init
     #
     # PURPOSE:
     #     Call this function to initialize the
-    #     functions (specifically, this sets heap_begin
-    #     and current_break). This has no parameters
-    #     and no return value.
+    #     functions (specifically, this sets
+    #     heap_begin and current_break). This has no
+    #     parameters and no return value.
     #
-        .globl _allocate_init
-        .type  _allocate_init,  @function
+        .globl allocate_init
+        .type  allocate_init,  @function
 
-_allocate_init:
-    pushl %ebp              # Standard function stuff.
-    movl  %esp, %ebp
+allocate_init:
+    pushq %rbp              # Standard function stuff.
+    movq  %rsp, %rbp
 
-    # If the brk system call is called with 0 in %ebx,
-    # it returns the last valid usable address.
-    #
-    movl  $SYS_BRK, %eax    # Find out where the
-    movl  $0, %ebx          # break is.
-    int   $LINUX_SYSCALL
+    movq  $SYS_BRK, %rax    # If the brk system call is
+    movq  $0, %rdi          # called with 0, it returns
+    syscall                 # the current break: the
+                            # first address after the
+                            # memory of the program.
 
-    incl  %eax              # %eax now has the last
-                            # valid address, and we
-                            # want the memory location
-                            # after that.
+    addq  $15, %rax         # Round it up to a multiple
+    andq  $-16, %rax        # of 16.
 
+    movq  %rax, current_break(%rip)
                             # Store the current break.
-    movl  %eax, current_break
-
-    movl  %eax, heap_begin  # Store the current break
+    movq  %rax, heap_begin(%rip)
+                            # Store the current break
                             # as our first address.
                             # This will cause the
                             # allocate function to get
                             # more memory from Linux
                             # the first time it is run.
 
-    movl  %ebp, %esp        # Exit the function.
-    popl  %ebp
+    movq  %rbp, %rsp        # Exit the function.
+    popq  %rbp
     ret
+    # ----- END OF FUNCTION ----- #
 
-    # ----- END OF FUNCTION: _allocate_init ----- #
-
-    # ----- FUNCTION: allocate ----- #
+    # allocate
     #
     # PURPOSE:
     #     This function is used to grab a section of
-    #     memory. It checks to  see if there are any
+    #     memory. It checks to see if there are any
     #     free blocks, and, if not, it asks Linux for
     #     a new one.
     #
-    # PARAMETERS:
-    #     This function has one parameter - the size
-    #     of the memory block we want to allocate.
+    # INPUT:
+    #     %rdi - The size of the memory block we want
+    #            to allocate.
     #
-    # RETURN VALUE:
+    # OUTPUT:
     #     This function returns the address of the
-    #     allocated memory in %eax.  If there is no
-    #     memory available, it will return 0 in %eax.
+    #     allocated memory in %rax. If there is no
+    #     memory available, it will return 0 in %rax.
     #
-    # PROCESSING:
+    # PROCESS:
     #     Variables used:
-    #       %ecx - hold the size of the requested
-    #       memory (first/only parameter).
-    #       %eax - current memory region being examined
-    #       %ebx - current break position.
-    #       %edx - size of current memory region.
+    #       %rdx - Size of the requested memory,
+    #              rounded up to a multiple of 16.
+    #       %rax - Current memory region being
+    #              examined.
+    #       %rsi - Current break position.
+    #       %r8  - Size of current memory region.
     #
-    # We scan through each memory region starting with
-    # heap_begin. We look at the size of each one, and
-    # if it has been allocated.  If it is big enough
-    # for the requested size, and its available, it
-    # grabs that one. If it does not find a region
-    # large enough, it asks Linux for more memory.  In
-    # that case, it moves current_break up.
+    #     We scan through each memory region starting
+    #     with heap_begin. We look at the size of each
+    #     one, and if it has been allocated. If it's
+    #     big enough for the requested size, and its
+    #     available, it grabs that one. If it does
+    #     not find a region large enough, it asks
+    #     Linux for more memory. In that case, it
+    #     moves current_break up.
     #
-        .globl _allocate
-        .type  _allocate,   @function
+        .globl allocate
+        .type  allocate,   @function
 
-        .equ ST_MEM_SIZE,  8    # Stack position of the
-                                # memory size to
-                                # allocate.
+allocate:
+    pushq %rbp              # Standard function stuff.
+    movq  %rsp, %rbp
 
-_allocate:
-    pushl %ebp              # Standard function stuff.
-    movl  %esp, %ebp
+    leaq  15(%rdi), %rdx    # %rdx will hold the size
+    andq  $-16, %rdx        # we are looking for,
+                            # rounded up to a multiple
+                            # of 16.
 
-                            # %ecx will hold the size
-                            # we are looking for (which
-                            # is the first and only
-                            # parameter).
-                # ST_MEM_SIZE = 8
-    movl  ST_MEM_SIZE(%ebp), %ecx
-                # %ecx <- RECORD_SIZE, 324
-
-    movl  heap_begin, %eax  # %eax will hold the
+    movq  heap_begin(%rip), %rax
+                            # %rax will hold the
                             # current search location.
 
-                            # %ebx will hold the
+    movq  current_break(%rip), %rsi
+                            # %rsi will hold the
                             # current break.
-    movl  current_break, %ebx
 
-
-_alloc_loop_begin:          # Here we iterate through
+alloc_loop_begin:           # Here we iterate through
                             # each memory region.
 
-                # %eax <- heap_begin
-                # %ebx <- current_break
-    cmpl  %ebx, %eax        # Need more memory if these
-    je    _move_break       # are equal.
+    cmpq  %rsi, %rax        # Need more memory if these
+    je    move_break        # are equal.
 
+    movq  HDR_SIZE_OFFSET(%rax), %r8
                             # Grab the size of this
                             # memory.
-                # HDR_SIZE_OFFSET = 4
-                # %eax <- heap_begin
-    movl  HDR_SIZE_OFFSET(%eax), %edx
-                # %edx <- HDR_SIZE_OFFSET of heap_begin
-                #         ~ 324
 
+    cmpq  $UNAVAILABLE, HDR_AVAIL_OFFSET(%rax)
                             # If the space is
-                            # unavailable, go to the
+    je    next_location     # unavailable, go to the
                             # next one.
-                # UNAVAILABLE = 0
-                # HDR_AVAIL_OFFSET = 0
-                # %eax <- heap_begin
-    cmpl  $UNAVAILABLE, HDR_AVAIL_OFFSET(%eax)
-    je    _next_location
 
-                # %ecx <- RECORD_SIZE, 324
-                # %edx <- HDR_SIZE_OFFSET of heap_begin
-                #         ~ 324
-    cmpl  %edx, %ecx        # If the space is
-    jle   _allocate_here    # available, compare the
+    cmpq  %r8, %rdx         # If the space is
+    jbe   allocate_here     # available, compare the
                             # size to the needed size.
                             # If its big enough, go to
-                            # _allocate_here.
+                            # allocate_here.
 
-_next_location:
-                    # The total size of the memory
-                    # region is the sum of the size
-                    # requested (currently stored in
-                    # %edx), plus another 8 bytes for
-                    # the header (4 for the
-                    # AVAILABLE/UNAVAILABLE flag, and
-                    # 4 for the size of the region).
-                    # So, adding %edx and $8 to %eax
-                    # will get the address of the next
-                    # memory region.
-                    #
-                # HEADER_SIZE = 8
-                # %eax <- heap_begin
-    addl  $HEADER_SIZE, %eax
-                # %eax <- heap_begin + HEADER_SIZE
+next_location:
+    addq  $HEADER_SIZE, %rax
+    addq  %r8, %rax         # The total size of the
+                            # memory region is the sum
+                            # of the size requested
+                            # (currently stored in
+                            # %r8), plus another 16
+                            # bytes for the header (8
+                            # for the AVAILABLE/
+                            # UNAVAILABLE flag, and 8
+                            # for the size of the
+                            # region). So, adding %r8
+                            # and 16 to %rax will get
+                            # the address of the next
+                            # memory region.
 
-                # %eax <- heap_begin + HEADER_SIZE
-                # %edx <- HDR_SIZE_OFFSET(%eax)
-    addl  %edx, %eax
-                # %eax <- heap_begin + HEADER_SIZE
-                #         + HDR_SIZE_OFFSET
+    jmp   alloc_loop_begin  # Go look at the next
+                            # location.
 
-                    # Go look at the next location.
-    jmp   _alloc_loop_begin
-
-_allocate_here:     # If we have made it here, that
+allocate_here:      # If we have made it here, that
                     # means that the region header of
                     # the region to allocate is in
-                    # %eax.
+                    # %rax.
 
-                            # Mark space as unavailable
-                # UNAVAILABLE = 0
-                # HDR_AVAIL_OFFSET = 0
-                # %eax <- heap_begin
-    movl  $UNAVAILABLE, HDR_AVAIL_OFFSET(%eax)
-
-                            # Move %eax past the header
+                            # Mark space as
+                            # unavailable.
+    movq  $UNAVAILABLE, HDR_AVAIL_OFFSET(%rax)
+    addq  $HEADER_SIZE, %rax
+                            # Move %rax past the header
                             # to the usable memory
-                            # (since that is what we
+                            # (since that's what we
                             # return).
-                # HEADER_SIZE = 8
-                # %eax <- heap_begin
-    addl  $HEADER_SIZE, %eax
-                # %eax <- heap_begin + HEADER_SIZE
 
-    movl  %ebp, %esp        # Return from the function.
-    popl  %ebp
+    movq  %rbp, %rsp        # Return from the function.
+    popq  %rbp
     ret
 
-_move_break:        # If we have made it here, that
+move_break:         # If we have made it here, that
                     # means that we have exhausted all
                     # addressable memory, and we need
-                    # to ask for more. %ebx holds the
+                    # to ask for more. %rsi holds the
                     # current endpoint of the data,
-                    # and %ecx holds its size.
+                    # and %rdx holds its size.
 
-                    # We need to increase %ebx to
-                    # where we want memory to end, so
-                    # we add space for the headers
-                    # structure.
-                # HEADER_SIZE = 8
-                # %ebx <- current_break
-    addl  $HEADER_SIZE, %ebx
-                # %ebx <- current_break + HEADER_SIZE
+    movq  %rax, %r9         # The new region starts at
+                            # the current break. The
+                            # system call overwrites
+                            # %rax, %rcx and %r11, so
+                            # keep it in %r9.
 
-                # ST_MEM_SIZE = 8
-                # HEADER_SIZE = 8
-                # %ecx <- ST_MEM_SIZE(%ebp) ~ 324
-    addl  %ecx, %ebx        # Add space to the break
+    leaq  HEADER_SIZE(%rsi,%rdx), %rdi
+                            # We need to increase %rsi
+                            # to where we _want_ memory
+                            # to end, so we add space
+                            # for the header structure
+                            # and space to the break
                             # for the data requested.
-                # %ebx <- current_break + HEADER_SIZE
-                #         + ST_MEM_SIZE(%ebp) ~ 324
-                #      == 0x???????? + 8 + 324 = ~342
 
-                            # Now its time to ask Linux
-                            # for more memory.
-                # %eax <- heap_begin
-    pushl %eax              # Save needed registers.
+    movq  $SYS_BRK, %rax    # Now its time to ask Linux
+    syscall                 # for more memory.
 
-    movl  $SYS_BRK, %eax    # Reset the break (%ebx has
-                            # the requested break
-                            # point).
-
-    int   $LINUX_SYSCALL    # Under normal conditions,
+                            # Under normal conditions,
                             # this should return the
-                            # new break in %eax, which
-                            # will be either 0 if it
-                            # fails, or it will be
-                            # equal to or larger than
-                            # we asked for. We do not
-                            # care in this program
-                            # where it actually sets
-                            # the break, so as long as
-                            # %eax is not 0, we do not
-                            # care what it is.
-
-    cmpl  $0, %eax          # Check for error
-    je    _error            # conditions.
-
-                # %eax <- heap_begin
-    popl  %eax              # Restore saved registers.
+                            # new break in %rax, which
+                            # is exactly what we asked
+                            # for. On error, it returns
+                            # the old break.
+    cmpq  %rdi, %rax        # Check for error
+    jne   error             # conditions.
 
                             # Set this memory as
-                            # unavailable, since we are
+                            # unavailable, since we're
                             # about to give it away.
-                # UNAVAILABLE = 0
-                # HDR_AVAIL_OFFSET = 0
-                # %eax <- $heap_begin
-    movl  $UNAVAILABLE, HDR_AVAIL_OFFSET(%eax)
-
+    movq  $UNAVAILABLE, HDR_AVAIL_OFFSET(%r9)
                             # Set the size of the
                             # memory.
-                # ST_MEM_SIZE = 8
-                # HDR_SIZE_OFFSET = 4
-                # %eax <- $heap_begin
-                # %ecx <- ST_MEM_SIZE(%ebp) ~ 324
-    movl  %ecx, HDR_SIZE_OFFSET(%eax)
+    movq  %rdx, HDR_SIZE_OFFSET(%r9)
 
-                            # Move %eax to the actual
+    movq  %rdi, current_break(%rip)
+                            # Save the new break.
+
+    leaq  HEADER_SIZE(%r9), %rax
+                            # Return the address after
+                            # the header: the actual
                             # start of usable memory.
-                            # %eax now holds the return
-                            # value.
-                # %eax <- $heap_begin
-                # HEADER_SIZE = 8
-    addl  $HEADER_SIZE, %eax
-                # %eax <- $heap_begin + HEADER_SIZE
 
-                # %ebx <- current_break + HEADER_SIZE
-                #         + ST_MEM_SIZE(%ebp) ~ 342
-    movl  %ebx, current_break   # Save the new break.
-
-    movl  %ebp, %esp            # Return the function.
-    popl  %ebp
+    movq  %rbp, %rsp        # Return the function.
+    popq  %rbp
     ret
 
-_error:
-    movl  $0, %eax          # On error, we return zero.
-    movl  %ebp, %esp
-    popl  %ebp
+error:
+    movq  $0, %rax          # On error, we return zero.
+    movq  %rbp, %rsp
+    popq  %rbp
     ret
-    # ----- END OF FUNCTION: allocate ----- #
+    # ----- END OF FUNCTION ----- #
 
-
-    # ----- FUNCTION: _deallocate ----- #
+    # deallocate
     #
     # PURPOSE:
     #     The purpose of this function is to give back
-    #     a region of memory to the pool after we are
+    #     a region of memory to the pool after we're
     #     done using it.
     #
-    # PARAMETERS:
-    #     The only parameter is the address of the
-    #     memory we want to return to the memory pool.
+    # INPUT:
+    #     %rdi - The address of the memory we want to
+    #            return to the memory pool.
     #
-    # RETURN VALUE:
-    #     There is no return value
+    # OUTPUT:
+    #     There is no return value.
     #
-    # PROCESSING:
-    #     If you remember, we actually hand the program
-    #     the start of the memory that they can use,
-    #     which is 8 storage locations after the actual
-    #     start of the memory region.  All we have to
-    #     do is go back 8 locations and mark that
-    #     memory as available, so that the allocate
-    #     function knows it can use it.
+    # PROCESS:
+    #     If you remember, we actually hand the
+    #     program the start of the memory that they
+    #     can use, which is 16 storage locations
+    #     after the actual start of the memory
+    #     region. All we have to do is go back 16
+    #     locations and mark that memory as
+    #     available, so that the allocate function
+    #     knows it can use it.
     #
-        .globl _deallocate
-        .type  _deallocate,   @function
+        .globl deallocate
+        .type  deallocate,   @function
 
-        .equ ST_MEMORY_SEG,  4  # Stack position of the
-                                # memory region to free
-
-_deallocate:        # Since the function is so simple,
-                    # we do not need any of the fancy
+deallocate:         # Since the function is so simple,
+                    # we don't need any of the fancy
                     # function stuff.
 
-                    # Get the address of the memory to
-                    # free (normally this is 8(%ebp),
-                    # but since we did not push %ebp or
-                    # move %esp to %ebp, we can just
-                    # do 4(%esp).
-    movl  ST_MEMORY_SEG(%esp), %eax
-
+    subq  $HEADER_SIZE, %rdi
                             # Get the pointer to the
                             # real beginning of the
                             # memory.
-    subl  $HEADER_SIZE, %eax
 
+    movq  $AVAILABLE, HDR_AVAIL_OFFSET(%rdi)
                             # Mark it as available.
-    movl  $AVAILABLE, HDR_AVAIL_OFFSET(%eax)
 
-    ret
-    # ----- END OF FUNCTION: _deallocate ----- #
+    ret                     # Return.
+    # ----- END OF FUNCTION ----- #

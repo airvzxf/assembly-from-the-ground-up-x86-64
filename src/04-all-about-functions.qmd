@@ -212,9 +212,9 @@ to _%rsp_ before looking up the value being pointed to.
 
 > **NOTE:**
 >
-> Please, do a quick review of the tables which explain graphically,
-> how the memory and the stack works:
-> [Chapter 9 -> Table of the Physical Memory in the program](09-intermediate-memory-topics.qmd#chapter-9-table-of-the-physical-memory-in-the-program).
+> To see where the stack is in the memory of a program, look at the
+> picture in
+> [Chapter 9 -> The memory map of a program](09-intermediate-memory-topics.qmd#chapter-9-table-of-the-physical-memory-in-the-program).
 
 In the System V calling convention, the first parameters of a function
 travel in registers, and the stack is the key element for implementing

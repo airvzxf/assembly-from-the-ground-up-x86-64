@@ -6,6 +6,8 @@
         .equ SYS_WRITE,      1
         .equ SYS_CLOSE,      3
         .equ SYS_LSEEK,      8
+        .equ SYS_MMAP,       9
+        .equ SYS_MUNMAP,     11
         .equ SYS_BRK,        12
         .equ SYS_EXIT,       60
         .equ SYS_OPENAT,     257
@@ -19,6 +21,13 @@
         .equ O_RDONLY,              0
         .equ O_RDWR,                02
         .equ O_CREAT_WRONLY_TRUNC,  01101
+
+    # Options for mmap: memory that can be read and
+    # written, private to this program and not backed
+    # by any file (filled with zeros).
+    #
+        .equ PROT_READ_WRITE,       3
+        .equ MAP_PRIVATE_ANONYMOUS, 0x22
 
     # Standard File Descriptors.
     #

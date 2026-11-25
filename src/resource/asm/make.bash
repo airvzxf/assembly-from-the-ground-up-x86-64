@@ -149,6 +149,12 @@ rustc --edition 2024 -L . -l book -o 008-05-use-library-bin \
   008-05-use-library.rs
 check_elf64 008-05-use-library-bin
 
+# ----- Chapter 9 -----
+assemble64 009-01-memory-layout 009-02-alloc 009-02-read-records
+link64 009-01-memory-layout 009-01-memory-layout.o
+link64 009-02-read-records 009-02-read-records.o 009-02-alloc.o \
+  006-01-read-record.o 006-01-count-chars.o 006-01-write-newline.o
+
 # ----- Appendix K, Chapters 3 and 4 -----
 for SOURCE in 0AK-03-*.s 0AK-04-*.s; do
   assemble64 "${SOURCE%.s}"
@@ -199,6 +205,15 @@ link64 0AK-08-03-toupper-libc 0AK-08-03-toupper-libc.o \
   0AK-05-00-convert-to-upper.o "${LIBC[@]}"
 link64_shared libexitmsg.so 0AK-08-04-exit-message.o
 
+# ----- Appendix K, Chapter 9 -----
+assemble64 0AK-09-01-alloc 0AK-09-02-alloc-test 0AK-09-03-alloc-auto-init
+link64 0AK-09-02-alloc-test 0AK-09-02-alloc-test.o 0AK-09-01-alloc.o
+link64 0AK-09-02-alloc-test-book 0AK-09-02-alloc-test.o 009-02-alloc.o
+link64 0AK-09-03-alloc-auto-init 0AK-09-03-alloc-auto-init.o \
+  0AK-09-01-alloc.o
+link64 0AK-09-03-alloc-auto-init-book 0AK-09-03-alloc-auto-init.o \
+  009-02-alloc.o
+
 echo ""
 
 # =====================================================
@@ -224,7 +239,7 @@ as32() {
 for SOURCE in legacy32/*.s; do
   NAME="$(basename "${SOURCE%.s}")"
   case "${NAME}" in
-    006-01-linux|006-01-record-def) continue ;;  # Included.
+    006-01-linux) continue ;;  # Included.
   esac
   echo "Assembling (32-bit): legacy32/${NAME}"
   (cd legacy32 && as --32 --gstabs+ -o "${NAME}.o" "${NAME}.s")
@@ -235,9 +250,6 @@ done
 # -----------------------------------------------------
 
 FILES=(
-  009-01-memory-layout
-  009-02-alloc
-  009-02-read-records
   010-01-shift-bit
   010-02-conversion-program
   010-02-integer-to-string
@@ -256,7 +268,6 @@ echo ""
 # -----------------------------------------------------
 
 GENERIC_FILES=(
-  009-01-memory-layout
   010-01-shift-bit
 )
 
@@ -271,14 +282,6 @@ echo ""
 # -----------------------------------------------------
 # Linked special files.
 # -----------------------------------------------------
-
-echo "Linking #2: 009-02-read-records"
-ld -o "009-02-read-records-bin" -m elf_i386 \
-  "legacy32/006-01-count-chars.o" \
-  "legacy32/006-01-read-record.o" \
-  "legacy32/006-01-write-newline.o" \
-  "009-02-alloc.o" \
-  "009-02-read-records.o"
 
 echo "Linking #2: 010-02-conversion-program"
 ld -o "010-02-conversion-program-bin" -m elf_i386 \
@@ -298,7 +301,7 @@ gcc -o "011-01-hello-world-c-bin" "011-01-hello-world.c"
 
 for SOURCE in 0AK-*.s
 do
-    [[ "${SOURCE}" == 0AK-0[345678]-* ]] && continue  # 64-bit.
+    [[ "${SOURCE}" == 0AK-0[3-9]-* ]] && continue  # 64-bit.
     as32 "${SOURCE%.s}"
 done
 
@@ -309,12 +312,6 @@ link_solution() {
     echo "Linking #4: ${PROGRAM}"
     ld -o "${PROGRAM}-bin" -m elf_i386 "${PROGRAM}.o" "$@"
 }
-
-link_solution 0AK-09-02-alloc-test 0AK-09-01-alloc.o
-echo "Linking #4: 0AK-09-02-alloc-test-book (with 009-02-alloc.o)"
-ld -o 0AK-09-02-alloc-test-book-bin -m elf_i386 \
-  0AK-09-02-alloc-test.o 009-02-alloc.o
-link_solution 0AK-09-03-alloc-auto-init 0AK-09-01-alloc.o
 
 link_solution 0AK-10-02-print-numbers 0AK-10-01-integer2string-base.o \
   legacy32/0AK-08-01-factorial-lib.o legacy32/006-01-write-newline.o
