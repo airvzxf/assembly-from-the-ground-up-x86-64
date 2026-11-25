@@ -1,125 +1,123 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
     # PURPOSE:
     #     Convert an integer number to a decimal string
     #     for display.
     #
     # INPUT:
-    #     A buffer large enough to hold the largest
-    #     possible number an integer to convert.
+    #     %rdi - The number to convert (unsigned).
+    #     %rsi - A buffer large enough to hold the
+    #            largest possible number: 20 digits
+    #            and a null byte, 21 bytes.
     #
     # OUTPUT:
     #     The buffer will be overwritten with the
     #     decimal string.
     #
     # Variables:
-    #     %ecx will hold the count of characters
+    #     %rcx will hold the count of characters
     #     processed.
-    #     %eax will hold the current value.
-    #     %edi will hold the base (10).
+    #     %rax will hold the current value.
+    #     %r8 will hold the base (10).
     #
-        .equ ST_VALUE,   8
-        .equ ST_BUFFER,  12
+    .section .note.GNU-stack,"",@progbits
 
-        .globl _integer2string
-        .type  _integer2string,  @function
+    .section .text
+        .globl integer2string
+        .type  integer2string,  @function
 
-_integer2string:
-    pushl %ebp              # Normal function beginning
-    movl  %esp, %ebp
+integer2string:
+    pushq %rbp              # Normal function beginning
+    movq  %rsp, %rbp
 
-    movl  $0, %ecx          # Current character count.
+    movq  $0, %rcx          # Current character count.
 
-                            # Move the value into
+    movq  %rdi, %rax        # Move the value into
                             # position.
-    movl  ST_VALUE(%ebp), %eax
 
-    movl  $10, %edi         # When we divide by 10, the
+    movq  $10, %r8          # When we divide by 10, the
                             # 10 must be in a register
                             # or memory location.
 
-_conversion_loop:
+conversion_loop:
     # Division is actually performed on the combined
-    # %edx:%eax register, so first clear out %edx.
+    # %rdx:%rax register, so first clear out %rdx.
     #
-    movl  $0, %edx
+    movq  $0, %rdx
 
-    # Divide %edx:%eax (which are implied) by 10. Store
-    # the quotient in %eax and the remainder in %edx
-    # (both of which are implied).
+    # Divide %rdx:%rax (which are implied) by 10.
+    # Store the quotient in %rax and the remainder in
+    # %rdx (both of which are implied).
     #
-    divl  %edi
+    divq  %r8
 
-    # Quotient is in the right place.  %edx has the
+    # Quotient is in the right place. %rdx has the
     # remainder, which now needs to be converted into a
-    # number.  So, %edx has a number that is 0 through
-    # 9.  You could also interpret this as an index on
+    # number. So, %rdx has a number that is 0 through
+    # 9. You could also interpret this as an index on
     # the ASCII table starting from the character '0'.
     # The ascii code for '0' plus zero is still the
-    # ascii code for '0'.  The ascii code for '0' plus
+    # ascii code for '0'. The ascii code for '0' plus
     # 1 is the ascii code for the character '1'.
     # Therefore, the following instruction will give us
-    # the character for the number stored in %edx.
+    # the character for the number stored in %rdx.
     #
-    addl  $'0', %edx
+    addq  $'0', %rdx
 
     # Now we will take this value and push it on the
-    # stack.  This way, when we are done, we can just
+    # stack. This way, when we are done, we can just
     # pop off the characters one-by-one and they will
-    # be in the right order.  Note that we are pushing
+    # be in the right order. Note that we are pushing
     # the whole register, but we only need the byte in
-    # %dl (the last byte of the %edx register) for the
+    # %dl (the last byte of the %rdx register) for the
     # character.
     #
-    pushl %edx
+    pushq %rdx
 
-    incl  %ecx              # Increment the digit count
+    incq  %rcx              # Increment the digit count
 
-    cmpl  $0, %eax          # Check to see if %eax is
+    cmpq  $0, %rax          # Check to see if %rax is
                             # zero yet,
-    je    _end_conversion_loop  # go to next step if so
-                            # %eax already has its new
+    je    end_conversion_loop  # go to next step if so
+
+                            # %rax already has its new
                             # value.
 
-    jmp _conversion_loop
+    jmp   conversion_loop
 
-_end_conversion_loop:
+end_conversion_loop:
     # The string is now on the stack, if we pop it off
     # a character at a time we can copy it into the
-    # buffer and be done.
+    # buffer and be done. The buffer is in %rsi.
     #
-    movl  ST_BUFFER(%ebp), %edx     # Get the pointer
-                                    # to the buffer in
-                                    # %edx.
 
-_copy_reversing_loop:
+copy_reversing_loop:
     # We pushed a whole register, but we only need the
-    # last byte.  So we are going to pop off to the
-    # entire %eax register, but then only move the
+    # last byte. So we are going to pop off to the
+    # entire %rax register, but then only move the
     # small part (%al) into the character string.
     #
-    popl  %eax
-    movb  %al, (%edx)
+    popq  %rax
+    movb  %al, (%rsi)
 
-    decl  %ecx              # Decreasing %ecx so we
+    decq  %rcx              # Decreasing %rcx so we
                             # know when we are finished
 
-    incl  %edx              # Increasing %edx so that
+    incq  %rsi              # Increasing %rsi so that
                             # it will be pointing to
                             # the next byte.
 
-    cmpl  $0, %ecx          # Check to see if we are
+    cmpq  $0, %rcx          # Check to see if we are
                             # finished.
-    je    _end_copy_reversing_loop  # If so, jump to
-                                    # the end of the
-                                    # function.
-    jmp   _copy_reversing_loop      # Otherwise, repeat
-                                    # the loop.
+    je    end_copy_reversing_loop  # If so, jump to
+                                   # the end of the
+                                   # function.
 
-_end_copy_reversing_loop:
-    movb  $0, (%edx)        # Done copying.  Now write
+    jmp   copy_reversing_loop      # Otherwise, repeat
+                                   # the loop.
+
+end_copy_reversing_loop:
+    movb  $0, (%rsi)        # Done copying. Now write
                             # a null byte and return.
 
-    movl  %ebp, %esp
-    popl  %ebp
+    movq  %rbp, %rsp
+    popq  %rbp
     ret

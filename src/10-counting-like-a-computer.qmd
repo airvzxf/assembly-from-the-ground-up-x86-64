@@ -183,7 +183,7 @@ right, so from the bottom up you have 11101011001001.
 Each digit in a binary number is called a *bit*, which stands for
 *binary digit*. Remember, computers divide up their memory
 into storage locations called bytes. Each storage location on an
-x86 processor (and most others) is 8 bits long. Earlier we said that a
+x86-64 processor (and most others) is 8 bits long. Earlier we said that a
 byte can hold any number between 0 and 255. The reason for this is that
 the largest number you can fit into 8 bits is 255. You can see this for
 yourself if you convert binary 11111111 into decimal:
@@ -198,9 +198,9 @@ The largest number that you can hold in 16 bits is 65,535. The largest
 number you can hold in 32 bits is 4,294,967,295 (4 billion). The largest
 number you can hold in 64 bits is 18,446,744,073,709,551,615. The
 largest number you can hold in 128 bits is
-340,282,366,920,938,463,463,374,607,431,768,211,456. Anyway, you see the
-picture. For x86 processors, most of the time you will deal with 4-byte
-numbers (32 bits), because that\'s the size of the registers.
+340,282,366,920,938,463,463,374,607,431,768,211,455. Anyway, you see the
+picture. For x86-64 processors, most of the time you will deal with
+8-byte numbers (64 bits), because that\'s the size of the registers.
 
 Truth, Falsehood, and Binary Numbers {#truth-falsehood-and-binary-numbers}
 ------------------------------------
@@ -270,10 +270,12 @@ Finally, XOR is like OR, except it returns 0 if both bits are 1.
 
 Computers can do these operations on whole registers at a time. For
 example, if a register has 10100010101010010101101100101010 and another
-one has 10001000010101010101010101111010, you can run any of these
-operations on the whole registers. For example, if we were to AND them,
-the computer will run from the first bit to the 32nd and run the AND
-operation on that bit in both registers. In this case:
+one has 10001000010101010101010101111010 (to keep the lines short, these
+are 32-bit numbers, like the lower half of a register, such as _%eax_),
+you can run any of these operations on the whole registers. For
+example, if we were to AND them, the computer will run from the first
+bit to the 32nd and run the AND operation on that bit in both
+registers. In this case:
 
     10100010101010010101101100101010 AND
     10001000010101010101010101111010
@@ -322,12 +324,12 @@ These operations are useful for two reasons:
 You may not have known that different instructions execute at different
 speeds. It\'s true, they do. And these operations are the fastest on
 most processors. For example, you saw that XORing a number with itself
-produces 0. Well, the XOR operation is faster than the loading
-operation, so many programmers use it to load a register with
-zero. For example, the code:
+produces 0. Well, the XOR operation is shorter than loading a zero, and
+processors recognize it as a special case, so many programmers use it
+to load a register with zero. For example, the code:
 
 ```{.gnuassembler .numberLines}
-movl  $0, %eax
+movq  $0, %rax
 ```
 
 Is often replaced by:
@@ -335,6 +337,38 @@ Is often replaced by:
 ```{.gnuassembler .numberLines}
 xorl  %eax, %eax
 ```
+
+Why _%eax_ and not _%rax_? Because of a rule of x86-64 that you need to
+know: *an instruction that writes a 32-bit register also clears the
+upper 32 bits of the 64-bit register*. So `xorl %eax, %eax` sets all of
+_%rax_ to 0, and it is one byte shorter than `xorq %rax, %rax`.
+`objdump -d` shows the bytes of each version:
+
+    48 c7 c0 00 00 00 00    mov    $0x0,%rax
+    b8 00 00 00 00          mov    $0x0,%eax
+    31 c0                   xor    %eax,%eax
+    48 31 c0                xor    %rax,%rax
+
+The rule only applies to 32-bit registers. Writing an 8-bit or a 16-bit
+register (_%al_, _%bx_) leaves the rest of the 64-bit register as it
+was. You can see both cases in gdb, after these instructions:
+
+```{.gnuassembler}
+movq  $-1, %rax         # All 64 bits set to 1.
+movl  $5, %eax          # %rax is now 0x5.
+movq  $-1, %rbx
+movw  $5, %bx           # %rbx is 0xffffffffffff0005.
+```
+
+    (gdb) p/x $rax
+    $1 = 0x5
+    (gdb) p/x $rbx
+    $2 = 0xffffffffffff0005
+
+This is also why the `int` parameters and results of the C library
+(see
+[Chapter 8](08-sharing-functions-with-code-libraries.qmd#finding-information-about-libraries))
+only use the lower half of a register: the upper half may hold anything.
 
 We\'ll discuss speed more in
 [Chapter 12. Optimization](12-optimization.qmd#chapter-12-optimization), but I want you to
@@ -464,7 +498,8 @@ started with. However, if you *shift* a number for every digit you have,
 you wind up with 0. So, what are these shifts useful for? Well, if you
 have binary numbers representing things, you use shifts to peek at each
 individual value. Let\'s say, for instance, that we had my Dad\'s likes
-stored in a register (32 bits). It would look like this:
+stored in a register (here we only show its lower 32 bits; the other 32
+are zeros too). It would look like this:
 
     00000000000000000000000000001011
 
@@ -496,20 +531,20 @@ print the results. The code would look like this:
 ```{.gnuassembler .numberLines include=resource/asm/010-01-shift-bit.s}
 ```
 
-And then we would have two labels which printed something about whether
-or not he likes dressy clothes and then exits. The `0b` notation means
-that what follows is a binary number. In this case it
-wasn\'t needed, because 1 is the same in any numbering system, but I put
-it there for clarity. We also didn\'t need the 31 zeroes, but I put them
-in to make a point that the number you are using is 32 bits.
+The two labels at the end print something about whether or not he
+likes dressy clothes, and then the program exits. Run it, and it says
+`He likes dressy clothes.` The `0b` notation means that what follows is
+a binary number. In the `andq` and `cmpq` it wasn\'t needed, because 1
+is the same in any numbering system, but I put it there for clarity.
+The assembler fills the other 60 bits of the 64-bit number with zeros.
 
 When a number represents a set of options for a function or
 system call, the individual true/false elements are called
 *flags*. Many system calls have numerous options that are all set
 in the same register using a mechanism like we\'ve described. The
-`open` system call, for example, has as its second parameter a list
-of flags to tell the operating system how to open the file. Some of the
-flags include:
+`openat` system call, for example, has as its third parameter (in
+_%rdx_) a list of flags to tell the operating system how to open the
+file. Some of the flags include:
 
 `O_WRONLY`:
 
@@ -543,14 +578,19 @@ flags include:
 To use these flags, you simply OR them together in the combination
 that you want. For example, to open a file in write-only mode, and have
 it create the file if it doesn\'t exist, I would use `O_WRONLY` (01) and
-`O_CREAT` (0100). OR\'d together, I would have 0101.
+`O_CREAT` (0100). OR\'d together, I would have 0101. The `01101` that
+our programs have used since
+[Chapter 5](05-dealing-with-files.qmd#chapter-5-dealing-with-files) is
+`O_WRONLY`, `O_CREAT` and `O_TRUNC` together. The assembler can do the
+OR for you, with the `|` operator:
+`.equ FLAGS, O_WRONLY | O_CREAT | O_TRUNC`.
 
 Note that if you don\'t set either `O_WRONLY` or `O_RDWR`, then the file
 is automatically opened in read-only mode (`O_RDONLY`, except that it
 isn\'t really a flag since it\'s zero).
 
 Many functions and system calls use flags for options, as it allows a
-single word to hold up to 32 possible options if each option is
+single register to hold up to 64 possible options if each option is
 represented by a single bit.
 
 The Program Status Register {#the-program-status-register}
@@ -558,22 +598,22 @@ The Program Status Register {#the-program-status-register}
 
 We\'ve seen how bits on a register can be used to give the answers of
 yes/no and true/false statements. On your computer, there is a register
-called the *program status register*. This
+called the *program status register* (on x86-64, _%rflags_). This
 register holds a lot of information about what happens in a computation.
 For example, have you ever wondered what would happen if you added two
 numbers and the result was larger than would fit in a register? The
 program status register has a flag called the carry flag. You
 can test it to see if the last computation overflowed the register.
 There are flags for a number of different statuses. In fact, when you do
-a compare (`cmpl`) instruction, the result is stored in this
+a compare (`cmpq`) instruction, the result is stored in this
 register. The conditional jump instructions (`jge`,
 `jne`, etc) use these results to tell whether or not they should jump.
 `jmp`, the unconditional jump, doesn\'t care what
 is in the status register, since it is unconditional.
 
-Let\'s say you needed to store a number larger than 32 bits. So, let\'s
-say the number is 2 registers wide, or 64 bits. How could you handle
-this? If you wanted to add two 64-bit numbers, you would add the least
+Let\'s say you needed to store a number larger than 64 bits. So, let\'s
+say the number is 2 registers wide, or 128 bits. How could you handle
+this? If you wanted to add two 128-bit numbers, you would add the least
 significant registers first. Then, if you detected a carry, you could
 add 1 to the most significant register. In fact, this is probably the
 way you learned to do decimal addition. If the result in one column is
@@ -583,7 +623,17 @@ keep the 2 in the right column, and carry the one to the next column.
 There you add 6, 3, and the 1 you carried. This results in 10. So, you
 keep the zero in that column and carry the one to the next most
 significant column, which is empty, so you just put the one there.
-Luckily, 32 bits is usually big enough to hold the numbers we use
+The processor has an instruction for this, `adcq` (\"add with
+carry\"), which adds two numbers and the carry flag. If one 128-bit
+number is in _%rdx_ (high half) and _%rax_ (low half), and another one
+in _%rcx_ and _%rbx_, this adds the second one to the first:
+
+```{.gnuassembler}
+addq  %rbx, %rax        # Low halves; may set the carry.
+adcq  %rcx, %rdx        # High halves, plus the carry.
+```
+
+Luckily, 64 bits is usually big enough to hold the numbers we use
 regularly.
 
 Additional program status register flags are examined in
@@ -625,18 +675,26 @@ sufficiently big, adding 1 to it might not even register in the mantissa
 (remember, both parts are only so long). This affects several things,
 especially order of operations. If you add 1.0 to a given floating point
 number, it might not even affect the number if it is large enough. For
-example, on x86 platforms, a four-byte floating-point number, although
-it can represent very large numbers, cannot have 1.0 added to it past
+example, a four-byte floating-point number (a `float`), although it can
+represent very large numbers, cannot have 1.0 added to it past
 16777216.0, because it is no longer significant. The number no longer
 changes when 1.0 is added to it. So, if there is a multiplication
 followed by an addition it may give a different result than if the
-addition is performed first.
+addition is performed first. An eight-byte floating-point number (a
+`double`) has a longer mantissa, so the same problem appears much later,
+past 9007199254740992.0. And many decimal numbers, such as 0.1, have no
+exact binary form at all, just as 1 / 3 has no exact decimal form, so
+they are stored rounded.
 
-You should note that it takes most computers a lot longer to do
-floating-point arithmetic than it does integer arithmetic. So, for
-programs that really need speed, integers are mostly used.
+Floating-point arithmetic is slower than integer arithmetic on most
+computers, although the difference is much smaller today than when
+this book was first written. So, for programs that really need speed,
+or that need exact results (such as amounts of money), integers are
+mostly used.
 
-Short floating-point:
+The computers of today store floating-point numbers in the format of
+the IEEE 754 standard. This is the format of a four-byte `float`
+(called *single precision*):
 
 - The first bit is the sign bit: 0 for positive and 1 for negative.
 
@@ -665,6 +723,80 @@ Example:
     Value:       1 * 128 * 1.558624267578125
                  = 199.50390625
 
+A `double` (*double precision*) follows the same rules with more bits:
+1 bit for the sign, 11 for the exponent (`2^(x - 1023)`), and 52 for
+the fraction of the mantissa. Rust calls these types `f32` and `f64`,
+and the `float` type of Python is a `double`.
+
+### Floating Point in Assembly Language {#floating-point-in-assembly-language}
+
+x86-64 processors do floating-point arithmetic in a separate set of
+registers, _%xmm0_ to _%xmm15_. Each one is 16 bytes wide, but the
+instructions that we will use only work on its lowest 4 bytes (a
+`float`) or 8 bytes (a `double`). They are part of *SSE2*, an extension
+of the instruction set that every x86-64 processor has.[^10-2] The
+instructions have names that end in `ss` (*scalar single*, one `float`)
+or `sd` (*scalar double*, one `double`):
+
+`movss`, `movsd`:
+
+:   Copy a `float` or a `double` between memory and an _%xmm_ register,
+    or between two _%xmm_ registers.
+
+`addss`, `subss`, `mulss`, `divss`, and `addsd`, `subsd`, `mulsd`, `divsd`:
+
+:   Add, subtract, multiply and divide. The result goes in the second
+    operand, as with the integer instructions: `addsd %xmm1, %xmm0`
+    adds _%xmm1_ to _%xmm0_.
+
+`cvtsi2sdq`, `cvttsd2si`:
+
+:   Convert a 64-bit integer to a `double`, and a `double` to an
+    integer, *truncating* it (dropping the part after the point).
+    `cvtss2sd` and `cvtsd2ss` convert between `float` and `double`.
+
+`ucomisd`:
+
+:   Compare two `double`s and set the flags, like `cmpq` does for
+    integers. After it, use the jumps for unsigned numbers (`ja`, `jb`,
+    `jae`, `jbe`).
+
+The calling convention passes the first eight floating-point parameters
+in _%xmm0_ to _%xmm7_, in order, independently of the integer ones, and
+a function returns a floating-point result in _%xmm0_. None of the
+_%xmm_ registers is preserved across a call. Now you can see why
+`printf` needs _%al_
+([Chapter 8](08-sharing-functions-with-code-libraries.qmd#two-rules-for-calling-library-functions)):
+it is the number of _%xmm_ registers that hold parameters.
+
+This program, `010-03-floating-point.s`, puts it all together. It shows
+the problems of precision that we just described, and it prints the
+results with `printf`, which takes floating-point numbers as `double`s
+(a `float` is converted first):
+
+```{.gnuassembler .numberLines include=resource/asm/010-03-floating-point.s}
+```
+
+Build it like the programs of Chapter 8, which use the C library:
+
+```{.bash}
+as --64 -g -o 010-03-floating-point.o 010-03-floating-point.s
+ld -o 010-03-floating-point 010-03-floating-point.o \
+  -l c -dynamic-linker /lib64/ld-linux-x86-64.so.2
+```
+
+And this is what it prints:
+
+    16777216 + 1 = 16777216.0 (float)
+    16777216 + 1 = 16777217.0 (double)
+    0.1 + 0.2 = 0.30000000000000004
+    7 / 2 = 3.5, truncated to 3
+
+`%.1f` prints one digit after the point, and `%.17g` prints 17
+significant digits, enough to show exactly which `double` we have. Run
+`print(0.1 + 0.2)` in Python and you will get the same
+`0.30000000000000004`: Python adds the same two `double`s.
+
 References to understand in deep how the computer handle the floating points.
 
 - [Fixed Point and Floating Point][10-fixed-point-and-floating].
@@ -675,16 +807,17 @@ References to understand in deep how the computer handle the floating points.
 
 - [Single-precision floating-point format][10-single-precision-floating].
 
-For more information on using floating point numbers in assembly language, see:
-
-- [Floating Point Assembly Language][10-floating-point-assembly].
-
-- [Floating-Point Instruction Set][10-floating-point-instruction].
+For more information on using floating point numbers in assembly
+language, see the chapter \"Programming with Intel SSE2\" of the
+[Intel 64 and IA-32 Architectures Software Developer\'s Manuals][10-Intel-SDM]
+(volume 1) and the section on parameter passing of the
+[System V AMD64 psABI][10-ABI].
 
 ### Negative Numbers {#negative-numbers}
 
 How would you think that negative numbers on a computer
-might be represented? One thought might be to use the first digit of a
+might be represented? (The examples in this section use 32 bits, to keep
+the lines short; 64-bit numbers work in exactly the same way.) One thought might be to use the first digit of a
 number as the sign, so `00000000000000000000000000000001` would
 represent the number 1, and `10000000000000000000000000000001` would
 represent -1. This makes a lot of sense, and in fact some old processors
@@ -721,7 +854,9 @@ have a `1` in the leftmost bit. This also changes which numbers are
 valid for a given number of bits. With signed numbers, the possible
 magnitude of the values is split to allow for both positive and negative
 numbers. For example, a byte can normally have values up to 255. A
-signed byte, however, can store values from -128 to 127.
+signed byte, however, can store values from -128 to 127, and a signed
+64-bit register from -9,223,372,036,854,775,808 to
+9,223,372,036,854,775,807.
 
 One thing to note about the two\'s complement
 representation of signed numbers is that, unlike unsigned
@@ -737,14 +872,46 @@ the sign digit when you add bits. So, if we extend a negative number by
 4 digits, we should fill the new digits with a 1. If we extend a
 positive number by 4 digits, we should fill the new digits with a 0. So,
 the extension of -3 from four to eight bits will yield `11111101`.
+The processor has instructions that do it: `movslq` copies a 32-bit
+number into a 64-bit register with sign extension, and `movzbq` copies a
+byte with zeros (*zero extension*, for unsigned numbers).
 
-The x86 processor has different forms of several instructions depending
-on whether they expect the quantities they operate on to be signed
-or unsigned. These are listed in
+The x86-64 processor has different forms of several instructions
+depending on whether they expect the quantities they operate on to be
+signed or unsigned. These are listed in
 [Appendix B. Common x86 Instructions](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions).
-For example, the x86 processor has both a sign-preserving shift-right,
-`sarl`, and a shift-right which does not preserve the sign bit,
-`shrl`.
+For example, the x86-64 processor has both a sign-preserving
+shift-right, `sarq`, and a shift-right which does not preserve the sign
+bit, `shrq`. The conditional jumps come in both forms too: after a
+`cmpq`, `jl` and `jg` (\"less\" and \"greater\") compare signed
+numbers, and `jb` and `ja` (\"below\" and \"above\") compare unsigned
+ones. For the processor, -1 is less than 0, but `0xffffffffffffffff` is
+above 0: it is the same register, read in two ways. The memory manager
+of [Chapter 9](09-intermediate-memory-topics.qmd#the-allocate-function)
+uses `jbe` for this reason: sizes are never negative.
+
+Division has two forms as well. `divq` divides the 128-bit number
+in _%rdx_ (the high half) and _%rax_ (the low half) by its operand, and
+leaves the quotient in _%rax_ and the remainder in _%rdx_. To divide a
+64-bit number, put it in _%rax_ and set _%rdx_ to 0 first. `idivq` does
+the same with signed numbers, but then the high half must be the sign
+extension of _%rax_: all zeros for a positive number and all ones for a
+negative one. The instruction `cqto` (\"convert quadword to
+octoword\") does exactly that. To divide -7 by 2:
+
+```{.gnuassembler}
+movq  $-7, %rax
+cqto                    # %rdx = -1 (all ones).
+movq  $2, %rcx
+idivq %rcx              # %rax = -3, %rdx = -1.
+```
+
+The quotient is rounded toward zero, and the remainder has the sign of
+the number being divided. If you forget `cqto` (or the 0 in _%rdx_ for
+`divq`), the processor divides whatever was left in _%rdx_, and if the
+quotient doesn\'t fit in 64 bits, the program stops with a *divide
+error* (Linux reports it as `SIGFPE`, \"floating point exception\",
+although no floating point is involved).
 
 Octal and Hexadecimal Numbers {#octal-and-hexadecimal-numbers}
 -----------------------------
@@ -789,32 +956,27 @@ hexadecimal uses the letters `a` through `f` to represent them. For
 example, the letter `a` represents 10, the letter `b` represents 11, and
 so on. 10 in hexadecimal is 16 in decimal. In octal, each digit
 represented three bits. In hexadecimal, each digit represents
-four bits. Every two digits is a full byte, and eight digits is a
-32-bit word. So you see, it is considerably easier to write a
+four bits. Every two digits is a full byte, and sixteen digits is a
+64-bit register. So you see, it is considerably easier to write a
 hexadecimal number than it is to write a binary number, because it\'s
 only a quarter as many digits. The most important number to remember in
 hexadecimal is `f`, which means that all bits are set. So, if I want to
 set all of the bits of a register to 1, I can just do:
 
 ```{.gnuassembler}
-movl  $0xFFFFFFFF, %eax
+movq  $0xFFFFFFFFFFFFFFFF, %rax
 ```
 
-Which is considerably easier and less error-prone than writing:
+Which is considerably easier and less error-prone than writing
+sixty-four ones after `0b`. (In two\'s complement, all ones is -1, so
+`movq $-1, %rax` does the same, and `objdump` shows `$-1` as
+`$0xffffffffffffffff`.)
 
-```{.gnuassembler}
-movl  $0b11111111111111111111111111111111, %eax
-```
-
-Note also that hexadecimal numbers are prefixed with `0x`.
-So, when we do
-
-```{.gnuassembler}
-int   $0x80
-```
-
-We are calling interrupt number 128 (8 groups of 16), or interrupt
-number `0b00000000000000000000000010000000`.
+Note also that hexadecimal numbers are prefixed with `0x`. You have
+seen them in every address of Chapters 8 and 9. For example, the
+`andq $-16, %rax` of the memory manager in Chapter 9 uses the number
+`0xfffffffffffffff0`: all ones except the lowest four bits, so the AND
+clears those four bits and leaves a multiple of 16.
 
 Hexadecimal and octal numbers take some getting used to, but they are
 heavily used in computer programming. It might be worthwhile to make up
@@ -828,14 +990,29 @@ One thing that confuses many people when dealing with bits and
 bytes on a low level is that, when bytes are written from
 registers to memory, their bytes are written out
 least-significant-portion-first.[^10-1] What most people expect is that if
-they have a word in a register, say `0x5d 23 ef ee` (the spacing is so
+they have a number in a register, say `0x5d 23 ef ee` (the spacing is so
 you can see where the bytes are), the bytes will be written to memory in
-that order. However, on x86 processors, the bytes are actually written
-in reverse order. In memory the bytes would be `0xee ef 23 5d` on x86
-processors. The bytes are written in reverse order from what they would
-appear conceptually, but the bits within the bytes are ordered normally.
+that order. However, on x86-64 processors, the bytes are actually
+written in reverse order. In memory the bytes would be `0xee ef 23 5d`
+on x86-64 processors. The bytes are written in reverse order from what
+they would appear conceptually, but the bits within the bytes are
+ordered normally.
 
-Not all processors behave this way. The x86 processor is a
+You can see it in the `test.dat` of
+[Chapter 6](06-reading-and-writing-simple-records.qmd#chapter-6-reading-and-writing-simple-records).
+The age of the first record, 45 (0x2d), is a `.quad` at offset 320. `od`
+can print those 8 bytes one by one, in hexadecimal:
+
+```{.bash}
+od -A d -t x1 -j 320 -N 8 test.dat
+```
+
+    0000320 2d 00 00 00 00 00 00 00
+    0000328
+
+The byte with the value 0x2d, the least significant one, comes first.
+
+Not all processors behave this way. The x86-64 processor is a
 *little-endian* processor, which means that it stores the
 \"little end\", or least-significant byte of its words first.
 
@@ -855,7 +1032,7 @@ order the bytes are in. The byte-switching magic happens automatically
 behind the scenes during register-to-memory transfers. However, the byte
 order can cause problems in several instances:
 
--   If you try to read in several bytes at a time using `movl` but deal
+-   If you try to read in several bytes at a time using `movq` but deal
     with them on a byte-by-byte basis using the least significant byte
     (i.e. - by using _%al_ and/or shifting of the register), this will be
     in a different order than they appear in memory.
@@ -879,16 +1056,17 @@ except by the extremely limited means of passing it through exit codes.
 In this section, we will discuss converting positive numbers into
 strings for display.
 
-The function will be called `_integer2string`, and it will take two
-parameters - an integer to convert and a string buffer filled with null
-characters (zeroes). The buffer will be assumed to be big enough to
-store the entire number as a string (at least 11 characters long, to
-include a trailing null character).
+The function will be called `integer2string`, and it will take two
+parameters - an integer to convert (in _%rdi_) and a string buffer (in
+_%rsi_). The buffer will be assumed to be big enough to store the entire
+number as a string: the largest 64-bit number,
+18,446,744,073,709,551,615, has 20 digits, so the buffer must be at
+least 21 characters long, to include a trailing null character.
 
 Remember that the way that we see numbers is in base 10. Therefore, to
 access the individual decimal digits of a number, we need to be dividing
-by 10 and displaying the remainder for each digit. Therefore, the
-process will look like this:
+by 10 (with `divq`, since the number is unsigned) and displaying the
+remainder for each digit. Therefore, the process will look like this:
 
 -   Divide the number by ten.
 
@@ -913,8 +1091,14 @@ The code for the function should be put in a file called
 ```{.gnuassembler .numberLines include=resource/asm/010-02-integer-to-string.s}
 ```
 
+Notice the `movq $0, %rdx` before each `divq`: the remainder of one
+division would otherwise become the high half of the next one. The
+function doesn\'t call anything, so it can push the digits without
+caring about the alignment of the stack; it pops all of them before it
+returns.
+
 To show this used in a full program, use the following code, along with
-the `_count_chars` and `_write_newline` functions written about in
+the `count_chars` and `write_newline` functions written about in
 previous chapters. The code should be in a file called
 `010-02-conversion-program.s`.
 
@@ -924,30 +1108,17 @@ previous chapters. The code should be in a file called
 To build the program, issue the following commands:
 
 ```{.bash}
-as -o 010-02-integer-to-number.o   --32 \
-                                   --gstabs+ \
-                                   010-02-integer-to-string.s
-
-as -o 006-01-count-chars.o         --32 \
-                                   --gstabs+ \
-                                   006-01-count-chars.s
-
-as -o 006-01-write-newline.o       --32 \
-                                   --gstabs+ \
-                                   006-01-write-newline.s
-
-as -o 010-02-conversion-program.o  --32 \
-                                   --gstabs+ \
-                                   010-02-conversion-program.s
-
-ld -o 010-02-conversion-program    -m elf_i386 \
-                                   006-01-count-chars.o \
-                                   006-01-write-newline.o \
-                                   010-02-conversion-program.o \
-                                   010-02-integer-to-number.o
+as --64 -g -o 010-02-integer-to-string.o 010-02-integer-to-string.s
+as --64 -g -o 006-01-count-chars.o 006-01-count-chars.s
+as --64 -g -o 006-01-write-newline.o 006-01-write-newline.s
+as --64 -g -o 010-02-conversion-program.o 010-02-conversion-program.s
+ld -o 010-02-conversion-program 010-02-conversion-program.o \
+  010-02-integer-to-string.o 006-01-count-chars.o 006-01-write-newline.o
 ```
 
-To run just type `./010-02-conversion-program` and the output should say `824`.
+To run just type `./010-02-conversion-program` and the output should
+say `824`. Try other numbers, up to 18446744073709551615 (written in
+the program as `$-1`, all ones).
 
 Review {#review-8}
 ------
@@ -969,9 +1140,9 @@ Review {#review-8}
 
 -   What is masking for?
 
--   What number would you use for the flags of the `open` system call if
-    you wanted to open the file for writing, and create the file if it
-    doesn\'t exist?
+-   What number would you use for the flags of the `openat` system call
+    if you wanted to open the file for writing, and create the file if
+    it doesn\'t exist?
 
 -   How would you represent -55 in a 32-bit register?
 
@@ -980,36 +1151,49 @@ Review {#review-8}
 -   Describe the difference between little-endian and big-endian storage
     of words in memory.
 
+-   What does `movl $5, %eax` do to the upper half of _%rax_? And
+    `movw $5, %ax`?
+
+-   Why must _%rdx_ be set before `divq` or `idivq`, and to what?
+
+-   Where does a function receive its `double` parameters, and where
+    does it return a `double`?
+
 ### Use the Concepts {#use-the-concepts-8}
 
 -   Go back to previous programs that returned numeric results through
     the exit status code, and rewrite them to print out the results
     instead using our integer to string conversion function.
 
--   Modify the `_integer2string` code to return results in octal rather
+-   Modify the `integer2string` code to return results in octal rather
     than decimal.
 
--   Modify the `_integer2string` code so that the conversion base is a
+-   Modify the `integer2string` code so that the conversion base is a
     parameter rather than hardcoded.
 
--   Write a function called `_is_negative` that takes a single integer as
+-   Write a function called `is_negative` that takes a single integer as
     a parameter and returns 1 if the parameter is negative, and 0 if the
     parameter is positive.
 
+-   Write a function that converts a temperature from Fahrenheit to
+    Celsius (subtract 32, then multiply by 5 and divide by 9) with the
+    SSE2 instructions, and a program that prints a few temperatures with
+    `printf`.
+
 ### Going Further {#going-further-8}
 
--   Modify the `_integer2string` code so that the conversion base can be
+-   Modify the `integer2string` code so that the conversion base can be
     greater than 10 (this requires you to use letters for numbers past
     9).
 
--   Create a function that does the reverse of `_integer2string` called
-    `_number2integer` which takes a character string and converts it to a
+-   Create a function that does the reverse of `integer2string` called
+    `number2integer` which takes a character string and converts it to a
     register-sized integer. Test it by running that integer back through
-    the `_integer2string` function and displaying the results.
+    the `integer2string` function and displaying the results.
 
--   Write a program that stores likes and dislikes into a single machine
-    word, and then compares two sets of likes and dislikes for
-    commonalities.
+-   Write a program that stores likes and dislikes into a single
+    register-sized number, and then compares two sets of likes and
+    dislikes for commonalities.
 
 -   Write a program that reads a string of characters from STDIN and
     converts them to a number.
@@ -1019,6 +1203,13 @@ Review {#review-8}
     significant because it represents the hundreds place, 9 is the next
     most significant, and 4 is the least significant.
 
+[^10-2]: Older programs, and 32-bit ones, use the *x87* floating-point
+    unit instead, with its own stack of eight 80-bit registers
+    (`fld`, `fadd`, `fstp`, \...). It still exists, but on x86-64 the
+    calling convention uses SSE2, and so do compilers. Newer extensions
+    (AVX, AVX-512) widen the vector registers to 32 and 64 bytes, to
+    work on many numbers at once.
+
 
 [10-Davs]: http://david.carybros.com/html/endian_faq.html
 [10-holy-war]: https://dcc.ufrj.br/~gabriel/progpar/danny_co.pdf
@@ -1026,5 +1217,5 @@ Review {#review-8}
 [10-floating-point-tutorial]: https://www.rfwireless-world.com/Tutorials/floating-point-tutorial.html
 [10-IEEE-standard-for-floating]: https://en.wikipedia.org/wiki/IEEE_754
 [10-single-precision-floating]: https://en.wikipedia.org/wiki/Single-precision_floating-point_format
-[10-floating-point-assembly]: https://cs.fit.edu/~mmahoney/cse3101/float.html
-[10-floating-point-instruction]: https://www3.physnet.uni-hamburg.de/physnet/Tru64-Unix/HTML/APS31DTE/DOCU_010.HTM
+[10-Intel-SDM]: https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
+[10-ABI]: https://gitlab.com/x86-psABIs/x86-64-ABI
