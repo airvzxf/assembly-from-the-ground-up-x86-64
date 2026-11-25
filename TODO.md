@@ -31,8 +31,8 @@
 - [x] Write the x86-64 edition: every chapter, appendix and example for 64-bit Linux (see `PORTING.md`).
 - [x] Publish the website with Cloudflare Pages connected to this repository: <https://asm32.rovisoft.net/>.
 - [x] Create the x86-64 edition in its own repository.
-- [ ] Port the text, the examples and the solutions to x86-64 (AT&T syntax, `syscall`, System V AMD64 calling convention).
-- [ ] Publish the website with the Cloudflare Pages project `assembly-from-the-ground-up-x86-64`: <https://asm64.rovisoft.net/>.
+- [x] Port the text, the examples and the solutions to x86-64 (AT&T syntax, `syscall`, System V AMD64 calling convention).
+- [x] Publish the website with the Cloudflare Pages project `assembly-from-the-ground-up-x86-64`: <https://asm64.rovisoft.net/>.
 
 #### Knowledge
 
