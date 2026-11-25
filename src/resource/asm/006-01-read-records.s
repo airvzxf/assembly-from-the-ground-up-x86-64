@@ -1,5 +1,5 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
+    .section .note.GNU-stack,"",@progbits
+
     .include "006-01-linux.s"      # Linux Definitions.
     .include "006-01-record-def.s" # Record definitions
 
@@ -21,65 +21,63 @@ _start:
     # (FYI - we could have used memory addresses in a
     # .data section instead).
     #
-    .equ ST_INPUT_DESCRIPTOR,   -4
-    .equ ST_OUTPUT_DESCRIPTOR,  -8
+    .equ ST_INPUT_DESCRIPTOR,   -8
+    .equ ST_OUTPUT_DESCRIPTOR,  -16
 
-    movl  %esp, %ebp        # Copy the stack pointer to
-                            # %ebp.
-    subl  $8, %esp          # Allocate space to hold
+    movq  %rsp, %rbp        # Copy the stack pointer to
+                            # %rbp.
+    subq  $16, %rsp         # Allocate space to hold
                             # the file descriptors.
 
-    movl  $SYS_OPEN, %eax   # Open the file.
-    movl  $file_name, %ebx
-    movl  $0, %ecx          # This says to open
+    movq  $SYS_OPENAT, %rax # Open the file.
+    movq  $AT_FDCWD, %rdi
+    leaq  file_name(%rip), %rsi
+    movq  $O_RDONLY, %rdx   # This says to open
                             # read-only.
-    movl  $0666, %edx
-    int   $LINUX_SYSCALL
+    movq  $0666, %r10
+    syscall
 
     # ----- Save file descriptor ----- #
     #
-    movl  %eax, ST_INPUT_DESCRIPTOR(%ebp)
+    movq  %rax, ST_INPUT_DESCRIPTOR(%rbp)
 
     # Even though it is a constant, we are saving the
     # output file descriptor in a local variable so
     # that if we later decide that it is not always
     # going to be STDOUT, we can change it easily.
     #
-    movl  $STDOUT, ST_OUTPUT_DESCRIPTOR(%ebp)
+    movq  $STDOUT, ST_OUTPUT_DESCRIPTOR(%rbp)
 
-_record_read_loop:
-    pushl ST_INPUT_DESCRIPTOR(%ebp)
-    pushl $record_buffer
-    call  _read_record
-    addl  $8, %esp
+record_read_loop:
+    movq  ST_INPUT_DESCRIPTOR(%rbp), %rdi
+    leaq  record_buffer(%rip), %rsi
+    call  read_record
 
     # Returns the number of bytes read. If it is not
     # the same number we requested, then it is either
     # an end-of-file, or an error, so we are quitting.
     #
-    cmpl  $RECORD_SIZE, %eax
-    jne   _finished_reading
+    cmpq  $RECORD_SIZE, %rax
+    jne   finished_reading
 
     # Otherwise, print out the first name but we must
     # know the size.
     #
-    pushl  $RECORD_FIRSTNAME + record_buffer
-    call   _count_chars
-    addl   $4, %esp
+    leaq  record_buffer + RECORD_FIRSTNAME(%rip), %rdi
+    call  count_chars
 
-    movl   %eax, %edx
-    movl   ST_OUTPUT_DESCRIPTOR(%ebp), %ebx
-    movl   $SYS_WRITE, %eax
-    movl   $RECORD_FIRSTNAME + record_buffer, %ecx
-    int    $LINUX_SYSCALL
+    movq  %rax, %rdx
+    movq  ST_OUTPUT_DESCRIPTOR(%rbp), %rdi
+    leaq  record_buffer + RECORD_FIRSTNAME(%rip), %rsi
+    movq  $SYS_WRITE, %rax
+    syscall
 
-    pushl  ST_OUTPUT_DESCRIPTOR(%ebp)
-    call   _write_newline
-    addl   $4, %esp
+    movq  ST_OUTPUT_DESCRIPTOR(%rbp), %rdi
+    call  write_newline
 
-    jmp    _record_read_loop
+    jmp   record_read_loop
 
-_finished_reading:
-    movl   $SYS_EXIT, %eax
-    movl   $0, %ebx
-    int    $LINUX_SYSCALL
+finished_reading:
+    movq  $SYS_EXIT, %rax
+    movq  $0, %rdi
+    syscall

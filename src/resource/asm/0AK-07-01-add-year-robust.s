@@ -1,4 +1,3 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
     # Link with `006-01-read-record.o`,
     # `006-01-write-record.o`, `007-01-error-exit.o`,
     # `006-01-count-chars.o` and
@@ -21,9 +20,10 @@
     #     more than 0 but less than a whole record
     #     means the file is damaged.
     #
+    .section .note.GNU-stack,"",@progbits
+
     .include "006-01-linux.s"
     .include "006-01-record-def.s"
-        .equ O_CREAT_WRONLY_TRUNC, 03101
 
     .section .data
         input_file_name:
@@ -61,86 +61,86 @@
 
     .section .text
         .globl _start
-        # %esi - Input file descriptor.
-        # %edi - Output file descriptor.
+        # %r12 - Input file descriptor.
+        # %r13 - Output file descriptor.
 
 _start:
-    movl  $SYS_OPEN, %eax
-    movl  $input_file_name, %ebx
-    movl  $0, %ecx           # Read only.
-    movl  $0666, %edx
-    int   $LINUX_SYSCALL
-    movl  %eax, %esi
-    cmpl  $0, %eax
-    jge   _open_output
+    movq  $SYS_OPENAT, %rax
+    movq  $AT_FDCWD, %rdi
+    leaq  input_file_name(%rip), %rsi
+    movq  $O_RDONLY, %rdx
+    movq  $0666, %r10
+    syscall
+    movq  %rax, %r12
+    cmpq  $0, %rax
+    jge   open_output
 
     # Recovery point: use STDIN instead.
-    movl  $STDIN, %esi
-    movl  $SYS_WRITE, %eax
-    movl  $STDERR, %ebx
-    movl  $msg_recover, %ecx
-    movl  $RECOVER_LEN, %edx
-    int   $LINUX_SYSCALL     # Nothing useful to do
+    movq  $STDIN, %r12
+    movq  $SYS_WRITE, %rax
+    movq  $STDERR, %rdi
+    leaq  msg_recover(%rip), %rsi
+    movq  $RECOVER_LEN, %rdx
+    syscall                  # Nothing useful to do
                              # if this one fails.
-_open_output:
-    movl  $SYS_OPEN, %eax
-    movl  $output_file_name, %ebx
-    movl  $O_CREAT_WRONLY_TRUNC, %ecx
-    movl  $0666, %edx
-    int   $LINUX_SYSCALL
-    movl  %eax, %edi
-    cmpl  $0, %eax
-    jl    _error_output
 
-_loop_begin:
-    pushl %esi
-    pushl $record_buffer
-    call  _read_record
-    addl  $8, %esp
-    cmpl  $0, %eax
-    jl    _error_read        # Read failed.
-    je    _loop_end          # End of file.
-    cmpl  $RECORD_SIZE, %eax
-    jne   _error_partial     # Damaged file.
+open_output:
+    movq  $SYS_OPENAT, %rax
+    movq  $AT_FDCWD, %rdi
+    leaq  output_file_name(%rip), %rsi
+    movq  $O_CREAT_WRONLY_TRUNC, %rdx
+    movq  $0666, %r10
+    syscall
+    movq  %rax, %r13
+    cmpq  $0, %rax
+    jl    error_output
 
-    incl  record_buffer + RECORD_AGE
+loop_begin:
+    movq  %r12, %rdi
+    leaq  record_buffer(%rip), %rsi
+    call  read_record
+    cmpq  $0, %rax
+    jl    error_read         # Read failed.
+    je    loop_end           # End of file.
+    cmpq  $RECORD_SIZE, %rax
+    jne   error_partial      # Damaged file.
 
-    pushl %edi
-    pushl $record_buffer
-    call  _write_record
-    addl  $8, %esp
-    cmpl  $RECORD_SIZE, %eax # Everything written?
-    jne   _error_write
-    jmp   _loop_begin
+    incq  record_buffer + RECORD_AGE(%rip)
 
-_loop_end:
-    movl  $SYS_CLOSE, %eax   # Closing the output
-    movl  %edi, %ebx         # can report a delayed
-    int   $LINUX_SYSCALL     # write error.
-    cmpl  $0, %eax
-    jl    _error_close
+    movq  %r13, %rdi
+    leaq  record_buffer(%rip), %rsi
+    call  write_record
+    cmpq  $RECORD_SIZE, %rax # Everything written?
+    jne   error_write
+    jmp   loop_begin
 
-    movl  $SYS_EXIT, %eax
-    movl  $0, %ebx
-    int   $LINUX_SYSCALL
+loop_end:
+    movq  $SYS_CLOSE, %rax   # Closing the output
+    movq  %r13, %rdi         # can report a delayed
+    syscall                  # write error.
+    cmpq  $0, %rax
+    jl    error_close
+    movq  $SYS_EXIT, %rax
+    movq  $0, %rdi
+    syscall
 
-_error_output:
-    pushl $msg_output
-    pushl $code_output
-    call  _error_exit
-_error_read:
-    pushl $msg_read
-    pushl $code_read
-    call  _error_exit
-_error_partial:
-    pushl $msg_partial
-    pushl $code_partial
-    call  _error_exit
-_error_write:
-    pushl $msg_write
-    pushl $code_write
-    call  _error_exit
-_error_close:
-    pushl $msg_close
-    pushl $code_close
-    call  _error_exit
+error_output:
+    leaq  code_output(%rip), %rdi
+    leaq  msg_output(%rip), %rsi
+    call  error_exit
+error_read:
+    leaq  code_read(%rip), %rdi
+    leaq  msg_read(%rip), %rsi
+    call  error_exit
+error_partial:
+    leaq  code_partial(%rip), %rdi
+    leaq  msg_partial(%rip), %rsi
+    call  error_exit
+error_write:
+    leaq  code_write(%rip), %rdi
+    leaq  msg_write(%rip), %rsi
+    call  error_exit
+error_close:
+    leaq  code_close(%rip), %rdi
+    leaq  msg_close(%rip), %rsi
+    call  error_exit

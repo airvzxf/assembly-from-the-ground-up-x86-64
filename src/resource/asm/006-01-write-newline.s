@@ -1,27 +1,31 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
+    # PURPOSE:
+    #     Write a newline character to a file
+    #     descriptor.
     #
-    .include "006-01-linux.s"      # Linux Definitions.
+    # INPUT:
+    #     %rdi - The file descriptor.
+    #
+    .section .note.GNU-stack,"",@progbits
 
-        .globl _write_newline
-        .type  _write_newline,  @function
+    .include "006-01-linux.s"      # Linux Definitions.
 
     .section .data
         newline:
             .ascii "\n"
 
     .section .text
-        .equ ST_FILEDES,  8
+        .globl write_newline
+        .type  write_newline,  @function
 
-_write_newline:
-    pushl %ebp
-    movl  %esp, %ebp
+write_newline:
+    pushq %rbp
+    movq  %rsp, %rbp
 
-    movl  $SYS_WRITE, %eax
-    movl  ST_FILEDES(%ebp), %ebx
-    movl  $newline, %ecx
-    movl  $1, %edx
-    int   $LINUX_SYSCALL
+    movq  $SYS_WRITE, %rax  # The file descriptor is
+    leaq  newline(%rip), %rsi   # already in %rdi.
+    movq  $1, %rdx
+    syscall
 
-    movl  %ebp, %esp
-    popl  %ebp
+    movq  %rbp, %rsp
+    popq  %rbp
     ret

@@ -712,14 +712,8 @@ the assembler, as the distance between the labels `text` and
 Chapter 6. Reading and Writing Simple Records {#chapter-6.-reading-and-writing-simple-records}
 ---------------------------------------------
 
-A correction first. The data of `006-01-write-records.s` had two
-addresses shorter than in the original book (`"Chicago, IL"` instead of
-`"Chicago, IL 12345"`, and `"500 Oakland"` instead of `"500 W Oakland"`),
-so the second and third records were not 324 bytes long and their ages
-were not where `RECORD_AGE` says. The programs that only print the
-names worked, but any program that reads the ages got garbage. The file
-is fixed in this edition, and the ages of `test.dat` are now 45, 29 and
-36.
+The ages in the `test.dat` that `006-01-write-records` creates are 45,
+29 and 36.
 
 ### Know the Concepts {#know-the-concepts-15}
 
@@ -744,25 +738,36 @@ is fixed in this edition, and the ages of `test.dat` are now 45, 29 and
     small and focused, to let several people work at the same time,
     and to reassemble only the files that changed.
 
--   **What does the instruction `incl record_buffer + RECORD_AGE` do?**
-    It adds 1 to the 4-byte number stored at the address
+-   **What does the instruction `incq record_buffer + RECORD_AGE(%rip)`
+    do?** It adds 1 to the 8-byte number stored at the address
     `record_buffer + RECORD_AGE`, which is the age of the record in
-    the buffer. It uses direct addressing, with a single operand. The
-    assembler (and the linker) compute the address
-    `record_buffer + 320` once, before the program runs; when the
-    program runs, the processor only reads that memory location,
+    the buffer. It uses instruction-pointer-relative addressing, with a
+    single operand. The assembler and the linker compute the address
+    `record_buffer + 320`, and the distance from the instruction to it,
+    once, before the program runs; when the program runs, the processor
+    only adds that distance to _%rip_, reads that memory location,
     increments it and writes it back.
+
+-   **How does `006-01-write-records` make sure that each record is
+    exactly `RECORD_SIZE` bytes long?** With the `.if` and `.error`
+    directives after the data: the assembler computes the size of each
+    record as the difference between two labels (`record2 - record1`)
+    and stops with an error message if it isn\'t `RECORD_SIZE`. The
+    check happens while the program is assembled, so a record with a
+    miscounted padding never reaches a file.
 
 ### Use the Concepts {#use-the-concepts-15}
 
 **Add another data member to the person structure.** This version adds
-a 20-byte phone number after the age, so `RECORD_SIZE` changes from 324
-to 344:
+a 24-byte phone number after the age, so `RECORD_SIZE` changes from 328
+to 352. 24 bytes is more than a phone number needs, but it keeps the
+size of the record a multiple of 8, so the age of every record in a
+file or in memory stays aligned:
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-06-01-record-def.s}
 ```
 
-`_read_record` and `_write_record` use `RECORD_SIZE`, so they must be
+`read_record` and `write_record` use `RECORD_SIZE`, so they must be
 reassembled with the new definition. Their code doesn\'t change:
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-06-01-record-io.s}
@@ -770,7 +775,9 @@ reassembled with the new definition. Their code doesn\'t change:
 
 The programs that write and read the records now handle the phone
 number. `.space N` reserves `N` zero bytes, which is shorter than
-`.rept`:
+`.rept`. The program that reads them keeps the file descriptor in
+_%r12_, a callee-saved register, so it survives the calls to the
+functions, and its helper `print_string` saves _%rbx_ for its caller:
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-06-01-write-records.s}
 ```
@@ -790,14 +797,14 @@ Fredrick: 555-0100
 Marilyn: 555-0199
 ```
 
-**Write 30 identical records to a file with a loop.** _%edi_ counts
-down from 30; `decl` sets the zero flag when it reaches 0, so `jnz`
-needs no `cmpl`:
+**Write 30 identical records to a file with a loop.** _%r13_ counts
+down from 30; `decq` sets the zero flag when it reaches 0, so `jnz`
+needs no `cmpq`:
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-06-02-write-30-records.s}
 ```
 
-The file `test30.dat` is 9720 bytes long (30 × 324).
+The file `test30.dat` is 9840 bytes long (30 × 328).
 
 **Find the largest age** and **the smallest age in the file.** Both
 programs are the same except for the conditional jump. The first record
@@ -814,10 +821,10 @@ they return `45` and `29`.
 
 -   **Use command-line arguments to specify the filenames.** As in
     Chapter 5, the arguments are on the stack when the program starts:
-    `8(%ebp)` is the address of the first filename and `12(%ebp)` the
-    address of the second (after `movl %esp, %ebp`). Use them instead of
-    `$file_name` in the `open` calls, and check `ARGC` (`0(%ebp)`)
-    first. See `0AK-05-04-toupper-checked.s`.
+    `16(%rbp)` is the address of the first filename and `24(%rbp)` the
+    address of the second (after `movq %rsp, %rbp`). Load them with
+    `movq` instead of `leaq file_name(%rip)` in the `openat` calls, and
+    check `argc` (`0(%rbp)`) first. See `0AK-05-04-toupper-checked.s`.
 
 -   **Use `lseek` to write the modified records back to the same
     file.** After reading a record, `lseek` moves the file offset back
@@ -829,7 +836,7 @@ they return `45` and `29`.
     After running it on `test.dat`, the largest and smallest ages are
     46 and 30, and the file size doesn\'t change.
 
--   **Check _%eax_ for error conditions and write a message to
+-   **Check _%rax_ for error conditions and write a message to
     `STDERR`.** See the solution for Chapter 7, which does this for
     every system call of `007-01-add-year.s`.
 
@@ -877,8 +884,9 @@ Chapter 7. Developing Robust Programs {#chapter-7.-developing-robust-programs-1}
 -   **What are corner cases? Numeric examples?** Inputs at the limits
     of what a program accepts, where bugs tend to hide. Numeric
     examples: 0, 1, -1, the largest and smallest values that fit in a
-    register (2147483647 and -2147483648 for a signed 32-bit number,
-    4294967295 for an unsigned one), the values just past each limit,
+    register (9223372036854775807 and -9223372036854775808 for a signed
+    64-bit number, 18446744073709551615 for an unsigned one), the values
+    just past each limit,
     and, for lists, an empty list and a list of one item.
 
 -   **Why is user testing so important?** Users do things the
@@ -921,7 +929,9 @@ mv test.dat input.dat
 ```
 
 It prints `Warning: can't open test.dat, reading STDIN` and writes
-the records with the ages 46, 30 and 37 to `testout.dat`. With a
+the records with the ages 46, 30 and 37 to `testout.dat`. The file
+descriptors live in _%r12_ and _%r13_, callee-saved registers, so they
+survive every call. With a
 damaged `test.dat` it prints `0004: Incomplete Record.` and exits with
 status 1.
 

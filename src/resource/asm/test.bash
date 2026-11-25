@@ -120,16 +120,52 @@ expect_output "0AK-05-04-toupper-checked (one argument)" \
   "${A}/0AK-06-01-write-records-bin"       # test-phone.dat.
   "${A}/0AK-06-02-write-30-records-bin"    # test30.dat.
 )
+# Ages of the three records in a record file, one per line.
+ages() {
+  local offset
+  for offset in 320 648 976; do
+    od -A n -t d8 -j "${offset}" -N 8 "$1" | tr -d ' '
+  done
+}
+# The book programs: 3 records of 328 bytes, their first names, and
+# the ages after 006-01-add-year and 007-01-add-year.
+if [[ "$(stat -c %s "${TMP_DIR}/test.dat")" == 984 ]]; then
+  pass "006-01-write-records: 3 records of 328 bytes"
+else
+  fail "006-01-write-records: wrong file size"
+fi
+INPUT="" expect_output 006-01-read-records \
+  "$(printf 'Fredrick\nMarilyn\nDerrick')" \
+  sh -c "cd '${TMP_DIR}' && '${PWD}/006-01-read-records-bin'"
+for PROGRAM in 006-01-add-year 007-01-add-year; do
+  (cd "${TMP_DIR}" && rm -f testout.dat && "${OLDPWD}/${PROGRAM}-bin")
+  if [[ "$(ages "${TMP_DIR}/testout.dat" | paste -sd ' ')" \
+        == "46 30 37" ]]; then
+    pass "${PROGRAM}: ages 46 30 37"
+  else
+    fail "${PROGRAM}: wrong ages"
+  fi
+done
+mkdir -p "${TMP_DIR}/empty"
+STATUS=0
+OUTPUT="$(cd "${TMP_DIR}/empty" && "${OLDPWD}/007-01-add-year-bin" 2>&1)" \
+  || STATUS=$?
+if [[ "${OUTPUT}" == "0001: Can't Open Input File." && "${STATUS}" == 1 ]]
+then
+  pass "007-01-add-year (missing file): message and status 1"
+else
+  fail "007-01-add-year (missing file): '${OUTPUT}', status ${STATUS}"
+fi
 INPUT="" expect_output 0AK-06-01-read-records \
   "$(printf 'Fredrick: 555-0100\nMarilyn: 555-0199')" \
   sh -c "cd '${TMP_DIR}' && '${PWD}/0AK-06-01-read-records-bin'"
-if [[ "$(stat -c %s "${TMP_DIR}/test-phone.dat")" == 688 ]]; then
-  pass "0AK-06-01-write-records: 2 records of 344 bytes"
+if [[ "$(stat -c %s "${TMP_DIR}/test-phone.dat")" == 704 ]]; then
+  pass "0AK-06-01-write-records: 2 records of 352 bytes"
 else
   fail "0AK-06-01-write-records: wrong file size"
 fi
-if [[ "$(stat -c %s "${TMP_DIR}/test30.dat")" == 9720 ]]; then
-  pass "0AK-06-02-write-30-records: 30 records of 324 bytes"
+if [[ "$(stat -c %s "${TMP_DIR}/test30.dat")" == 9840 ]]; then
+  pass "0AK-06-02-write-30-records: 30 records of 328 bytes"
 else
   fail "0AK-06-02-write-30-records: wrong file size"
 fi
@@ -145,7 +181,7 @@ status_in_tmp 0AK-06-04-min-age 29 "(ages 45, 29, 36)"
 in_tmp 0AK-06-05-add-year-in-place
 status_in_tmp 0AK-06-03-max-age 46 "(after add-year-in-place)"
 status_in_tmp 0AK-06-04-min-age 30 "(after add-year-in-place)"
-if [[ "$(stat -c %s "${TMP_DIR}/test.dat")" == 972 ]]; then
+if [[ "$(stat -c %s "${TMP_DIR}/test.dat")" == 984 ]]; then
   pass "0AK-06-05-add-year-in-place: file size unchanged"
 else
   fail "0AK-06-05-add-year-in-place: file size changed"
@@ -159,13 +195,6 @@ INPUT="Zed" expect_output "0AK-06-07-find-records (no match)" "" \
   sh -c "cd '${TMP_DIR}' && '${PWD}/0AK-06-07-find-records-bin'"
 
 # ----- Chapter 7 -----
-# Ages of the three records in a record file, one per line.
-ages() {
-  local offset
-  for offset in 320 644 968; do
-    od -A n -t d4 -j "${offset}" -N 4 "$1" | tr -d ' '
-  done
-}
 C7="${TMP_DIR}/c7"
 mkdir -p "${C7}"
 (cd "${C7}" && "${OLDPWD}/006-01-write-records-bin")

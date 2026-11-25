@@ -1,4 +1,3 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
     # Link with `0AK-06-06-compare-strings.o`,
     # `006-01-read-record.o`, `006-01-count-chars.o`
     # and `006-01-write-newline.o`.
@@ -12,6 +11,8 @@
     # USAGE:
     #     echo Mar | ./0AK-06-07-find-records
     #
+    .section .note.GNU-stack,"",@progbits
+
     .include "006-01-linux.s"
     .include "006-01-record-def.s"
         .equ INPUT_SIZE, 5
@@ -28,64 +29,62 @@
         .globl _start
 
 _start:
-    movl  $SYS_READ, %eax    # Read the prefix.
-    movl  $STDIN, %ebx
-    movl  $input, %ecx
-    movl  $INPUT_SIZE, %edx
-    int   $LINUX_SYSCALL
-    cmpl  $0, %eax           # Nothing read (or an
-    jle   _exit              # error): stop.
+    movq  $SYS_READ, %rax    # Read the prefix.
+    movq  $STDIN, %rdi
+    leaq  input(%rip), %rsi
+    movq  $INPUT_SIZE, %rdx
+    syscall
+    cmpq  $0, %rax           # Nothing read (or an
+    jle   exit               # error): stop.
 
     # End the text at the first newline, if any,
     # so "Mar\n" is used as "Mar".
-    movl  $0, %ecx
-_find_newline:
-    cmpl  %eax, %ecx
-    je    _open_file
-    cmpb  $'\n', input(%ecx)
-    je    _cut
-    incl  %ecx
-    jmp   _find_newline
-_cut:
-    movb  $0, input(%ecx)
+    leaq  input(%rip), %rdx
+    movq  $0, %rcx
+find_newline:
+    cmpq  %rax, %rcx
+    je    open_file
+    cmpb  $'\n', (%rdx,%rcx,1)
+    je    cut
+    incq  %rcx
+    jmp   find_newline
+cut:
+    movb  $0, (%rdx,%rcx,1)
 
-_open_file:
-    movl  $SYS_OPEN, %eax
-    movl  $file_name, %ebx
-    movl  $0, %ecx
-    movl  $0666, %edx
-    int   $LINUX_SYSCALL
-    movl  %eax, %esi
+open_file:
+    movq  $SYS_OPENAT, %rax
+    movq  $AT_FDCWD, %rdi
+    leaq  file_name(%rip), %rsi
+    movq  $O_RDONLY, %rdx
+    movq  $0666, %r10
+    syscall
+    movq  %rax, %r12         # File descriptor.
 
-_record_loop:
-    pushl %esi
-    pushl $record_buffer
-    call  _read_record
-    addl  $8, %esp
-    cmpl  $RECORD_SIZE, %eax
-    jne   _exit
+record_loop:
+    movq  %r12, %rdi
+    leaq  record_buffer(%rip), %rsi
+    call  read_record
+    cmpq  $RECORD_SIZE, %rax
+    jne   exit
 
-    pushl $record_buffer + RECORD_FIRSTNAME
-    pushl $input
-    call  _compare_strings
-    addl  $8, %esp
-    cmpl  $1, %eax
-    jne   _record_loop       # No match.
+    leaq  input(%rip), %rdi
+    leaq  record_buffer + RECORD_FIRSTNAME(%rip), %rsi
+    call  compare_strings
+    cmpq  $1, %rax
+    jne   record_loop        # No match.
 
-    pushl $record_buffer + RECORD_FIRSTNAME
-    call  _count_chars
-    addl  $4, %esp
-    movl  %eax, %edx
-    movl  $SYS_WRITE, %eax
-    movl  $STDOUT, %ebx
-    movl  $record_buffer + RECORD_FIRSTNAME, %ecx
-    int   $LINUX_SYSCALL
-    pushl $STDOUT
-    call  _write_newline
-    addl  $4, %esp
-    jmp   _record_loop
+    leaq  record_buffer + RECORD_FIRSTNAME(%rip), %rdi
+    call  count_chars
+    movq  %rax, %rdx
+    movq  $SYS_WRITE, %rax
+    movq  $STDOUT, %rdi
+    leaq  record_buffer + RECORD_FIRSTNAME(%rip), %rsi
+    syscall
+    movq  $STDOUT, %rdi
+    call  write_newline
+    jmp   record_loop
 
-_exit:
-    movl  $SYS_EXIT, %eax
-    movl  $0, %ebx
-    int   $LINUX_SYSCALL
+exit:
+    movq  $SYS_EXIT, %rax
+    movq  $0, %rdi
+    syscall

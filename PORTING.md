@@ -79,13 +79,13 @@ material. This file records the decisions and tracks the work, one block
   solutions. Programs: power, factorial; 4 solutions.
 - [x] **4. Chapter 5** (files, argv, buffers), solutions. Programs: toupper;
   5 solutions.
-- [ ] **5. Chapters 6 and 7** (records of 328 bytes, robust programs),
+- [x] **5. Chapters 6 and 7** (records of 328 bytes, robust programs),
   solutions. Programs: the record library, add-year, error-exit;
   9 solutions.
 - [ ] **6. Chapter 8** (libc, shared libraries, PIC, calling assembly from
   Rust and Python), solutions. Adds pinned Rust to the build, and
-  deletes `src/resource/asm/legacy32/` (a temporary 32-bit copy of
-  `convert_to_upper` used by `0AK-08-03-toupper-libc`).
+  removes from `src/resource/asm/legacy32/` the 32-bit copies that only
+  Chapter 8 needs.
 - [ ] **7. Chapter 9** (64-bit memory map, ASLR, `brk` and `mmap`, the
   memory manager with 16-byte headers), solutions.
 - [ ] **8. Chapter 10** (64-bit integers, `divq`/`cqto`, SSE2 floating
@@ -96,5 +96,7 @@ material. This file records the decisions and tracks the work, one block
 - [ ] **10. Appendices B, E and F, then A** (instructions, high-level
   language idioms, gdb sessions captured from the 64-bit programs, GTK 4).
 - [ ] **11. Close-out**: Chapter 1, Appendices J and G, README, remove
-  `gcc-multilib` and every 32-bit program, PDF and ePUB, release tag,
+  `gcc-multilib`, every 32-bit program and `src/resource/asm/legacy32/`
+  (the 32-bit copies of the files already written for x86-64, which
+  the remaining 32-bit programs still use), PDF and ePUB, release tag,
   custom domain `asm64.rovisoft.net` on Cloudflare Pages.

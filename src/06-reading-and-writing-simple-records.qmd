@@ -31,12 +31,15 @@ fixed-length record about people:
 
 -   Address - 240 bytes.
 
--   Age - 4 bytes.
+-   Age - 8 bytes.
 
 In this, everything is character data except for the age, which is
-simply a numeric field, using a standard 4-byte word (we could just use
+simply a numeric field, using a standard 8-byte word (we could just use
 a single byte for this, but keeping it at a word makes it easier to
-process).
+process). The whole record is 40 + 40 + 240 + 8 = 328 bytes. Notice
+that the age starts at byte 320, a multiple of 8, so the processor can
+read it in one go: the text fields happen to keep the number
+*aligned*.
 
 In programming, you often have certain definitions that you will use
 over and over again within the program, or perhaps within several
@@ -49,7 +52,7 @@ addressing mode. The following constants describe
 the offsets to the above structure. Put them in a file named
 `006-01-record-def.s`:
 
-```{.gnuassembler .numberLines include=resource/asm/006-01-record-def.s startLine=3}
+```{.gnuassembler .numberLines include=resource/asm/006-01-record-def.s}
 ```
 
 In addition, there are several constants that we have been defining over
@@ -57,8 +60,12 @@ and over in our programs, and it is useful to put them in a file, so
 that we don\'t have to keep entering them. Put the following
 constants in a file called `006-01-linux.s`:
 
-```{.gnuassembler .numberLines include=resource/asm/006-01-linux.s startLine=3}
+```{.gnuassembler .numberLines include=resource/asm/006-01-linux.s}
 ```
+
+These two files only contain `.equ` directives, which produce no code
+and no data, so they don\'t need the `.note.GNU-stack` line: the files
+that include them have it.
 
 We will write three programs in this chapter using the structure defined
 in `006-01-record-def.s`. The first program will build a file containing
@@ -74,9 +81,13 @@ record.
 What parameters do these functions need in order to operate? We
 basically need:
 
+-   The file descriptor that we want to read from or write to.
+
 -   The location of a buffer that we can read a record into.
 
--   The file descriptor that we want to read from or write to.
+We will take them in this order, which is the same order the `read` and
+`write` system calls take them: the file descriptor in _%rdi_ and the
+buffer in _%rsi_.
 
 Let\'s look at our reading function first in `006-01-read-record.s`:
 
@@ -85,7 +96,9 @@ Let\'s look at our reading function first in `006-01-read-record.s`:
 
 It\'s a pretty simple function. It just reads data the size of our
 structure into an appropriately sized buffer from the given file
-descriptor. The writing one is similar in `006-01-write-record.s`:
+descriptor. Because its parameters arrive in the same registers that
+`read` uses, it only has to add the size and the system call number.
+The writing one is similar in `006-01-write-record.s`:
 
 ```{.gnuassembler .numberLines include=resource/asm/006-01-write-record.s}
 ```
@@ -134,20 +147,25 @@ pad values in the `.data` section. In our case, we are adding
 null characters to the end of each field until they are
 their defined lengths.
 
+Counting padding by hand is easy to get wrong: if an address is one
+character shorter than we think, the record is one byte shorter, and
+every field after it is in the wrong place. So, after the records, the
+program asks the assembler to check its work with the `.if` and
+`.error` directives. `record2 - record1` is the size of the first
+record, which the assembler can compute because both labels are in the
+same section. If it is not `RECORD_SIZE`, the assembler stops with the
+message, before a wrong file can ever be written:
+
+```{.gnuassembler .numberLines include=resource/asm/006-01-write-records.s startLine=81 endLine=89}
+```
+
 To build the application, run the commands:
 
 ```{.bash}
-as -o 006-01-write-record.o   --32 \
-                              --gstabs+ \
-                              006-01-write-record.s
-
-as -o 006-01-write-records.o  --32 \
-                              --gstabs+ \
-                              006-01-write-records.s
-
-ld -o 006-01-write-records    -m elf_i386 \
-                              006-01-write-record.o \
-                              006-01-write-records.o
+as -g -o 006-01-write-record.o 006-01-write-record.s
+as -g -o 006-01-write-records.o 006-01-write-records.s
+ld -o 006-01-write-records 006-01-write-record.o \
+  006-01-write-records.o
 ```
 
 Here we are assembling two files separately, and then combining them
@@ -161,7 +179,9 @@ following:
 This will cause a file called `test.dat` to be created containing the
 records. However, since they contain non-printable characters (the null
 character, specifically), they may not be viewable by a text editor.
-Therefore we need the next program to read them for us.
+Therefore we need the next program to read them for us. (If you are
+curious, `od -c test.dat` shows every byte of the file, including the
+null characters.)
 
 Reading Records {#reading-records}
 ---------------
@@ -219,31 +239,17 @@ To build this program, we need to assemble all of the parts and link
 them together:
 
 ```{.bash}
-as -o 006-01-count-chars.o    --32 \
-                              --gstabs+ \
-                              006-01-count-chars.s
-
-as -o 006-01-read-record.o    --32 \
-                              --gstabs+ \
-                              006-01-read-record.s
-
-as -o 006-01-read-records.o   --32 \
-                              --gstabs+ \
-                              006-01-read-records.s
-
-as -o 006-01-write-newline.o  --32 \
-                              --gstabs+ \
-                              006-01-write-newline.s
-
-ld -o 006-01-read-records     -m elf_i386 \
-                              006-01-count-chars.o \
-                              006-01-read-record.o \
-                              006-01-read-records.o \
-                              006-01-write-newline.o
+as -g -o 006-01-count-chars.o 006-01-count-chars.s
+as -g -o 006-01-read-record.o 006-01-read-record.s
+as -g -o 006-01-read-records.o 006-01-read-records.s
+as -g -o 006-01-write-newline.o 006-01-write-newline.s
+ld -o 006-01-read-records 006-01-count-chars.o \
+  006-01-read-record.o 006-01-read-records.o \
+  006-01-write-newline.o
 ```
 
-The backslash in the first line simply means that the command continues
-on the next line. You can run your program by doing `./006-01-read-records`.
+The backslash at the end of a line simply means that the command
+continues on the next line. You can run your program by doing `./006-01-read-records`.
 
 As you can see, this program opens the file and then runs a loop of
 reading, checking for the end of file, and writing the firstname. The
@@ -252,16 +258,16 @@ one construct that might be new is the line that says:
 ```{.gnuassembler .numberLines include=resource/asm/006-01-read-records.s startLine=66 endLine=66}
 ```
 
-It looks like we are combining and add instruction with a push
+It looks like we are combining an add instruction with a `leaq`
 instruction, but we are not. You see, both `RECORD_FIRSTNAME` and
 `record_buffer` are constants. The first is a direct constant,
 created through the use of a `.equ` directive, while the latter is
 defined automatically by the assembler through its use as a
 label (it\'s value being the address that the data that follows
-it will start at). Since they are both constants that the assembler
-knows, it is able to add them together while it is assembling your
-program, so the whole instruction is a single immediate
-mode addressing push of a single constant.
+it will start at). Since the assembler and the linker know both, they
+add them together before the program runs, and store in the
+instruction the distance from _%rip_ to the result. So the whole
+instruction is a single `leaq` of a single address.
 
 The `RECORD_FIRSTNAME` constant is the number of bytes after
 the beginning of a record before we hit the first name. `record_buffer`
@@ -291,14 +297,9 @@ is pretty straightforward.[^6-3]
 You can type it in as `006-01-add-year.s`. To build it, type the following[^6-4]:
 
 ```{.bash}
-as -o 006-01-add-year.o  --32 \
-                         --gstabs+ \
-                         006-01-add-year.s
-
-ld -o 006-01-add-year    -m elf_i386 \
-                         006-01-add-year.o \
-                         006-01-read-record.o \
-                         006-01-write-record.o
+as -g -o 006-01-add-year.o 006-01-add-year.s
+ld -o 006-01-add-year 006-01-add-year.o 006-01-read-record.o \
+  006-01-write-record.o
 ```
 
 To run the program, just type in the following[^6-5]:
@@ -308,7 +309,14 @@ To run the program, just type in the following[^6-5]:
 ```
 
 This will add a year to every record listed in `test.dat` and write the
-new records to the file `testout.dat`.
+new records to the file `testout.dat`. The line that does the work is:
+
+```{.gnuassembler}
+incq  record_buffer + RECORD_AGE(%rip)
+```
+
+`incq` adds one to the 8-byte number stored at that address, the age
+of the record in the buffer, without loading it into a register first.
 
 As you can see, writing fixed-length records is pretty simple. You only
 have to read in blocks of data to a buffer, process them, and write them
@@ -320,7 +328,9 @@ and
 [Chapter 10. Counting Like a Computer](10-counting-like-a-computer.qmd#chapter-10-counting-like-a-computer).
 After reading those you may want to come back
 and rewrite this program to display the numeric data that we are
-modifying.
+modifying. Until then, `od -A d -t d8 -j 320 -N 8 testout.dat` shows
+the 8 bytes at offset 320 of the file (the age of the first record) as
+a decimal number.
 
 Review {#review-4}
 ------
@@ -336,10 +346,14 @@ Review {#review-4}
 
 -   Why might you want to split up a project into multiple source files?
 
--   What does the instruction `incl record_buffer + RECORD_AGE` do? What
-    addressing mode is it using? How many operands does the `incl`
-    instructions have in this case? Which parts are being handled by the
-    assembler and which parts are being handled when the program is run?
+-   What does the instruction `incq record_buffer + RECORD_AGE(%rip)`
+    do? What addressing mode is it using? How many operands does the
+    `incq` instruction have in this case? Which parts are being handled
+    by the assembler and the linker, and which parts are being handled
+    when the program is run?
+
+-   How does `006-01-write-records` make sure that each record is
+    exactly `RECORD_SIZE` bytes long?
 
 ### Use the Concepts {#use-the-concepts-4}
 
@@ -363,13 +377,13 @@ Review {#review-4}
     to specify the filenames.
 
 -   Research the `lseek` system call. Rewrite the `006-01-add-year` program to
-    open the source file for both reading and writing (use \$2 for the
-    read/write mode), and write the modified records back to the same
-    file they were read from.
+    open the source file for both reading and writing (use \$2, called
+    `O_RDWR`, for the read/write mode), and write the modified records
+    back to the same file they were read from.
 
 -   Research the various error codes that can be returned by the system
     calls made in these programs. Pick one to rewrite, and add code that
-    checks _%eax_ for error conditions, and, if one is found,
+    checks _%rax_ for error conditions, and, if one is found,
     writes a message about it to `STDERR` and exit.
 
 -   Write a program that will add a single record to the file by reading
@@ -394,7 +408,13 @@ Review {#review-4}
     are listed in
     [Chapter 13. Moving On from Here](13-moving-on-from-here.qmd#chapter-13-moving-on-from-here).
 
-[^6-2]: If you have used C, this is what the `strlen` function does.
+[^6-2]: This is a common way to store text, called *null-terminated
+    strings*. Many system interfaces use it, such as the file names we
+    pass to `openat`, because the C language that Unix was written in
+    stores its strings this way. Rust and Python store the length of a
+    string next to its characters instead, which is safer: the program
+    never has to search for the end, and a string can contain a null
+    character.
 
 [^6-3]: You will find that after learning the mechanics of programming,
     most programs are pretty straightforward once you know exactly what

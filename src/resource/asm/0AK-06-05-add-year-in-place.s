@@ -1,4 +1,3 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
     # Link with `006-01-read-record.o` and
     # `006-01-write-record.o`.
     #
@@ -16,11 +15,11 @@
     #     back to the start of the record just read
     #     before writing it again.
     #
+    .section .note.GNU-stack,"",@progbits
+
     .include "006-01-linux.s"
     .include "006-01-record-def.s"
-        .equ SYS_LSEEK,  19
         .equ SEEK_CUR,   1
-        .equ O_RDWR,     2
 
     .section .data
         file_name:
@@ -33,39 +32,37 @@
         .globl _start
 
 _start:
-    movl  $SYS_OPEN, %eax
-    movl  $file_name, %ebx
-    movl  $O_RDWR, %ecx
-    movl  $0666, %edx
-    int   $LINUX_SYSCALL
-    movl  %eax, %esi         # File descriptor.
+    movq  $SYS_OPENAT, %rax
+    movq  $AT_FDCWD, %rdi
+    leaq  file_name(%rip), %rsi
+    movq  $O_RDWR, %rdx
+    movq  $0666, %r10
+    syscall
+    movq  %rax, %r12         # File descriptor.
 
-_record_loop:
-    pushl %esi
-    pushl $record_buffer
-    call  _read_record
-    addl  $8, %esp
-    cmpl  $RECORD_SIZE, %eax
-    jne   _finished
+record_loop:
+    movq  %r12, %rdi
+    leaq  record_buffer(%rip), %rsi
+    call  read_record
+    cmpq  $RECORD_SIZE, %rax
+    jne   finished
+    incq  record_buffer + RECORD_AGE(%rip)
 
-    incl  record_buffer + RECORD_AGE
+    movq  $SYS_LSEEK, %rax   # Go back one record.
+    movq  %r12, %rdi
+    movq  $-RECORD_SIZE, %rsi
+    movq  $SEEK_CUR, %rdx
+    syscall
 
-    movl  $SYS_LSEEK, %eax   # Go back one record.
-    movl  %esi, %ebx
-    movl  $-RECORD_SIZE, %ecx
-    movl  $SEEK_CUR, %edx
-    int   $LINUX_SYSCALL
+    movq  %r12, %rdi         # Overwrite it.
+    leaq  record_buffer(%rip), %rsi
+    call  write_record
+    jmp   record_loop
 
-    pushl %esi               # Overwrite it.
-    pushl $record_buffer
-    call  _write_record
-    addl  $8, %esp
-    jmp   _record_loop
-
-_finished:
-    movl  $SYS_CLOSE, %eax
-    movl  %esi, %ebx
-    int   $LINUX_SYSCALL
-    movl  $SYS_EXIT, %eax
-    movl  $0, %ebx
-    int   $LINUX_SYSCALL
+finished:
+    movq  $SYS_CLOSE, %rax
+    movq  %r12, %rdi
+    syscall
+    movq  $SYS_EXIT, %rax
+    movq  $0, %rdi
+    syscall

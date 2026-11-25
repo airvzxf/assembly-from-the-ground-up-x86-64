@@ -1,4 +1,3 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
     # Link with `0AK-06-01-record-io.o`,
     # `006-01-count-chars.o` and
     # `006-01-write-newline.o`.
@@ -7,6 +6,8 @@
     #     Print the first name and the phone number
     #     of every record in `test-phone.dat`.
     #
+    .section .note.GNU-stack,"",@progbits
+
     .include "006-01-linux.s"
     .include "0AK-06-01-record-def.s"
 
@@ -23,62 +24,64 @@
         .globl _start
 
 _start:
-    movl  $SYS_OPEN, %eax
-    movl  $file_name, %ebx
-    movl  $0, %ecx           # Read only.
-    movl  $0666, %edx
-    int   $LINUX_SYSCALL
-    movl  %eax, %esi         # File descriptor.
+    movq  $SYS_OPENAT, %rax
+    movq  $AT_FDCWD, %rdi
+    leaq  file_name(%rip), %rsi
+    movq  $O_RDONLY, %rdx
+    movq  $0666, %r10
+    syscall
+    movq  %rax, %r12         # File descriptor.
 
-_record_loop:
-    pushl %esi
-    pushl $record_buffer
-    call  _read_record
-    addl  $8, %esp
-    cmpl  $RECORD_SIZE, %eax # A whole record?
-    jne   _finished
+record_loop:
+    movq  %r12, %rdi
+    leaq  record_buffer(%rip), %rsi
+    call  read_record
+    cmpq  $RECORD_SIZE, %rax # A whole record?
+    jne   finished
 
-    pushl $record_buffer + RECORD_FIRSTNAME
-    call  _print_string
-    addl  $4, %esp
+    leaq  record_buffer + RECORD_FIRSTNAME(%rip), %rdi
+    call  print_string
 
-    movl  $SYS_WRITE, %eax   # ": "
-    movl  $STDOUT, %ebx
-    movl  $separator, %ecx
-    movl  $2, %edx
-    int   $LINUX_SYSCALL
+    movq  $SYS_WRITE, %rax   # ": "
+    movq  $STDOUT, %rdi
+    leaq  separator(%rip), %rsi
+    movq  $2, %rdx
+    syscall
 
-    pushl $record_buffer + RECORD_PHONE
-    call  _print_string
-    addl  $4, %esp
+    leaq  record_buffer + RECORD_PHONE(%rip), %rdi
+    call  print_string
 
-    pushl $STDOUT
-    call  _write_newline
-    addl  $4, %esp
-    jmp   _record_loop
+    movq  $STDOUT, %rdi
+    call  write_newline
+    jmp   record_loop
 
-_finished:
-    movl  $SYS_EXIT, %eax
-    movl  $0, %ebx
-    int   $LINUX_SYSCALL
+finished:
+    movq  $SYS_EXIT, %rax
+    movq  $0, %rdi
+    syscall
 
     # PURPOSE:
     #     Write a null-terminated string to STDOUT.
     #
-        .type _print_string, @function
-_print_string:
-    pushl %ebp
-    movl  %esp, %ebp
-    pushl %ebx
-    pushl 8(%ebp)
-    call  _count_chars
-    addl  $4, %esp
-    movl  %eax, %edx         # Length.
-    movl  $SYS_WRITE, %eax
-    movl  $STDOUT, %ebx
-    movl  8(%ebp), %ecx
-    int   $LINUX_SYSCALL
-    popl  %ebx
-    movl  %ebp, %esp
-    popl  %ebp
+    # INPUT:
+    #     %rdi - Address of the string.
+    #
+    .type print_string, @function
+print_string:
+    pushq %rbp
+    movq  %rsp, %rbp
+    pushq %rbx               # Callee-saved: keep the
+    subq  $8, %rsp           # caller's value. (The
+                             # subq keeps %rsp
+                             # aligned to 16.)
+    movq  %rdi, %rbx         # Address of the string.
+    call  count_chars
+    movq  %rax, %rdx         # Length.
+    movq  %rbx, %rsi
+    movq  $SYS_WRITE, %rax
+    movq  $STDOUT, %rdi
+    syscall
+    movq  -8(%rbp), %rbx     # Restore %rbx.
+    movq  %rbp, %rsp
+    popq  %rbp
     ret

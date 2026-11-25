@@ -1,5 +1,5 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
+    .section .note.GNU-stack,"",@progbits
+
     .include "006-01-linux.s"      # Linux Definitions.
     .include "006-01-record-def.s" # Record definitions
 
@@ -8,36 +8,32 @@
     #     descriptor.
     #
     # INPUT:
-    #     The file descriptor and a buffer.
+    #     %rdi - The file descriptor.
+    #     %rsi - The address of a buffer of
+    #            RECORD_SIZE bytes.
     #
     # OUTPUT:
     #     This function writes the data to the buffer
-    #     and returns a status code.
+    #     and returns the result of `read` in %rax.
     #
-    # ----- STACK LOCAL VARIABLES ----- #
-    #
-        .equ ST_READ_BUFFER,  8
-        .equ ST_FILEDES,      12
-
     .section .text
-        .globl _read_record
-        .type  _read_record,  @function
+        .globl read_record
+        .type  read_record,  @function
 
-_read_record:
-    pushl %ebp
-    movl  %esp, %ebp
+read_record:
+    pushq %rbp
+    movq  %rsp, %rbp
 
-    pushl %ebx
-    movl  ST_FILEDES(%ebp), %ebx
-    movl  ST_READ_BUFFER(%ebp), %ecx
-    movl  $RECORD_SIZE, %edx
-    movl  $SYS_READ, %eax
-    int   $LINUX_SYSCALL
-
-    popl  %ebx          # NOTE - %eax has the return
+                        # The file descriptor and the
+                        # buffer are already in %rdi
+                        # and %rsi, where `read` wants
+                        # them.
+    movq  $RECORD_SIZE, %rdx
+    movq  $SYS_READ, %rax
+    syscall             # NOTE - %rax has the return
                         # value, which we will give
                         # back to our calling program.
 
-    movl  %ebp, %esp
-    popl  %ebp
+    movq  %rbp, %rsp
+    popq  %rbp
     ret
