@@ -562,7 +562,7 @@ only things you should need to know is that `imulq` does integer
 multiplication and stores the result in the second operand, and
 `decq` decreases the given register by 1. For more information on
 these and other instructions, see
-[Appendix B. Common x86 Instructions](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions)
+[Appendix B. Common x86-64 Instructions](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions)
 
 A good project to try now is to extend the program so it will return the
 value of a number if the power is 0 (hint, anything raised to the zero

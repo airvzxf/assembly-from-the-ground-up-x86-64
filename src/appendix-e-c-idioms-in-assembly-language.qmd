@@ -1,86 +1,111 @@
-# C Idioms in Assembly Language {#appendix-e-c-idioms-in-assembly-language}
+# High-Level Language Idioms in Assembly Language {#appendix-e-c-idioms-in-assembly-language}
 
-This appendix is for C programmers learning
-assembly language. It is meant to give a general idea about how C
-constructs can be implemented in assembly language.
+This appendix is for programmers of high-level languages learning
+assembly language. It is meant to give a general idea about how the
+constructs of those languages can be implemented in assembly language.
+The examples are in Rust, but C, Go, Java and most other languages have
+the same constructs, and their compilers translate them in the same
+way.
 
 If Statement {#if-statement}
 ------------
 
-In C, an if statement consists of three parts - the condition, the true branch, and the false branch. However, since assembly language is not a
+An if statement consists of three parts - the condition, the true
+branch, and the false branch. However, since assembly language is not a
 block structured language, you have to work a little to implement the
-block-like nature of C. For example, look at the following C code:
+block-like nature of an if. For example, look at the following Rust
+code:
 
-```{.c}
-if(a == b)
-{
-    /* True Branch Code Here */
-}
-else
-{
-    /* False Branch Code Here */
+```{.rust}
+if a == b {
+    // True branch code here.
+} else {
+    // False branch code here.
 }
 
-/* At This Point, Reconverge */
+// At this point, reconverge.
 ```
 
 In assembly language, this can be rendered as:
 
 ```{.gnuassembler}
-    movl a, %eax        # Move a and b into registers
-    movl b, %ebx        # for comparison.
+    movq  a(%rip), %rax     # Move a and b into registers
+    movq  b(%rip), %rbx     # for comparison.
 
-    cmpl %eax, %ebx     # Compare.
+    cmpq  %rax, %rbx        # Compare.
 
-    je true_branch      # If True, go to true branch.
+    je    true_branch       # If true, go to true branch.
 
-false_branch:           # This label is unnecessary,
-                        # only here for documentation.
-                        # False branch code here.
+false_branch:               # This label is unnecessary,
+                            # only here for documentation.
+                            # False branch code here.
 
-    jmp reconverge      # Jump to recovergence point.
+    jmp   reconverge        # Jump to reconvergence point.
 
-true_branch:            # True branch code here.
+true_branch:                # True branch code here.
 
-reconverge:             # Both branches recoverge to
-                        # this point.
+reconverge:                 # Both branches reconverge to
+                            # this point.
 ```
 
 As you can see, since assembly language is linear, the blocks have to
 jump around each other. Reconvergence is handled by the programmer, not
 the system.
 
-A case statement is written just like a sequence of if statements.
+A `match` (or a `switch` in C) is written just like a sequence of if
+statements. When the cases are consecutive numbers, compilers often
+build a *jump table* instead: a list of addresses, one per case, and an
+indirect jump, `jmp *(%rbx,%rax,8)`, to the one for the value in _%rax_.
+
+An if that only chooses a value, such as
+`let largest = if item > largest { item } else { largest };`, can be
+written without any jump, with a conditional move, as `rustc` did in
+[Chapter 11](11-high-level-languages.qmd#what-the-compiler-generates):
+
+```{.gnuassembler}
+    cmpq  %rax, %rcx        # item (%rcx) > largest (%rax)?
+    cmovgq %rcx, %rax       # Then largest = item.
+```
 
 Function Call {#function-call}
 -------------
 
-A function call in assembly language simply requires
-pushing the arguments to the function onto the stack in *reverse* order,
-and issuing a `call` instruction. After calling, the arguments are
-then popped back off of the stack. For example, consider the C code:
+A function call in assembly language simply requires putting the
+arguments to the function in the registers of the calling convention,
+in order - _%rdi_, _%rsi_, _%rdx_, _%rcx_, _%r8_ and _%r9_ (the rest go
+on the stack) - and issuing a `call` instruction, with _%rsp_ aligned to
+16. The result comes back in _%rax_. For example, consider the Rust
+code:
 
-```{.c}
-printf("The number is %d", 88);
+```{.rust}
+let total = add(88, 12);
 ```
 
 In assembly language, this would be rendered as:
 
 ```{.gnuassembler}
+    movq  $88, %rdi         # First argument.
+    movq  $12, %rsi         # Second argument.
+    call  add
+    movq  %rax, %rbx        # The result. %rbx is
+                            # callee-saved, so it survives
+                            # the next calls.
+```
+
+A call to a function with a variable number of arguments, such as the C
+library\'s `printf`, also needs the number of vector registers used in
+_%al_:
+
+```{.gnuassembler}
 .section .data
     text_string:
-        .ascii "The number is %d\0"
+        .ascii "The number is %ld\n\0"
 
 .section .text
-    pushl $88
-    pushl $text_string
-    call  printf
-    popl  %eax
-    popl  %eax      # %eax is just a dummy variable,
-                    # nothing is actually being done
-                    # with the value.  You can also
-                    # directly re-adjust %esp to the
-                    # proper location.
+    leaq  text_string(%rip), %rdi
+    movq  $88, %rsi
+    movq  $0, %rax          # No floating-point arguments.
+    call  printf@PLT
 ```
 
 Variables and Assignment {#variables-and-assignment}
@@ -92,127 +117,127 @@ beginning of the function. This space is given back at the end of the
 function.
 
 Interestingly, global variables are accessed differently than local
-variables in assembly language. Global variables are accessed using direct
-addressing mode, while local variables are accessed using base pointer
-addressing mode. For example, consider the following C code:
+variables in assembly language. Global variables are accessed relative
+to _%rip_, while local variables are accessed using base pointer
+addressing mode. For example, consider the following Rust code:
 
-```{.c}
-int my_global_var;
+```{.rust}
+static mut MY_GLOBAL_VAR: i64 = 0;
 
-int foo()
-{
-    int my_local_var;
+fn foo() -> i64 {
+    let my_local_var: i64;
 
     my_local_var = 1;
-    my_global_var = 2;
+    unsafe { MY_GLOBAL_VAR = 2; }
 
-    return 0;
+    0
 }
 ```
 
 This would be rendered in assembly language as:
 
 ```{.gnuassembler}
-    .section .data
-        .lcomm my_global_var, 4
+    .section .bss
+        .lcomm my_global_var, 8
 
+    .section .text
     .type  foo,  @function
-
 foo:
-    pushl %ebp              # Save old base pointer.
-    movl  %esp, $ebp        # Make stack pointer base
+    pushq %rbp              # Save old base pointer.
+    movq  %rsp, %rbp        # Make stack pointer base
                             # pointer.
-    subl  $4, %esp          # Make room for
-                            # my_local_var.
-    .equ my_local_var, -4   # Can now use my_local_var
+    subq  $16, %rsp         # Make room for my_local_var
+                            # (16 bytes, to keep %rsp
+                            # aligned).
+    .equ my_local_var, -8   # Can now use my_local_var
                             # to find the local
                             # variable.
 
-    movl  $1, my_local_var(%ebp)
-    movl  $2, my_global_var
+    movq  $1, my_local_var(%rbp)
+    movq  $2, my_global_var(%rip)
 
-    movl  %ebp, %esp        # Clean up function and
-    popl  %ebp              # return.
+    movq  $0, %rax          # The result.
+
+    movq  %rbp, %rsp        # Clean up function and
+    popq  %rbp              # return.
     ret
 ```
 
-What may not be obvious is that accessing the global variable takes
-fewer machine cycles than accessing the local variable. However, that
-may not matter because the stack is more likely to be in physical
-memory (instead of swap) than the global variable is.
+Rust makes you write `unsafe` to change a `static mut`, because two
+threads could change it at the same time; the assembly language version
+has the same problem, but nobody warns you.
 
-Also note that in the C programming language, after the compiler loads a
-value into a register, that value will likely stay in that register
-until that register is needed for something else. It may also move
-registers. For example, if you have a variable `foo`, it may start on
-the stack, but the compiler will eventually move it into registers for
-processing. If there aren\'t many variables in use, the value may simply
-stay in the register until it is needed again. Otherwise, when that
+Also note that in compiled languages, after the compiler loads a value
+into a register, that value will likely stay in that register until
+that register is needed for something else. It may also move registers.
+For example, if you have a variable `foo`, it may start on the stack,
+but the compiler will eventually move it into registers for processing.
+If there aren\'t many variables in use, the value may simply stay in the
+register until it is needed again, and with optimizations, most local
+variables never get a place on the stack at all. Otherwise, when that
 register is needed for something else, the value, if it\'s changed, is
-copied back to its corresponding memory location. In C, you can use the
-keyword `volatile` to make sure all modifications and references
-to the variable are done to the memory location itself, rather than a
-register copy of it, in case other processes, threads, or hardware may
-be modifying the value while your function is running.
+copied back to its corresponding memory location. If another thread or
+some hardware may change a memory location while your function is
+running, the compiler must be told, so that it reads the memory every
+time: in Rust with atomic types (`AtomicI64`) or `read_volatile`, and in
+C with the keyword `volatile`.
 
 Loops {#loops}
 -----
 
 Loops work a lot like if statements in assembly language - the
-blocks are formed by jumping around. In C, a while loop consists of a
-loop body, and a test to determine whether or not it is time to exit the
-loop. A for loop is exactly the same, with optional initialization and
-counter-increment sections. These can simply be moved around to make a
-while loop.
+blocks are formed by jumping around. A while loop consists of a loop
+body, and a test to determine whether or not it is time to exit the
+loop. A for loop over a range is exactly the same, with an
+initialization and a counter-increment. These can simply be moved around
+to make a while loop.
 
-In C, a while loop looks like this:
+In Rust, a while loop looks like this:
 
-```{.c}
-while(a < b)
-{
-    /* Do stuff here */
+```{.rust}
+while a < b {
+    // Do stuff here.
 }
 
-/* Finished Looping */
+// Finished looping.
 ```
 
 This can be rendered in assembly language like this:
 
 ```{.gnuassembler}
 loop_begin:
-    movl  a, %eax
-    movl  b, %ebx
-    cmpl  %eax, %ebx
-    jge   loop_end
+    movq  a(%rip), %rax
+    movq  b(%rip), %rbx
+    cmpq  %rbx, %rax        # a < b?
+    jge   loop_end          # If not, we are done.
 
 loop_body:                  # Do stuff here.
 
-    jmp loop_begin
+    jmp   loop_begin
 
 loop_end:                   # Finished looping.
 ```
 
-The x86 assembly language has some direct support for looping as well.
-The _%ecx_ register can be used as a counter that *ends* with zero.
-The `loop` instruction will decrement _%ecx_ and jump to a specified
-address unless _%ecx_ is zero. For example, if you wanted to execute a
-statement 100 times, you would do this in C:
+The x86-64 assembly language has some direct support for looping as
+well. The _%rcx_ register can be used as a counter that *ends* with
+zero. The `loop` instruction will decrement _%rcx_ and jump to a
+specified address unless _%rcx_ is zero. For example, if you wanted to
+execute a statement 100 times, you would do this in Rust:
 
-```{.c}
-for(i=0; i < 100; i++)
-{
-    /* Do process here */
+```{.rust}
+for i in 0..100 {
+    // Do process here.
 }
 ```
 
-In assembly language it would be written like this:
+In assembly language it could be written like this:
 
 ```{.gnuassembler}
 loop_initialize:
-    movl $100, %ecx
+    movq  $100, %rcx
 
-loop_begin:                 # Do Process Here.
-    loop loop_begin         # Decrement %ecx and loops
+loop_begin:                 # Do process here.
+    loop  loop_begin        # Decrement %rcx and loop
                             # if not zero.
 
 rest_of_program:            # Continues on to here.
@@ -221,92 +246,100 @@ rest_of_program:            # Continues on to here.
 One thing to notice is that the `loop` instruction *requires you to be
 counting backwards to zero*. If you need to count forwards or use
 another ending number, you should use the loop form which does not
-include the `loop` instruction.
+include the `loop` instruction. In practice, compilers never use `loop`:
+on current processors, `decq %rcx` followed by `jnz loop_begin` does the
+same and is faster. And remember that a `syscall` overwrites _%rcx_.
 
 For really tight loops of character string operations, there is also the
-`rep` instruction, but we will leave learning about that as an
-exercise to the reader.
+`rep` prefix (for example `rep movsb`, which copies _%rcx_ bytes from
+the address in _%rsi_ to the address in _%rdi_), but we will leave
+learning about that as an exercise to the reader.
 
 Structs {#structs}
 -------
 
-Structs are simply descriptions of memory blocks. For example, in
-C you can say:
+Structs are simply descriptions of memory blocks. For example, in Rust
+you can say:
 
-```{.c}
-struct person {
-    char firstname[40];
-    char lastname[40];
-    int age;
-};
+```{.rust}
+#[repr(C)]
+struct Person {
+    firstname: [u8; 40],
+    lastname: [u8; 40],
+    age: i64,
+}
 ```
 
 This doesn\'t do anything by itself, except give you ways of
-intelligently using 84 bytes of data. You can do basically the same
-thing using `.equ` directives in assembly language. Like this:
+intelligently using 88 bytes of data. `#[repr(C)]` asks Rust to keep the
+fields in this order, with the layout of the calling convention, so the
+offsets are the ones you would compute by hand (without it, Rust may
+reorder the fields to waste less space). You can do basically the same
+thing using `.equ` directives in assembly language, as Chapter 6 did
+for its records. Like this:
 
 ```{.gnuassembler}
 .equ PERSON_FIRSTNAME_OFFSET,  0
 .equ PERSON_LASTNAME_OFFSET,   40
 .equ PERSON_AGE_OFFSET,        80
-.equ PERSON_SIZE,              84
+.equ PERSON_SIZE,              88
 ```
 
 When you declare a variable of this type, all you are doing is reserving
-84 bytes of space. So, if you have this in C:
+88 bytes of space. So, if you have this in Rust:
 
-```{.c}
-void foo()
-{
-    struct person p;
+```{.rust}
+fn foo() {
+    let mut p: Person;
 
-    /* Do stuff here */
+    // Do stuff here.
 }
 ```
 
 In assembly language you would have:
 
 ```{.gnuassembler}
-foo:                        # Standard header beginning
-    pushl %ebp
-    movl %esp, %ebp
+foo:                        # Standard header beginning.
+    pushq %rbp
+    movq  %rsp, %rbp
 
-    subl $PERSON_SIZE, %esp     # Reserve our local
-                                # variable.
-    .equ P_VAR, 0 - PERSON_SIZE # This is the
-                                # variable's offset
-                                # from %ebp.
+    subq  $96, %rsp         # Reserve our local variable
+                            # (88 bytes, rounded up to a
+                            # multiple of 16).
+    .equ P_VAR, -96         # This is the variable's
+                            # offset from %rbp.
 
                             # Do stuff here.
 
-    movl %ebp, %esp         # Standard function ending.
-    popl %ebp
+    movq  %rbp, %rsp        # Standard function ending.
+    popq  %rbp
     ret
 ```
 
 To access structure members, you just have to use base pointer addressing
-mode with the offsets defined above. For example, in C you could set the
-person\'s age like this:
+mode with the offsets defined above. For example, in Rust you could set
+the person\'s age like this:
 
-```{.c}
+```{.rust}
 p.age = 30;
 ```
 
 In assembly language it would look like this:
 
 ```{.gnuassembler}
-movl $30, P_VAR + PERSON_AGE_OFFSET(%ebp)
+movq  $30, P_VAR + PERSON_AGE_OFFSET(%rbp)
 ```
 
 Pointers {#pointers}
 --------
 
-Pointers are very easy. Remember, pointers are simply the
-address that a value resides at. Let\'s start by taking a look at
-global variables. For example:
+Pointers are very easy. Remember, pointers are simply the address that a
+value resides at. In Rust, the safe kind of pointer is called a
+*reference*. Let\'s start by taking a look at global variables. For
+example:
 
-```{.c}
-int global_data = 30;
+```{.rust}
+static GLOBAL_DATA: i64 = 30;
 ```
 
 In assembly language, this would be:
@@ -314,37 +347,36 @@ In assembly language, this would be:
 ```{.gnuassembler}
 .section .data
     global_data:
-        .long 30
+        .quad 30
 ```
 
-Taking the address of this data in C:
+Taking the address of this data in Rust:
 
-```{.c}
-a = &global_data;
+```{.rust}
+let a = &GLOBAL_DATA;
 ```
 
 Taking the address of this data in assembly language:
 
 ```{.gnuassembler}
-movl $global_data, %eax
+leaq  global_data(%rip), %rax
 ```
 
 You see, with assembly language, you are almost always accessing memory
-through pointers. That\'s what direct addressing is. To get the pointer
-itself, you just have to go with immediate mode addressing.
+through addresses. `movq global_data(%rip), %rax` reads the value, and
+`leaq global_data(%rip), %rax` gives the address itself.
 
-Local variables are a little more difficult, but not much. Here is how you
-take the address of a local variable in C:
+Local variables are a little more difficult, but not much. Here is how
+you take the address of a local variable in Rust:
 
-```{.c}
-void foo()
-{
-    int a;
-    int *b;
+```{.rust}
+fn foo() {
+    let mut a: i64;
+    let b: &mut i64;
 
     a = 30;
 
-    b = &a;
+    b = &mut a;
 
     *b = 44;
 }
@@ -354,83 +386,99 @@ The same code in assembly language:
 
 ```{.gnuassembler}
 foo:
-    pushl %ebp              # Standard opening.
-    movl  %esp, %ebp
+    pushq %rbp              # Standard opening.
+    movq  %rsp, %rbp
 
-    subl  $8, $esp          # Reserve two words of
-    .equ A_VAR, -4          # memory.
-    .equ B_VAR, -8
+    subq  $16, %rsp         # Reserve two quadwords of
+    .equ A_VAR, -8          # memory.
+    .equ B_VAR, -16
 
-    movl $30, A_VAR(%ebp)           # a = 30.
+    movq  $30, A_VAR(%rbp)          # a = 30.
 
-    movl $A_VAR, B_VAR(%ebp)        # b = &a.
-    addl %ebp, B_VAR(%ebp)
+    movq  $A_VAR, B_VAR(%rbp)       # b = &a.
+    addq  %rbp, B_VAR(%rbp)
 
-    movl B_VAR(%ebp), %eax          # *b = 30.
-    movl $30, (%eax)
+    movq  B_VAR(%rbp), %rax         # *b = 44.
+    movq  $44, (%rax)
 
-    movl %ebp, %esp         # Standard closing.
-    popl %ebp
+    movq  %rbp, %rsp        # Standard closing.
+    popq  %rbp
     ret
 ```
 
 As you can see, to take the address of a local variable, the address has
 to be computed the same way the computer computes the addresses in base
 pointer addressing. There is an easier way - the processor provides the
-instruction `leal`, which stands for \"load effective address\". This lets
-the computer compute the address, and then load it wherever you want.
-So, we could just say:
+instruction `leaq`, which stands for \"load effective address\". This
+lets the computer compute the address, and then load it wherever you
+want. So, we could just say:
 
 ```{.gnuassembler}
-leal A_VAR(%ebp), %eax              # b = &a.
-movl %eax, B_VAR(%ebp)
+leaq  A_VAR(%rbp), %rax             # b = &a.
+movq  %rax, B_VAR(%rbp)
 ```
 
 It\'s the same number of lines, but a little cleaner. Then, to use this
 value, you simply have to move it to a general-purpose register and use
 indirect addressing mode, as shown in the example above.
 
-Getting GCC to Help {#getting-gcc-to-help}
--------------------
+What the Rust compiler adds is the checking: it doesn\'t let `b` live
+longer than `a`, or let two `&mut` references to `a` exist at the same
+time. In assembly language, nothing stops you from returning the address
+of a local variable, whose memory is reused by the next function call.
 
-One of the nice things about GCC is its ability to spit out assembly
-language code. To convert a C language file to assembly, you can simply
-do:
+Getting the Compiler to Help {#getting-the-compiler-to-help}
+----------------------------
+
+One of the nice things about compilers is their ability to spit out
+assembly language code. As we saw in
+[Chapter 11](11-high-level-languages.qmd#what-the-compiler-generates),
+to convert a Rust file to assembly, you can simply do:
 
 ```{.bash}
-gcc -S file.c
+rustc --edition 2024 --emit asm file.rs
 ```
 
-The output will be in `file.s`. It\'s not the most readable output -
-most of the variable names have been removed and replaced either with
-numeric stack locations or references to automatically-generated labels.
-To start with, you probably want to turn off optimizations with `-O0` so
-that the assembly language output will follow your source code better.
+The output will be in `file.s`. For a C file, `gcc -S file.c` does the
+same. It\'s not the most readable output - most of the variable names
+have been removed and replaced either with numeric stack locations or
+references to automatically-generated labels. To start with, you
+probably want to turn off optimizations with `-C opt-level=0` (`-O0`
+for `gcc`) so that the assembly language output will follow your source
+code better. [Compiler Explorer][AE-Godbolt] does all this in the web
+browser, and colors each line of the source code and the instructions
+that came from it.
 
-Something else you might notice is that GCC reserves more stack space
-for local variables than we do, and then AND\'s _%esp_ [^AE-1] This is
-to increase memory and cache efficiency by double-word aligning
-variables.
+Something else you might notice is that compilers often reserve more
+stack space for local variables than we do, and some functions AND
+_%rsp_ with a number like -16 or -32 (`andq $-32, %rsp`). This is to
+align the stack for the variables that need it.[^AE-1]
 
 Finally, at the end of functions, we usually do the following
 instructions to clean up the stack before issuing a `ret`
 instruction:
 
 ```{.gnuassembler}
-movl %ebp, %esp
-popl %ebp
+movq  %rbp, %rsp
+popq  %rbp
 ```
 
-However, GCC output will usually just include the instruction
-`leave`. This instruction is simply the combination of the above
-two instructions. We do not use `leave` in this text because we want to
-be clear about exactly what is happening at the processor level.
+However, compiler output will usually just include the instruction
+`leave`. This instruction is simply the combination of the above two
+instructions. We do not use `leave` in this text because we want to be
+clear about exactly what is happening at the processor level. And with
+optimizations, as we saw, the compiler usually doesn\'t use _%rbp_ at
+all (see
+[The Frame Pointer](12-optimization.qmd#the-frame-pointer)).
 
-I encourage you to take a C program you have written and compile it to
+I encourage you to take a program you have written and compile it to
 assembly language and trace the logic. Then, add in optimizations and
 try again. See how the compiler chose to rearrange your program to be
 more optimized, and try to figure out why it chose the arrangement and
 instructions it did.
 
 
-[^AE-1]: Note that different versions of GCC do this differently.
+[^AE-1]: Note that different compilers, and different versions of the
+    same compiler, do this differently.
+
+[AE-Godbolt]: https://godbolt.org/

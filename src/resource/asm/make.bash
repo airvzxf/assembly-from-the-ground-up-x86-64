@@ -255,15 +255,15 @@ rust64 0AK-11-01-toupper 0AK-11-01-toupper.rs -C opt-level=2
 
 echo ""
 
-# =====================================================
-# 32-bit programs inherited from the x86 32-bit edition.
-# =====================================================
-# Each chapter of the x86-64 edition removes its programs from here.
-# Only the GNOME example of Appendix A is left; as before, it is only
-# assembled, not linked.
-
-echo "Assembling (32-bit): 0AA-01-gnome-example"
-as --32 --gstabs+ -o 0AA-01-gnome-example.o 0AA-01-gnome-example.s
+# ----- Appendix A -----
+# The GTK 4 example is linked by gcc, which adds the C start-up code that
+# calls `main`, and gets the libraries from pkg-config.
+assemble64 0AA-01-gtk-example
+echo "Linking (64-bit, gcc): 0AA-01-gtk-example"
+# shellcheck disable=SC2046  # pkg-config prints several options.
+gcc -Wl,--fatal-warnings -o 0AA-01-gtk-example-bin 0AA-01-gtk-example.o \
+  $(pkg-config --libs gtk4)
+check_elf64 0AA-01-gtk-example-bin
 
 echo ""
 

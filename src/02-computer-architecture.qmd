@@ -439,7 +439,7 @@ Review {#review}
     assembler follows that tradition too, as we will see in the next
     chapter. We are using the term *word* to mean the normal register
     size of a computer, which in this case is eight bytes. More information is available in
-    [Appendix B. Common x86 Instructions](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions).
+    [Appendix B. Common x86-64 Instructions](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions).
 
 [^2-3]: Note that here we are talking about general computer theory. In
     practice, every x86-64 processor can mark regions of memory as

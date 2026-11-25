@@ -281,6 +281,9 @@ writers know the processor very well, so reading the output of the
 compiler is a good way to learn tricks like `cmovg`. The site
 [Compiler Explorer][11-Godbolt] shows it as you type, for many
 languages and compilers.
+[Appendix E. High-Level Language Idioms in Assembly Language](appendix-e-c-idioms-in-assembly-language.qmd#appendix-e-c-idioms-in-assembly-language)
+shows how the usual constructs of these languages (ifs, loops, structs
+and pointers) look in assembly language.
 
 Python {#python}
 ------

@@ -10,20 +10,22 @@ additional library to handle the graphical parts. As a programmer you
 need to get used to learning new libraries. Most of your time will be
 spent passing data from one library to another.
 
-The GNOME Libraries {#the-gnome-libraries}
--------------------
+The GTK Library {#the-gtk-library}
+---------------
 
-The GNOME projects is one of several projects to provide a complete
-desktop to Linux users. The GNOME project includes a panel to hold
-application launchers and mini-applications called applets, several
-standard applications to do things such as file management, session
-management, and configuration, and an API for creating applications
-which fit in with the way the rest of the system works.
+GTK is the library that draws the windows, buttons and menus of the
+GNOME desktop and of many other Linux programs. It is written in C, on
+top of GLib, a library of general-purpose functions and data structures
+that GTK and GNOME share. GNOME is one of several projects to provide a
+complete desktop to Linux users, with a panel to launch applications,
+standard applications for file management, settings and many other
+things, and libraries for creating applications which fit in with the
+way the rest of the system works. This appendix uses version 4 of GTK.
 
-One thing to notice about the GNOME libraries is that they constantly
-create and give you pointers to large data structures, but you never
-need to know how they are laid out in memory. All manipulation of the
-GUI data structures are done entirely through function calls. This is a
+One thing to notice about the GTK library is that it constantly creates
+and gives you pointers to large data structures, but you never need to
+know how they are laid out in memory. All manipulation of the GUI data
+structures is done entirely through function calls. This is a
 characteristic of good library design. Libraries change from version to
 version, and so does the data that each data structure holds. If you had
 to access and manipulate that data yourself, then when the library is
@@ -36,145 +38,191 @@ are pointing to looks like, you only need to know the functions that
 will properly manipulate it. When designing libraries, even for use
 within only one program, this is a good practice to keep in mind.
 
-This chapter will not go into details about how GNOME works. If you
-would like to know more, visit the [GNOME developer web site][AA-1].
-This site contains tutorials, mailing
-lists, API documentation, and everything else you need to start
-programming in the GNOME environment.
+This appendix will not go into details about how GTK works. If you would
+like to know more, visit the [GTK documentation][AA-GTK-docs] and the
+[GNOME developer documentation][AA-1]. They contain tutorials, API
+documentation, and everything else you need to start programming in the
+GNOME environment. The functions are described with C prototypes, which
+you can read as we did in
+[Chapter 8](08-sharing-functions-with-code-libraries.qmd#finding-information-about-libraries).
 
-A Simple GNOME Program in Several Languages {#a-simple-gnome-program-in-several-languages}
--------------------------------------------
+A Simple GTK Program in Two Languages {#a-simple-gtk-program-in-two-languages}
+-------------------------------------
 
-This program will simply show a Window that has a button to quit the
+This program will simply show a window that has a button to quit the
 application. When that button is clicked it will ask you if you are
-sure, and if you click yes it will close the application. To run this
-program, type in the following as `0AA-01-gnome-example.s`:
+sure, and if you click Yes it will close the application. To run this
+program, type in the following as `0AA-01-gtk-example.s`:
 
-```{.gnuassembler .numberLines include=resource/asm/0AA-01-gnome-example.s}
+```{.gnuassembler .numberLines include=resource/asm/0AA-01-gtk-example.s}
 ```
 
-To build this application, execute the following commands:
+To build this application, you need the development files of GTK 4 (on
+Ubuntu, the package `libgtk-4-dev`). Execute the following commands:
 
 ```{.bash}
-as -o 0AA-01-gnome-example.o   --32 \
-                               --gstabs+ \
-                               0AA-01-gnome-example.s
-
-gcc -o 0AA-01-gnome-example    `gnome-config --libs gnomeui` \
-                               0AA-01-gnome-example.o
+as --64 -g -o 0AA-01-gtk-example.o 0AA-01-gtk-example.s
+gcc -o 0AA-01-gtk-example 0AA-01-gtk-example.o $(pkg-config --libs gtk4)
 ```
 
-Then type in `./0AA-01-gnome-example` to run it.
+Then type in `./0AA-01-gtk-example` to run it.
+
+This time we link with `gcc` instead of `ld`, and the program starts at
+`main` instead of `_start`. GTK uses many libraries (`pkg-config
+--libs gtk4` prints the `-l` options for all of them), and it expects
+the start-up code of the C library, which prepares the program before
+calling `main(argc, argv)`. `gcc` adds that code and the dynamic linker
+for us; it doesn\'t compile anything here, it only runs `ld` with the
+right options. `main` is a normal function: it receives `argc` in _%rdi_
+and `argv` in _%rsi_, and returns the exit status in _%rax_. And since
+`gcc` makes a PIE program, everything in it must be position-independent
+(see
+[Chapter 8](08-sharing-functions-with-code-libraries.qmd#position-independent-code)):
+all the data is reached relative to _%rip_, and the table `answers`,
+which holds addresses, goes in the section `.data.rel.ro`, where the
+dynamic linker can write those addresses when the program starts.
 
 This program, like most GUI programs, makes heavy use of passing
 pointers to functions as parameters. In this program you create widgets
-with the GNOME functions and then you set up functions to be called when
-certain events happen. These functions are called *callback* functions.
-All of the event processing is handled by the function `gtk_main`, so
-you don\'t have to worry about how the events are being processed. All
-you have to do is have callbacks set up to wait for them.
+with the GTK functions and then you set up functions to be called when
+certain events happen. These functions are called *callback*
+functions. All of the event processing is handled by the function
+`g_application_run`, so you don\'t have to worry about how the events
+are being processed. All you have to do is have callbacks set up to wait
+for them. Our callbacks are normal functions too, called by GTK with the
+System V convention, so they must follow all of its rules: parameters in
+_%rdi_, _%rsi_ and _%rdx_, callee-saved registers preserved, and
+_%rsp_ aligned to 16 at every `call`. That is why each callback pushes
+_%rbx_ and _%r12_ (two registers keep the alignment) before it uses
+them, and why `main` subtracts 8 more bytes after its three pushes.
 
-Here is a short description of all of the GNOME functions that were used
+Here is a short description of all of the GTK functions that were used
 in this program:
 
-gnome_init:
+gtk_application_new:
 
-:   Takes the command-line arguments, argument count, application id,
-    and application version and initializes the GNOME libraries.
+:   Creates a new application, and returns a pointer to it. Takes the
+    application id (a name in the reverse-domain style, unique for each
+    application) and some flags (0 for the default behavior).
 
-gnome_app_new:
+g_signal_connect_data:
 
-:   Creates a new application window, and returns a pointer to it. Takes
-    the application id and the window title as arguments.
+:   This is the function that connects objects and their signal
+    handling callback functions. In C, programs use `g_signal_connect`,
+    but it is a macro, a name that the C compiler replaces with a call
+    to `g_signal_connect_data` with two more parameters (both 0 here),
+    so in assembly language we have to call the real function. It takes
+    the object pointer, the name of the signal, the callback function,
+    an extra data pointer, a function to free that data (NULL) and some
+    flags (0). After this function is called, any time the given event
+    is triggered, the callback will be called with the object that
+    produced the signal and the extra data pointer.
+
+g_application_run:
+
+:   This function causes GTK to enter into its main loop, the *event
+    loop*. GTK checks for events and calls the appropriate callback
+    functions when they occur. It starts by emitting the signal
+    `activate`, which calls our `activate_handler`, and it continues to
+    process events until the application has no windows left or
+    `g_application_quit` is called. It returns the exit status.
+
+g_object_unref:
+
+:   GTK objects count how many pointers to them are in use (*reference
+    counting*, see the exercises of
+    [Chapter 9](09-intermediate-memory-topics.qmd#going-further-7)).
+    This function says that we no longer use our pointer; the object is
+    freed when nobody uses it.
+
+gtk_application_window_new:
+
+:   Creates a new window that belongs to the application.
+
+gtk_window_set_title:
+
+:   Sets the text in the title bar of a window.
+
+gtk_window_set_default_size:
+
+:   Sets the width and the height of a window, in pixels.
 
 gtk_button_new_with_label:
 
 :   Creates a new button and returns a pointer to it. Takes one
     argument - the text that is in the button.
 
-gnome_app_set_contents:
+gtk_window_set_child:
 
-:   This takes a pointer to the gnome application window and whatever
-    widget you want (a button in this case) and makes the widget be the
-    contents of the application window
+:   This takes a pointer to a window and whatever widget you want (a
+    button in this case) and makes the widget be the contents of the
+    window.
 
-gtk_widget_show:
+gtk_window_present:
 
-:   This must be called on every widget created (application window,
-    buttons, text entry boxes, etc) in order for them to be visible.
-    However, in order for a given widget to be visible, all of its
-    parents must be visible as well.
+:   Shows a window, with everything in it.
 
-gtk_signal_connect:
+gtk_alert_dialog_new:
 
-:   This is the function that connects widgets and their signal handling
-    callback functions. This function takes the widget pointer, the name
-    of the signal, the callback function, and an extra data pointer.
-    After this function is called, any time the given event is
-    triggered, the callback will be called with the widget that produced
-    the signal and the extra data pointer. In this application, we
-    don\'t use the extra data pointer, so we just set it to NULL, which
-    is 0.
+:   Creates a dialog that shows a message. Like `printf`, its first
+    parameter is a format, followed by a variable number of parameters,
+    so _%al_ must be 0 when we call it.
 
-gtk_main:
+gtk_alert_dialog_set_buttons:
 
-:   This function causes GNOME to enter into its main loop. To make
-    application programming easier, GNOME handles the main loop of the
-    program for us. GNOME will check for events and call the appropriate
-    callback functions when they occur. This function will continue to
-    process events until `gtk_main_quit` is called by a signal handler.
+:   Sets the buttons of the dialog: it takes a list of addresses of
+    strings, ended by NULL.
 
-gtk_main_quit:
+gtk_alert_dialog_set_default_button, gtk_alert_dialog_set_cancel_button:
 
-:   This function causes GNOME to exit its main loop at the earliest
-    opportunity.
+:   Choose the button that the Return key and the Escape key press: Yes
+    (button 0) and No (button 1).
 
-gnome_message_box_new:
+gtk_alert_dialog_choose:
 
-:   This function creates a dialog window containing a question and
-    response buttons. It takes as parameters the message to display, the
-    type of message it is (warning, question, etc), and a list of
-    buttons to display. The final parameter should be NULL to indicate
-    that there are no more buttons to display.
+:   Shows the dialog over a window, as a *modal* dialog: in GUI
+    programming, a modal window is one that prevents the use of other
+    windows (here, the main window) until it is closed. It doesn\'t wait
+    for the answer. It returns at once, and when the user clicks on a
+    button, GTK calls the function we gave it (`response_handler`) with
+    the dialog, a pointer to the result and our extra data. This is an
+    *asynchronous* function: the event loop keeps running, and the
+    window keeps redrawing itself, while the dialog is open.
 
-gtk_window_set_modal:
+gtk_alert_dialog_choose_finish:
 
-:   This function makes the given window a modal window. In GUI
-    programming, a modal window is one that prevents event processing in
-    other windows until that window is closed. This is often used with
-    Dialog windows.
+:   Called in `response_handler`, it returns the number of the button
+    that was clicked.
 
-gnome_dialog_run_and_close:
+gtk_window_get_application, g_application_quit:
 
-:   This function takes a dialog pointer (the pointer returned by
-    `gnome_message_box_new` can be used here) and will set up all of the
-    appropriate signal handlers so that it will run until a button is
-    pressed. At that time it will close the dialog and return to you
-    which button was pressed. The button number refers to the order in
-    which the buttons were set up in `gnome_message_box_new`.
+:   Find the application of a window, and make it leave its event loop
+    at the earliest opportunity, so that `g_application_run` returns.
 
-The following is the same program written in the C language. Type it in
-as `0AA-01-gnome-example-c.c`:
+Finally, we have a version in Python, with PyGObject, the Python
+interface to GLib and GTK (on Ubuntu, the packages `python3-gi` and
+`gir1.2-gtk-4.0`). Type it in as `0AA-01-gtk-example.py`:
 
-```{.c .numberLines include=resource/asm/0AA-01-gnome-example-c.c}
+```{.python .numberLines include=resource/asm/0AA-01-gtk-example.py}
 ```
 
-To compile it, type
+To run it type `python3 0AA-01-gtk-example.py`.
 
-```{.bash}
-gcc -o 0AA-01-gnome-example-c  \
-            `gnome-config --cflags --libs gnomeui` \
-            0AA-01-gnome-example-c.c
-```
+Compare the two versions. They call the same functions, in the same
+order, with the same parameters: PyGObject reads the description of
+every GTK function from the *introspection* data that GTK installs (the
+package `gir1.2-gtk-4.0`), and calls it with the calling convention, as
+`ctypes` did in
+[Chapter 8](08-sharing-functions-with-code-libraries.qmd#calling-assembly-from-rust-and-python).
+Python takes care of the registers, the alignment, the list of buttons
+ended by NULL, the `_data` version of `g_signal_connect` and the calls
+to `g_object_unref`. In the assembly language version, all of that is
+our job.
 
-Run it by typing `./0AA-01-gnome-example-c`.
-
-Finally, we have a version in Python. Type it in as `0AA-01-gnome-example.py`:
-
-```{.python .numberLines include=resource/asm/0AA-01-gnome-example.py}
-```
-
-To run it type `python 0AA-01-gnome-example.py`.
+To test this appendix without a screen, the book\'s `test.bash` runs
+both versions in a virtual X server (`Xvfb`), and `xdotool` clicks on
+the button and presses Escape (No: the program keeps running), then
+clicks again and presses Return (Yes: the program ends with status 0).
 
 GUI Builders {#gui-builders}
 ------------
@@ -182,17 +230,17 @@ GUI Builders {#gui-builders}
 In the previous example, you have created the user-interface for the
 application by calling the create functions for each widget and placing
 it where you wanted it. However, this can be quite burdensome for more
-complex applications. Many programming environments, including GNOME,
-have programs called GUI builders that can be used to automatically
-create your GUI for you. You just have to write the code for the signal
-handlers and for initializing your program. The main GUI builder
-for GNOME applications is called GLADE. GLADE ships with most
-Linux distributions.
+complex applications. Many programming environments, including GTK,
+let you describe the user interface in a file instead. GTK reads
+descriptions written in XML (`.ui` files) with its `GtkBuilder`, and
+there are GUI builders, such as Cambalache, that let you draw the
+windows with the mouse and save them in that format. You just have to
+write the code for the signal handlers and for initializing your
+program.
 
-There are GUI builders for most programming environments. Borland has a
-range of tools that will build GUIs quickly and easily on Linux and
-Win32 systems. The KDE environment has a tool called QT Designer
-which helps you automatically develop the GUI for their system.
+There are GUI builders for most programming environments. The Qt
+library, used by the KDE desktop, has Qt Designer, and the toolkits of
+Windows and macOS come with their own.
 
 There is a broad range of choices for developing graphical applications,
 but hopefully this appendix gave you a taste of what GUI programming is
@@ -200,3 +248,4 @@ like.
 
 
 [AA-1]: https://developer.gnome.org/
+[AA-GTK-docs]: https://docs.gtk.org/gtk4/

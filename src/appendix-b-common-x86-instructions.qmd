@@ -1,4 +1,4 @@
-# Common x86 Instructions {#appendix-b-common-x86-instructions}
+# Common x86-64 Instructions {#appendix-b-common-x86-instructions}
 
 Reading the Tables {#reading-the-tables}
 ------------------
@@ -17,14 +17,23 @@ In the operands section, it will list the type of operands it takes. If
 it takes more than one operand, each operand will be separated by a
 comma. Each operand will have a list of codes which tell whether the
 operand can be an immediate-mode value (I), a register (R), or a memory
-address (M). For example, the `movl` instruction is listed as
+address (M). For example, the `movq` instruction is listed as
 `I/R/M, R/M`. This means that the first operand can be any kind of
 value, while the second operand must be a register or memory location.
-Note, however, that in x86 assembly language you cannot have more than
-one operand be a memory location.
+Note, however, that in x86-64 assembly language you cannot have more
+than one operand be a memory location. In the floating-point table, X
+is an _%xmm_ register.
 
-In the flags section, it lists the flags in the _%eflags_
-register affected by the instruction. The following flags are mentioned:
+Most instructions come in several sizes, with the suffix `b` (1 byte),
+`w` (2 bytes), `l` (4 bytes) or `q` (8 bytes); the tables show the `q`
+form, the normal size in this book. Remember that writing a 32-bit
+register (`l`) also clears the upper 32 bits of its 64-bit register,
+while `b` and `w` leave them alone (see Chapter 10).
+
+In the flags section, it lists the flags in the _%rflags_
+register affected by the instruction (\"none\" if it doesn\'t change
+any, and \"undefined\" if it leaves them with meaningless values). The
+following flags are mentioned:
 
 O:
 
@@ -66,53 +75,68 @@ Data Transfer Instructions {#data-transfer-instructions}
 --------------------------
 
 These instructions perform little, if any computation. Instead they are
-mostly used for moving data from one place to another.
-
-An example of this table is the `movl` instruction which could read
-like this:
-
-```{.gnuassembler}
-movl   I/R/M,  I/R/M      # eFlags affected: O/S/Z/A/C
-movl   $5,     eax        # I, R -> eFlags that may affect: O/S/Z/A/C
-movl   edx,    (%ebp)     # R, M -> eFlags that may affect: O/S/Z/A/C
-```
+mostly used for moving data from one place to another. None of them
+changes the flags.
 
 Table B-1. Data Transfer Instructions.
 
-**Instruction** _Operands_ -----> Affected Flags (eFlags).
+**Instruction** _Operands_ -----> Affected Flags.
 
 ---
 
-**movl** _I/R/M_, _I/R/M_ -----> O/S/Z/A/C:
+**movq** _I/R/M_, _R/M_ -----> none:
 
-> This copies a word of data from one location to another. `movl %eax, %ebx`
-  copies the contents of _%eax_ to _%ebx_.
+> This copies a quadword (8 bytes) of data from one location to
+  another. `movq %rax, %rbx` copies the contents of _%rax_ to _%rbx_.
+  `movl` copies 4 bytes (and, if the destination is a register, sets
+  the upper 32 bits of its 64-bit register to 0), `movw` 2 bytes and
+  `movb` 1 byte. When the destination is memory, an immediate value
+  must fit in 32 bits (it is sign-extended to 64); into a register, the
+  assembler uses a longer form, `movabsq`, for bigger numbers.
 
-**movb** _I/R/M_, _I/R/M_ -----> O/S/Z/A/C:
+**movzbq**, **movzwq** _R/M_, _R_ -----> none:
 
-> Same as `movl`, but operates on individual bytes.
+> Copy a byte or a 2-byte word into a 64-bit register, filling the rest
+  with zeros (*zero extension*, for unsigned values). `movzbq (%rdi),
+  %rcx` reads one character. There is no `movzlq`: `movl` already
+  clears the upper half.
 
-**leal** _M_, _I/R/M_ -----> O/S/Z/A/C:
+**movsbq**, **movswq**, **movslq** _R/M_, _R_ -----> none:
 
-> This takes a memory location given in the standard format, and, instead
-  of loading the contents of the memory location, loads the computed
-  address. For example, `leal 5(%ebp,%ecx,1), %eax` loads the address
-  computed by `5 + %ebp + 1*%ecx` and stores that in _%eax_.
+> Copy a byte, a 2-byte word or a 4-byte doubleword into a 64-bit
+  register with *sign extension*, for signed values.
 
-**popl** _R/M_ -----> O/S/Z/A/C:
+**cmovcc** _R/M_, _R_ -----> none:
 
-> Pops the top of the stack into the given location. This is equivalent to
-  performing `movl (%esp), R/M` followed by `addl $4, %esp`. `popfl` is a
-  variant which pops the top of the stack into the _%eflags_ register.
+> Conditional move: copies the first operand to the second only if the
+  condition `cc` is true (the same conditions as the conditional jumps
+  below, for example `cmovgq`). Compilers use it instead of a jump
+  around a `mov`.
 
-**pushl** _I/R/M_ -----> O/S/Z/A/C:
+**leaq** _M_, _R_ -----> none:
+
+> This takes a memory location given in the standard format, and,
+  instead of loading the contents of the memory location, loads the
+  computed address. For example, `leaq 5(%rbp,%rcx,1), %rax` loads the
+  address computed by `5 + %rbp + 1*%rcx` and stores that in _%rax_,
+  and `leaq data(%rip), %rbx` loads the address of `data`. It is also
+  used to add numbers: `leaq 15(%rdi), %rdx` computes `%rdi + 15`.
+
+**popq** _R/M_ -----> none:
+
+> Pops the top of the stack into the given location. This is equivalent
+  to performing `movq (%rsp), R/M` followed by `addq $8, %rsp`. `popfq`
+  is a variant which pops the top of the stack into the _%rflags_
+  register (and so changes all the flags).
+
+**pushq** _I/R/M_ -----> none:
 
 > Pushes the given value onto the stack. This is the equivalent to
-  performing `subl $4, %esp` followed by `movl I/R/M, (%esp)`. `pushfl` is
-  a variant which pushes the current contents of the _%eflags_ register
-  onto the top of the stack.
+  performing `subq $8, %rsp` followed by `movq I/R/M, (%rsp)`. `pushfq`
+  is a variant which pushes the current contents of the _%rflags_
+  register onto the top of the stack.
 
-**xchgl** _R/M_, _R/M_ -----> O/S/Z/A/C:
+**xchgq** _R/M_, _R/M_ -----> none:
 
 > Exchange the values of the given operands.
 
@@ -122,185 +146,204 @@ Integer Instructions {#integer-instructions}
 --------------------
 
 These are basic calculating instructions that operate on signed or
-unsigned integers.
+unsigned integers. They are shown with the `q` suffix; the `l`, `w` and
+`b` forms work on 4, 2 and 1 bytes.
 
 Table B-2. Integer Instructions.
 
-**Instruction** _Operands_ -----> Affected Flags (eFlags).
+**Instruction** _Operands_ -----> Affected Flags.
 
 ---
 
-**adcl** _I/R/M_, _R/M_ -----> O/S/Z/A/P/C:
+**adcq** _I/R/M_, _R/M_ -----> O/S/Z/A/P/C:
 
-> Add with carry. Adds the carry bit and the first operand to the second,
-  and, if there is an overflow, sets overflow and carry to true. This is
-  usually used for operations larger than a machine word. The addition on
-  the least-significant word would take place using `addl`, while additions
-  to the other words would use the `adcl` instruction to take the carry
-  from the previous add into account. For the usual case, this is not
-  used, and `addl` is used instead.
+> Add with carry. Adds the carry bit and the first operand to the
+  second, and, if there is an overflow, sets overflow and carry to
+  true. This is usually used for operations larger than a register. The
+  addition on the least-significant quadword would take place using
+  `addq`, while additions to the other quadwords would use the `adcq`
+  instruction to take the carry from the previous add into account. For
+  the usual case, this is not used, and `addq` is used instead.
 
-**addl** _I/R/M_, _R/M_ -----> O/S/Z/A/P/C:
+**addq** _I/R/M_, _R/M_ -----> O/S/Z/A/P/C:
 
-> Addition. Adds the first operand to the second, storing the result in the
-  second. If the result is larger than the destination register, the
-  overflow and carry bits are set to true. This instruction operates on
-  both signed and unsigned integers.
+> Addition. Adds the first operand to the second, storing the result in
+  the second. If the result is larger than the destination register,
+  the overflow and carry bits are set to true. This instruction
+  operates on both signed and unsigned integers.
 
-**cdq** _Not Applicable_ -----> O/S/Z/A/P/C:
+**cqto** _Not Applicable_ -----> none:
 
-> Converts the _%eax_ word into the double-word consisting of _%edx_:_%eax_
-  with sign extension. The `q` signifies that it is a *quad-word*. It\'s
-  actually a double-word, but it\'s called a quad-word because of the
-  terminology used in the 16-bit days. This is usually used before issuing
-  an `idivl` instruction.
+> Converts the quadword in _%rax_ into the octoword (16 bytes)
+  consisting of _%rdx_:_%rax_ with sign extension: _%rdx_ becomes all
+  zeros or all ones. This is used before issuing an `idivq` instruction.
+  Intel calls it `cqo`. `cltq` (`cdqe` for Intel) sign-extends _%eax_
+  into _%rax_.
 
-**cmpl** _I/R/M_, _R/M_ -----> O/S/Z/A/P/C:
+**cmpq** _I/R/M_, _R/M_ -----> O/S/Z/A/P/C:
 
-> Compares two integers. It does this by subtracting the first operand from
-  the second. It discards the results, but sets the flags accordingly.
-  Usually used before a conditional jump.
+> Compares two integers. It does this by subtracting the first operand
+  from the second. It discards the results, but sets the flags
+  accordingly. Usually used before a conditional jump.
 
-**decl** _R/M_ -----> O/S/Z/A/P:
+**decq** _R/M_ -----> O/S/Z/A/P:
 
 > Decrements the register or memory location. Use `decb` to decrement a
-  byte instead of a word.
+  byte instead of a quadword. It doesn\'t change the carry flag.
 
-**divl** _R/M_ -----> O/S/Z/A/P:
+**divq** _R/M_ -----> undefined:
 
-> Performs unsigned division. Divides the contents of the double-word
-  contained in the combined _%edx_:_%eax_ registers by the value in the
-  register or memory location specified. The _%eax_ register contains the
-  resulting quotient, and the _%edx_ register contains the resulting
-  remainder. If the quotient is too large to fit in _%eax_, it triggers a
-  type 0 interrupt.
+> Performs unsigned division. Divides the 128-bit number contained in
+  the combined _%rdx_:_%rax_ registers by the value in the register or
+  memory location specified. The _%rax_ register contains the resulting
+  quotient, and the _%rdx_ register contains the resulting remainder.
+  If the quotient is too large to fit in _%rax_, or the divisor is 0, it
+  triggers a divide error (Linux sends the signal `SIGFPE`). Set _%rdx_
+  to 0 first to divide the 64-bit number in _%rax_.
 
-**idivl** _R/M_ -----> O/S/Z/A/P:
+**idivq** _R/M_ -----> undefined:
 
-> Performs signed division. Operates just like `divl` above.
+> Performs signed division. Operates just like `divq` above; use `cqto`
+  first to divide the 64-bit number in _%rax_.
 
-**imull** _R/M/I_, _R_ -----> O/S/Z/A/P/C:
+**imulq** _I/R/M_, _R_ -----> O/C:
 
 > Performs signed multiplication and stores the result in the second
-  operand. If the second operand is left out, it is assumed to be _%eax_,
-  and the full result is stored in the double-word _%edx_:_%eax_.
+  operand. With three operands, `imulq $10, %rax, %rbx` multiplies the
+  second by the first and stores the result in the third. With a single
+  operand, it multiplies _%rax_ by it, and the full 128-bit result is
+  stored in _%rdx_:_%rax_. The overflow and carry flags say whether the
+  result didn\'t fit.
 
-**incl** _R/M_ -----> O/S/Z/A/P:
+**incq** _R/M_ -----> O/S/Z/A/P:
 
-> Increments the given register or memory location. Use `incb` to increment
-  a byte instead of a word.
+> Increments the given register or memory location. Use `incb` to
+  increment a byte instead of a quadword. It doesn\'t change the carry
+  flag.
 
-**mull** _R/M/I_, _R_ -----> O/S/Z/A/P/C:
+**mulq** _R/M_ -----> O/C:
 
-> Perform unsigned multiplication. Same rules as apply to `imull`.
+> Perform unsigned multiplication of _%rax_ by the operand, with the
+  128-bit result in _%rdx_:_%rax_.
 
-**negl** _R/M_ -----> O/S/Z/A/P/C:
+**negq** _R/M_ -----> O/S/Z/A/P/C:
 
-> Negates (gives the two\'s complement inversion of) the given register or
-  memory location.
+> Negates (gives the two\'s complement inversion of) the given register
+  or memory location.
 
-**sbbl** _I/R/M_, _R/M_ -----> O/S/Z/A/P/C:
+**sbbq** _I/R/M_, _R/M_ -----> O/S/Z/A/P/C:
 
-> Subtract with borrowing. This is used in the same way that `adc` is,
-  except for subtraction. Normally only `subl` is used.
+> Subtract with borrowing. This is used in the same way that `adcq` is,
+  except for subtraction. Normally only `subq` is used.
 
-**subl** _I/R/M_, _R/M_ -----> O/S/Z/A/P/C:
+**subq** _I/R/M_, _R/M_ -----> O/S/Z/A/P/C:
 
 > Subtract the two operands. This subtracts the first operand from the
-  second, and stores the result in the second operand. This instruction can
-  be used on both signed and unsigned numbers.
+  second, and stores the result in the second operand. This instruction
+  can be used on both signed and unsigned numbers.
 
 ---
 
 Logic Instructions {#logic-instructions}
 ------------------
 
-These instructions operate on memory as bits instead of words.
+These instructions operate on memory as bits instead of numbers.
 
 Table B-3. Logic Instructions.
 
-**Instruction** _Operands_ -----> Affected Flags (eFlags).
+**Instruction** _Operands_ -----> Affected Flags.
 
 ---
 
-**andl** _I/R/M_, _R/M_ -----> O/S/Z/P/C:
+**andq** _I/R/M_, _R/M_ -----> O/S/Z/P/C:
 
-> Performs a logical and of the contents of the two operands, and stores
-  the result in the second operand. Sets the overflow and carry flags to
-  false.
+> Performs a logical and of the contents of the two operands, and
+  stores the result in the second operand. Sets the overflow and carry
+  flags to false.
 
-**notl** _R/M_ -----> Not Applicable:
+**notq** _R/M_ -----> none:
 
-> Performs a logical not on each bit in the operand. Also known as a one\'s
-  complement.
+> Performs a logical not on each bit in the operand. Also known as a
+  one\'s complement.
 
-**orl** _I/R/M_, _R/M_ -----> O/S/Z/A/P/C:
+**orq** _I/R/M_, _R/M_ -----> O/S/Z/P/C:
 
-> Performs a logical or between the two operands, and stores the result in
-  the second operand. Sets the overflow and carry flags to false.
+> Performs a logical or between the two operands, and stores the result
+  in the second operand. Sets the overflow and carry flags to false.
 
-**rcll** _I/cl_, _R/M_ -----> O/C:
+**popcntq** _R/M_, _R_ -----> O/S/Z/A/P/C:
 
-> Rotates the given location\'s bits to the left the number of times in the
-  first operand, which is either an immediate-mode value or the register
-  _%cl_. The carry flag is included in the rotation, making it use 33 bits
-  instead of 32. Also sets the overflow flag.
+> Counts the bits set to 1 in the first operand and stores the number in
+  the second. Not every old processor has it.
 
-**rcrl** _I/cl_, _R/M_ -----> O/C:
+**rclq** _I/cl_, _R/M_ -----> O/C:
 
-> Same as above, but rotates right.
+> Rotates the given location\'s bits to the left the number of times in
+  the first operand, which is either an immediate-mode value or the
+  register _%cl_. The carry flag is included in the rotation, making it
+  use 65 bits instead of 64. Also sets the overflow flag.
 
-**roll** _I/cl_, _R/M_ -----> O/C:
-
-> Rotate bits to the left. It sets the overflow and carry flags, but does
-  not count the carry flag as part of the rotation. The number of bits to
-  roll is either specified in immediate mode or is contained in the _%cl_
-  register.
-
-**rorl** _I/cl_, _R/M_ -----> O/C:
+**rcrq** _I/cl_, _R/M_ -----> O/C:
 
 > Same as above, but rotates right.
 
-**sall** _I/cl_, _R/M_ -----> C:
+**rolq** _I/cl_, _R/M_ -----> O/C:
 
-> Arithmetic shift left. The sign bit is shifted out to the carry flag, and
-  a zero bit is placed in the least significant bit. Other bits are simply
-  shifted to the left. This is the same as the regular shift left. The
-  number of bits to shift is either specified in immediate mode or is
-  contained in the _%cl_ register.
+> Rotate bits to the left. It sets the overflow and carry flags, but
+  does not count the carry flag as part of the rotation. The number of
+  bits to roll is either specified in immediate mode or is contained in
+  the _%cl_ register.
 
-**sarl** _I/cl_, _R/M_ -----> C:
+**rorq** _I/cl_, _R/M_ -----> O/C:
 
-> Arithmetic shift right. The least significant bit is shifted out to the
-  carry flag. The sign bit is shifted in, and kept as the sign bit. Other
-  bits are simply shifted to the right. The number of bits to shift is
-  either specified in immediate mode or is contained in the _%cl_ register.
+> Same as above, but rotates right.
 
-**shll** _I/cl_, _R/M_ -----> C:
+**salq** _I/cl_, _R/M_ -----> O/S/Z/P/C:
+
+> Arithmetic shift left. The sign bit is shifted out to the carry flag,
+  and a zero bit is placed in the least significant bit. Other bits are
+  simply shifted to the left. This is the same as the regular shift
+  left. The number of bits to shift is either specified in immediate
+  mode or is contained in the _%cl_ register.
+
+**sarq** _I/cl_, _R/M_ -----> O/S/Z/P/C:
+
+> Arithmetic shift right. The least significant bit is shifted out to
+  the carry flag. The sign bit is shifted in, and kept as the sign bit.
+  Other bits are simply shifted to the right. The number of bits to
+  shift is either specified in immediate mode or is contained in the
+  _%cl_ register.
+
+**shlq** _I/cl_, _R/M_ -----> O/S/Z/P/C:
 
 > Logical shift left. This shifts all bits to the left (sign bit is not
   treated specially). The leftmost bit is pushed to the carry flag. The
   number of bits to shift is either specified in immediate mode or is
   contained in the _%cl_ register.
 
-**shrl** _I/cl_, _R/M_ -----> C:
+**shrq** _I/cl_, _R/M_ -----> O/S/Z/P/C:
 
-> Logical shift right. This shifts all bits in the register to the right
-  (sign bit is not treated specially). The rightmost bit is pushed to the
-  carry flag. The number of bits to shift is either specified in immediate
-  mode or is contained in the _%cl_ register.
+> Logical shift right. This shifts all bits in the register to the
+  right (sign bit is not treated specially). The rightmost bit is
+  pushed to the carry flag. The number of bits to shift is either
+  specified in immediate mode or is contained in the _%cl_ register.
 
-**testl** _I/R/M_, _R/M_ -----> O/S/Z/A/P/C:
+**testq** _I/R/M_, _R/M_ -----> O/S/Z/P/C:
 
-> Does a logical and of both operands and discards the results, but sets
-  the flags accordingly.
+> Does a logical and of both operands and discards the results, but
+  sets the flags accordingly. `testq %rax, %rax` is a common way to
+  compare _%rax_ with 0.
 
-**xorl** _I/R/M_, _R/M_ -----> O/S/Z/A/P/C:
+**xorq** _I/R/M_, _R/M_ -----> O/S/Z/P/C:
 
-> Does an exclusive or on the two operands, and stores the result in the
-  second operand. Sets the overflow and carry flags to false.
+> Does an exclusive or on the two operands, and stores the result in
+  the second operand. Sets the overflow and carry flags to false.
+  `xorl %eax, %eax` is the usual way to set _%rax_ to 0.
 
 ---
+
+In the shifts and rotations, the flags are only changed when the count
+is not 0, and the overflow flag is only defined for a count of 1.
 
 Flow Control Instructions {#flow-control-instructions}
 -------------------------
@@ -309,31 +352,29 @@ These instructions may alter the flow of the program.
 
 Table B-4. Flow Control Instructions.
 
-**Instruction** _Operands_ -----> Affected Flags (eFlags).
+**Instruction** _Operands_ -----> Affected Flags.
 
 ---
 
-**call** _Destination address_ -----> O/S/Z/A/C:
+**call** _Destination address_ -----> none:
 
-> This pushes what would be the next value for _%eip_ onto the stack, and
-  jumps to the destination address. Used for function calls. Alternatively,
-  the destination address can be an asterisk followed by a register for an
-  indirect function call. For example, `call *%eax` will call the function
-  at the address in _%eax_.
+> This pushes what would be the next value for _%rip_ (the return
+  address) onto the stack, and jumps to the destination address. Used
+  for function calls. Alternatively, the destination address can be an
+  asterisk followed by a register or a memory location for an indirect
+  function call. For example, `call *%rax` will call the function at
+  the address in _%rax_. `call printf@PLT` calls a function of a shared
+  library through the PLT (see Chapter 8). _%rsp_ must be a multiple
+  of 16 when it runs.
 
-**int** _I_ -----> O/S/Z/A/C:
-
-> Causes an interrupt of the given number. This is usually used for system
-  calls and other kernel interfaces.
-
-**Jcc** _Destination address_ -----> O/S/Z/A/C:
+**Jcc** _Destination address_ -----> none:
 
 > Conditional branch. `cc` is the *condition code*. Jumps to the given
-  address if the condition code is true (set from the previous instruction,
-  probably a comparison). Otherwise, goes to the next instruction. The
-  condition codes are:
+  address if the condition code is true (set from the previous
+  instruction, probably a comparison). Otherwise, goes to the next
+  instruction. The condition codes are:
 
-  > - `[n]a[e]` - above(unsigned greater than). An `n` can be added for
+  > - `[n]a[e]` - above (unsigned greater than). An `n` can be added for
         \"not\" and an `e` can be added for \"or equal to\".
     - `[n]b[e]` - below (unsigned less than).
     - `[n]e` - equal to.
@@ -342,21 +383,75 @@ Table B-4. Flow Control Instructions.
     - `[n]l[e]` - less than (signed comparison).
     - `[n]c` - carry flag set.
     - `[n]o` - overflow flag set.
-    - `[p]p` - parity flag set.
+    - `[n]p` - parity flag set.
     - `[n]s` - sign flag set.
-    - `ecxz` - _%ecx_ is zero.
+    - `rcxz` - _%rcx_ is zero (`jrcxz`).
 
-**jmp** _Destination address_ -----> O/S/Z/A/C:
+**jmp** _Destination address_ -----> none:
 
-> An unconditional jump. This simply sets _%eip_ to the destination
+> An unconditional jump. This simply sets _%rip_ to the destination
   address. Alternatively, the destination address can be an asterisk
-  followed by a register for an indirect jump. For example, `jmp *%eax`
-  will jump to the address in _%eax_.
+  followed by a register for an indirect jump. For example, `jmp *%rax`
+  will jump to the address in _%rax_.
 
-**ret** _Not Applicable_ -----> O/S/Z/A/C:
+**ret** _Not Applicable_ -----> none:
 
-> Pops a value off of the stack and then sets _%eip_ to that value. Used to
-  return from function calls.
+> Pops a value off of the stack and then sets _%rip_ to that value.
+  Used to return from function calls.
+
+**syscall** _Not Applicable_ -----> none:
+
+> Calls the kernel: the number of the system call is in _%rax_, and its
+  parameters are in _%rdi_, _%rsi_, _%rdx_, _%r10_, _%r8_ and _%r9_. The
+  result comes back in _%rax_ (a negative number, `-errno`, means an
+  error). It overwrites _%rcx_ and _%r11_ (the processor stores the
+  return address and the flags there); the kernel preserves the other
+  registers. The 32-bit programs used `int $0x80` instead.
+
+---
+
+Floating-Point Instructions {#floating-point-instructions}
+---------------------------
+
+These SSE2 instructions work on the _%xmm0_ to _%xmm15_ registers (see
+[Chapter 10](10-counting-like-a-computer.qmd#floating-point-in-assembly-language)).
+The `sd` forms work on one `double` (8 bytes), and the `ss` forms on
+one `float` (4 bytes).
+
+Table B-5. Floating-Point Instructions.
+
+**Instruction** _Operands_ -----> Affected Flags.
+
+---
+
+**movsd**, **movss** _X/M_, _X/M_ -----> none:
+
+> Copy a `double` or a `float` between memory and an _%xmm_ register
+  (X), or between two _%xmm_ registers.
+
+**addsd**, **subsd**, **mulsd**, **divsd** _X/M_, _X_ -----> none:
+
+> Add, subtract, multiply or divide the second operand by the first,
+  storing the result in the second. `sqrtsd` computes a square root.
+  The `ss` versions work on `float`s.
+
+**cvtsi2sdq** _R/M_, _X_ -----> none:
+
+> Converts a 64-bit integer into a `double`.
+
+**cvttsd2si** _X/M_, _R_ -----> none:
+
+> Converts a `double` into a 64-bit integer, truncating it (dropping
+  the part after the point). `cvtss2sd` and `cvtsd2ss` convert between
+  `float` and `double`.
+
+**ucomisd** _X/M_, _X_ -----> Z/P/C:
+
+> Compares two `double`s and sets the flags like an unsigned comparison
+  (use `ja`, `jb`, `jae`, `jbe` after it). The parity flag is set if
+  one of the numbers is not a number (NaN).
+
+---
 
 Assembler Directives {#assembler-directives}
 --------------------
@@ -365,7 +460,7 @@ These are instructions to the assembler and linker, instead of
 instructions to the processor. These are used to help the assembler put
 your code together properly, and make it easier to use.
 
-Table B-5. Assembler Directives.
+Table B-6. Assembler Directives.
 
 **Directive** _Operands_.
 
@@ -373,12 +468,23 @@ Table B-5. Assembler Directives.
 
 **.ascii** _Quoted String_:
 
-> Takes the given quoted string and converts it into byte data.
+> Takes the given quoted string and converts it into byte data. Add
+  `\0` at the end for a null-terminated string.
+
+**.balign** _Number_:
+
+> Adds bytes until the address is a multiple of the given number, so
+  that the data that follows is aligned.
 
 **.byte** _Values_:
 
-> Takes a comma-separated list of values and inserts them right there in
-  the program as data.
+> Takes a comma-separated list of values and inserts them right there
+  in the program as data.
+
+**.double**, **.float** _Values_:
+
+> Insert floating-point numbers as 8-byte `double`s or 4-byte
+  `float`s.
 
 **.endr** _Not Applicable_:
 
@@ -388,13 +494,25 @@ Table B-5. Assembler Directives.
 
 > Sets the given label equivalent to the given value. The value can be a
   number, a character, or a constant expression that evaluates to a
-  number or character. From that point on, use of the label will be
+  number or character (for example `label_end - label`, or
+  `O_WRONLY | O_CREAT`). From that point on, use of the label will be
   substituted for the given value.
+
+**.fill** _Count_, _Size_, _Value_:
+
+> Inserts _Count_ copies of _Value_, each one _Size_ bytes long.
+  `.fill 21, 1, 0` reserves 21 bytes of zeros.
 
 **.globl** _Label_:
 
 > Sets the given label as global, meaning that it can be used from
   separately-compiled object files.
+
+**.if** _Expression_, **.error** _Message_, **.endif**:
+
+> Assemble the lines between `.if` and `.endif` only if the expression
+  is not 0. With `.error`, the assembler stops with the message; Chapter
+  6 uses it to check the size of each record.
 
 **.include** _File_:
 
@@ -404,24 +522,33 @@ Table B-5. Assembler Directives.
 
 > This is used in the `.bss` section to specify storage that should be
   allocated when the program is executed. Defines the symbol with the
-  address where the storage will be located, and makes sure that it is the
-  given number of bytes long.
+  address where the storage will be located, and makes sure that it is
+  the given number of bytes long.
 
 **.long** _Values_:
 
 > Takes a sequence of numbers separated by commas, and inserts those
-  numbers as 4-byte words right where they are in the program.
+  numbers as 4-byte doublewords right where they are in the program.
+
+**.quad** _Values_:
+
+> Takes a sequence of numbers (or addresses) separated by commas, and
+  inserts them as 8-byte quadwords. This is the normal size of the
+  numbers in this book.
 
 **.rept** _Count_:
 
-> Repeats everything between this directive and the `.endr` directives the
-  number of times specified.
+> Repeats everything between this directive and the `.endr` directives
+  the number of times specified.
 
 **.section** _Section Name_:
 
 > Switches the section that is being worked on. Common sections include
-  `.text` (for code), `.data` (for data embedded in the program itself),
-  and `.bss` (for uninitialized global data).
+  `.text` (for code), `.data` (for data embedded in the program
+  itself), `.rodata` (for data that is only read), `.bss` (for
+  uninitialized global data), `.data.rel.ro` (for tables of addresses
+  in PIE programs) and `.note.GNU-stack` (which marks the stack as not
+  executable, see Chapter 3).
 
 **.type** _Symbol_, _\@function_:
 
@@ -432,12 +559,13 @@ Table B-5. Assembler Directives.
 Differences in Other Syntaxes and Terminology {#differences-in-other-syntaxes-and-terminology}
 ---------------------------------------------
 
-The syntax for assembly language used in this book is known at the
-*AT&T* syntax. It is the one supported by the GNU tool chain
-that comes standard with every Linux distribution. However, the official
-syntax for x86 assembly language (known as the Intel® syntax)
-is different. It is the same assembly language for the same platform,
-but it looks different. Some of the differences include:
+The syntax for assembly language used in this book is known as the
+*AT&T* syntax. It is the one supported by the GNU tool chain that comes
+standard with every Linux distribution, and the one that `objdump`,
+gdb and `rustc --emit asm` use by default. However, the official syntax
+for x86-64 assembly language (known as the Intel® syntax) is different.
+It is the same assembly language for the same platform, but it looks
+different. Some of the differences include:
 
 -   In Intel syntax, the operands of instructions are often reversed.
     The destination operand is listed before the source operand.
@@ -451,73 +579,123 @@ but it looks different. Some of the differences include:
 
 -   In Intel syntax, the instruction name does not include the size of
     data being moved. If that is ambiguous, it is explicitly stated as
-    `BYTE`, `WORD`, or `DWORD` immediately after the instruction name.
+    `BYTE PTR`, `WORD PTR`, `DWORD PTR` or `QWORD PTR` immediately
+    after the instruction name.
 
 -   The way that memory addresses are represented in Intel assembly
-    language is much different (shown below).
+    language is much different (shown below). An address relative to
+    the instruction pointer is written `[rip + label]`.
 
 -   Because the x86 processor line originally started out as a 16-bit
     processor, most literature about x86 processors refer to words as
-    16-bit values, and call 32-bit values double words. However, we use
-    the term \"word\" to refer to the standard register size on a
-    processor, which is 32 bits on an x86 processor. The syntax also
-    keeps this naming convention - `DWORD` stands for \"double word\" in
-    Intel syntax and is used for standard-sized registers, which we
-    would call simply a \"word\".
+    16-bit values, call 32-bit values double words and 64-bit values
+    quad words. The AT&T suffixes follow the same names (`w`, `l` for
+    \"long\", and `q`), and so does the Intel syntax (`WORD`, `DWORD`,
+    `QWORD`).
 
 -   Intel assembly language has the ability to address memory as a
-    segment/offset pair. We do not mention this because Linux does not
-    support segmented memory, and is therefore irrelevant to normal
-    Linux programming.
+    segment/offset pair. We do not mention this because 64-bit Linux
+    programs don\'t use segmented memory (except for the `%fs` register,
+    which the C library uses for the data of each thread).
 
 Other differences exist, but they are small in comparison. To show some
-of the differences, consider the following instruction:
+of the differences, consider the following instructions:
 
 ```{.gnuassembler .numberLines}
-movl $5, %eax
-movl 12(%ebx), %eax
-movl (%ebx,%edi), %ecx
-movl 8(%ebx,%edi), %eax
-movl (%ebx,%edi,4), %eax
-movl 8(%ebx,%edi,4), %eax
+movq $5, %rax
+movq 12(%rbx), %rax
+movq (%rbx,%rdi), %rcx
+movq 8(%rbx,%rdi), %rax
+movq (%rbx,%rdi,8), %rax
+movq 8(%rbx,%rdi,8), %rax
+leaq data(%rip), %rbx
 ```
 
 In Intel syntax, this would be written as:
 
 ```{.nasm .numberLines}
-mov  eax, 5
-mov  eax, [ebx+12]
-mov  ecx, [ebx+edi]
-mov  eax, [ebx+edi+8]
-mov  eax, [ebx+edi*4]
-mov  eax, [ebx+edi*4+8]
+mov  rax, 5
+mov  rax, QWORD PTR [rbx+12]
+mov  rcx, QWORD PTR [rbx+rdi]
+mov  rax, QWORD PTR [rbx+rdi+8]
+mov  rax, QWORD PTR [rbx+rdi*8]
+mov  rax, QWORD PTR [rbx+rdi*8+8]
+lea  rbx, [rip+data]
 ```
 
 The memory reference is a bit easier to read than its AT&T counterpart
 because it spells out exactly how the address will be computed. However,
-but the order of operands in Intel syntax can be confusing.
+the order of operands in Intel syntax can be confusing. You don\'t need
+another tool to read programs in Intel syntax: `objdump -d -M intel`
+and gdb\'s `set disassembly-flavor intel` show any program that way,
+`rustc` emits it with `-C llvm-args=-x86-asm-syntax=intel`, and the GNU
+assembler itself accepts it after the directive
+`.intel_syntax noprefix`. This is `003-02-maximum` in both syntaxes
+(`objdump -d` and `objdump -d -M intel`, with `--no-show-raw-insn`):
 
-The tool [intel2gas][AB-intel2gas] is a small text parser that can convert
-assembler source written in NASM syntax (Intel) to gas syntax (AT&T).
-And nowadays more often also the other way.
+
+```
+0000000000401000 <_start>:
+  401000:       lea    0xff9(%rip),%rbx        # 402000 <data_items>
+  401007:       mov    $0x0,%rcx
+  40100e:       mov    (%rbx,%rcx,8),%rax
+  401012:       mov    %rax,%rdi
+
+0000000000401015 <_start_loop>:
+  401015:       cmp    $0x0,%rax
+  401019:       je     40102c <_loop_exit>
+  40101b:       inc    %rcx
+  40101e:       mov    (%rbx,%rcx,8),%rax
+  401022:       cmp    %rdi,%rax
+  401025:       jle    401015 <_start_loop>
+  401027:       mov    %rax,%rdi
+  40102a:       jmp    401015 <_start_loop>
+```
+
+```
+0000000000401000 <_start>:
+  401000:       lea    rbx,[rip+0xff9]        # 402000 <data_items>
+  401007:       mov    rcx,0x0
+  40100e:       mov    rax,QWORD PTR [rbx+rcx*8]
+  401012:       mov    rdi,rax
+
+0000000000401015 <_start_loop>:
+  401015:       cmp    rax,0x0
+  401019:       je     40102c <_loop_exit>
+  40101b:       inc    rcx
+  40101e:       mov    rax,QWORD PTR [rbx+rcx*8]
+  401022:       cmp    rax,rdi
+  401025:       jle    401015 <_start_loop>
+  401027:       mov    rdi,rax
+  40102a:       jmp    401015 <_start_loop>
+```
+
+Notice that `objdump` leaves out the suffixes (`mov` instead of `movq`)
+when the registers already say the size.
 
 Where to Go for More Information {#where-to-go-for-more-information}
 --------------------------------
 
-Intel has a set of comprehensive guides to their processors. These are
-available at
-[Intel, Resource & Design Center][AB-Intel-resource] Note that all
-of these use the Intel syntax, not the AT&T syntax. The most important one is the
-[Intel® 64 and IA-32 Architectures Software Developer’s Manual Combined
-Volumes: 1, 2A, 2B, 2C, 2D, 3A, 3B, 3C, 3D, and 4][AB-Intel-manuals-volumes].
+Intel has a set of comprehensive guides to their processors, the
+[Intel® 64 and IA-32 Architectures Software Developer\'s
+Manuals][AB-Intel-manuals]. Note that all of these use the Intel syntax,
+not the AT&T syntax. Volume 2 describes every instruction, with its
+exact effect on the flags. AMD publishes the same information for its
+processors in the [AMD64 Architecture Programmer\'s Manual][AB-AMD].
+Félix Cloutier\'s [x86 and amd64 instruction reference][AB-Cloutier]
+has the pages of volume 2 on the web, one per instruction.
 
 In addition, you can find a lot of information in the manual for the
-[GNU assembler][AB-GNU-Assembler].
-Similarly, the manual for the [GNU linker][AB-GNU-Linker].
+[GNU assembler][AB-GNU-Assembler] (its section on the x86-64
+dependent features explains the AT&T syntax and the suffixes).
+Similarly, the manual for the [GNU linker][AB-GNU-Linker]. The calling
+convention and the formats of the object files are in the
+[System V AMD64 psABI][AB-ABI].
 
 
-[AB-Intel-resource]: https://www.intel.com/content/www/us/en/design/resource-design-center.html
-[AB-Intel-manuals-volumes]: https://software.intel.com/content/www/us/en/develop/download/intel-64-and-ia-32-architectures-sdm-combined-volumes-1-2a-2b-2c-2d-3a-3b-3c-3d-and-4.html
+[AB-Intel-manuals]: https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
+[AB-AMD]: https://docs.amd.com/v/u/en-US/40332-PUB_4.08
+[AB-Cloutier]: https://www.felixcloutier.com/x86/
 [AB-GNU-Assembler]: https://sourceware.org/binutils/docs/as/index.html
 [AB-GNU-Linker]: https://sourceware.org/binutils/docs/ld/index.html
-[AB-intel2gas]: http://manpages.org/intel2gas
+[AB-ABI]: https://gitlab.com/x86-psABIs/x86-64-ABI
