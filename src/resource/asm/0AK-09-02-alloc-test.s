@@ -1,4 +1,3 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
     # Link with `0AK-09-01-alloc.o` (or with
     # `009-02-alloc.o` to compare).
     #
@@ -9,57 +8,58 @@
     #       2 - Freed memory is not reused.
     #       4 - The free region was not split, so a
     #           second small request grew the heap.
+    #       8 - An address is not a multiple of 16.
     #     `0AK-09-01-alloc` returns 0; the book's
     #     manager returns 4, because it doesn't split.
     #
-    .section .data
-        failures:
-            .long 0
+    # VARIABLES:
+    #     %rbx = a, %r12 = b, %r13 = c,
+    #     %r14 = failures,
+    #     %r15 = all the addresses ORed together.
+    #
+    .section .note.GNU-stack,"",@progbits
+
+    .include "006-01-linux.s"
 
     .section .text
         .globl _start
-        # %esi = a, %edi = b, %ebx = c
-
 _start:
-    call  _allocate_init
-
-    pushl $100               # a = allocate(100)
-    call  _allocate
-    addl  $4, %esp
-    movl  %eax, %esi
-
-    pushl $100               # b = allocate(100)
-    call  _allocate
-    addl  $4, %esp
-    movl  %eax, %edi
-
-    leal  100(%esi), %eax    # Check 1: b must not
-    cmpl  %eax, %edi         # start before the end
-    jae   _check_reuse       # of a.
-    addl  $1, failures
-
-_check_reuse:
-    pushl %esi               # deallocate(a)
-    call  _deallocate
-    addl  $4, %esp
-
-    pushl $40                # c = allocate(40)
-    call  _allocate
-    addl  $4, %esp
-    movl  %eax, %ebx
-    cmpl  %esi, %ebx         # Check 2: c == a.
-    je    _check_split
-    addl  $2, failures
-
-_check_split:
-    pushl $40                # d = allocate(40)
-    call  _allocate
-    addl  $4, %esp
-    cmpl  %edi, %eax         # Check 3: d must be
-    jb    _done              # in a's old region,
-    addl  $4, failures       # below b.
-
-_done:
-    movl  $1, %eax
-    movl  failures, %ebx
-    int   $0x80
+    movq  $0, %r14
+    call  allocate_init
+    movq  $100, %rdi         # a = allocate(100)
+    call  allocate
+    movq  %rax, %rbx
+    movq  %rax, %r15
+    movq  $100, %rdi         # b = allocate(100)
+    call  allocate
+    movq  %rax, %r12
+    orq   %rax, %r15
+    leaq  100(%rbx), %rax    # Check 1: b must not
+    cmpq  %rax, %r12         # start before the end
+    jae   check_reuse        # of a.
+    addq  $1, %r14
+check_reuse:
+    movq  %rbx, %rdi         # deallocate(a)
+    call  deallocate
+    movq  $40, %rdi          # c = allocate(40)
+    call  allocate
+    movq  %rax, %r13
+    orq   %rax, %r15
+    cmpq  %rbx, %r13         # Check 2: c == a.
+    je    check_split
+    addq  $2, %r14
+check_split:
+    movq  $40, %rdi          # d = allocate(40)
+    call  allocate
+    orq   %rax, %r15
+    cmpq  %r12, %rax         # Check 3: d must be
+    jb    check_alignment    # in a's old region,
+    addq  $4, %r14           # below b.
+check_alignment:
+    testq $15, %r15          # Check 4: the lowest 4
+    jz    done               # bits of every address
+    addq  $8, %r14           # are 0.
+done:
+    movq  $SYS_EXIT, %rax
+    movq  %r14, %rdi
+    syscall

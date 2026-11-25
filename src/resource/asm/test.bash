@@ -295,10 +295,49 @@ expect_output 0AK-08-05-factorial.py \
   python3 0AK-08-05-factorial.py
 
 # ----- Chapter 9 -----
+# The memory map shows the program, the heap that brk created, the page
+# of mmap and the stack.
+MAPS="$(./009-01-memory-layout-bin)"
+for AREA in "009-01-memory-layout-bin" "[heap]" "[stack]"; do
+  if grep -qF -- "${AREA}" <<< "${MAPS}"; then
+    pass "009-01-memory-layout: ${AREA}"
+  else
+    fail "009-01-memory-layout: no ${AREA} in the map"
+  fi
+done
+# The program code starts at 0x400000 (not PIE), and its code is the
+# only executable part besides the vdso.
+if grep -q '^00400000-' <<< "${MAPS}" \
+   && [[ "$(grep -c ' r-xp .*009-01-memory-layout-bin$' <<< "${MAPS}")" \
+         == 1 ]]; then
+  pass "009-01-memory-layout: code at 0x400000, one r-xp area"
+else
+  fail "009-01-memory-layout: unexpected program areas"
+fi
+# The heap is exactly one page (4096 bytes) long.
+HEAP="$(grep -F '[heap]' <<< "${MAPS}" | cut -d ' ' -f 1)"
+if (( 0x${HEAP#*-} - 0x${HEAP%-*} == 4096 )); then
+  pass "009-01-memory-layout: heap of one page"
+else
+  fail "009-01-memory-layout: heap ${HEAP} is not one page"
+fi
+# With ASLR, the stack moves from one run to the next.
+STACK1="$(./009-01-memory-layout-bin | grep -F '[stack]')"
+STACK2="$(./009-01-memory-layout-bin | grep -F '[stack]')"
+if [[ "${STACK1}" != "${STACK2}" ]]; then
+  pass "009-01-memory-layout: the stack moves (ASLR)"
+else
+  fail "009-01-memory-layout: the stack didn't move"
+fi
+INPUT="" expect_output 009-02-read-records \
+  "$(printf 'Fredrick\nMarilyn\nDerrick')" \
+  sh -c "cd '${C8}' && cp ref.dat test.dat && '${PWD}/009-02-read-records-bin'"
 expect 0AK-09-02-alloc-test 0
 # The book's manager reuses memory but doesn't split regions (4).
 expect 0AK-09-02-alloc-test-book 4
 expect 0AK-09-03-alloc-auto-init 42
+# Without allocate_init, the book's allocate fails and returns 0.
+expect 0AK-09-03-alloc-auto-init-book 255
 
 # ----- Chapter 10 -----
 expect_output 0AK-10-02-print-numbers \

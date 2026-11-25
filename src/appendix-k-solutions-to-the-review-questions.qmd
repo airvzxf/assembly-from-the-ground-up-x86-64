@@ -1147,30 +1147,30 @@ wants.
 Chapter 9. Intermediate Memory Topics {#chapter-9.-intermediate-memory-topics-1}
 -------------------------------------
 
-A correction first. In `009-02-alloc.s`, the check for regions that are
-in use jumped to `_allocate_init` instead of to the next region, as the
-original book does. With that bug, a program that allocated memory
-three times crashed with a segmentation fault. It is fixed in this
-edition.
-
 ### Know the Concepts {#know-the-concepts-18}
 
--   **Describe the layout of memory when a Linux program starts.** In
-    this book\'s 32-bit programs: the code (`.text`) starts at address
-    `0x08048000` or a little above it, followed by the initialized data
-    (`.data`) and the zeroed data (`.bss`). The current break marks the
-    end of the program\'s data. At the top of memory, below the
-    kernel\'s area, is the stack, which holds the environment
-    variables, the command-line arguments and `ARGC` when the program
-    starts. Everything between the break and the stack is unmapped.
+-   **Describe the layout of memory when a Linux program starts.** For
+    the programs of this book (linked with `ld`, not PIE): the headers
+    of the file at `0x400000`, the code (`.text`) in the next page, and
+    then the initialized data (`.data`) and the zeroed data (`.bss`).
+    The current break marks the end of the program\'s data; with ASLR,
+    the heap starts at a random distance after it. Near the top of the
+    program\'s memory (below `0x0000800000000000`; the kernel is above)
+    is the stack, which holds the environment variables, the
+    command-line arguments, their addresses and `argc` when the program
+    starts. In between, Linux puts the vdso and the regions of `mmap`
+    and of the shared libraries. Everything else is unmapped.
+    `/proc/self/maps` shows all of it.
 
--   **What is the heap?** The memory after the end of the `.bss`
-    section that a program requests at run time (with `brk`) to store
-    data whose size isn\'t known in advance.
+-   **What is the heap?** The memory that a program requests at run
+    time to store data whose size isn\'t known in advance. Strictly,
+    it is the region after the program\'s data that grows with `brk`
+    (`[heap]` in `/proc/self/maps`); memory managers also get memory
+    from `mmap`, and the word *heap* is often used for all of it.
 
 -   **What is the current break?** The address just after the last
-    byte of the program\'s data memory. Memory beyond it is unmapped
-    until the program moves the break up with the `brk` system call.
+    byte of the heap. Memory beyond it is unmapped until the program
+    moves the break up with the `brk` system call.
 
 -   **Which direction does the stack grow in?** Down, towards lower
     addresses.
@@ -1180,12 +1180,14 @@ edition.
 
 -   **What happens when you access unmapped memory?** The processor
     can\'t translate the address, so it raises a page fault, and Linux
-    stops the program with a segmentation fault (`SIGSEGV`).
+    stops the program with a segmentation fault (`SIGSEGV`). The same
+    happens if the program writes to memory that can only be read, or
+    executes memory that is not executable.
 
 -   **How does the operating system prevent processes from writing over
     each other\'s memory?** With virtual memory. Each process has its
-    own table that maps its virtual addresses to physical memory, so
-    the same address in two processes points to different physical
+    own page tables that map its virtual addresses to physical memory,
+    so the same address in two processes points to different physical
     memory, and a process has no way to name the memory of another one.
 
 -   **Describe what happens if a piece of memory you are using is
@@ -1203,19 +1205,46 @@ edition.
     couldn\'t reuse memory that is freed in the middle of the heap. The
     allocator keeps track of which parts are free.
 
+-   **What is ASLR, and why does it make programs safer?** Address
+    space layout randomization: Linux places the stack, the heap, the
+    regions of `mmap`, the shared libraries and PIE programs at random
+    addresses, different in every run. An attack that overwrites a
+    return address or a pointer needs to know where its target is, and
+    with ASLR it can\'t simply use a fixed address.
+
+-   **What is the difference between `brk` and `mmap`?** `brk` moves
+    the end of a single region, the heap, so memory can only be given
+    back from the end. `mmap` creates a new, separate region wherever
+    Linux finds room (and can also map a file), and `munmap` returns
+    any region on its own. Memory managers use `brk` (or large `mmap`
+    blocks) for many small requests, and a separate `mmap` for each big
+    one.
+
+-   **Why does our memory manager use 16-byte headers?** So that every
+    address it returns is a multiple of 16, as with `malloc`: the heap
+    starts at a multiple of 16, the sizes are rounded up to multiples
+    of 16, and the header keeps that alignment. Instructions such as
+    `movaps` require 16-byte alignment, and the caller may use them on
+    the memory it gets.
+
 ### Use the Concepts {#use-the-concepts-18}
 
 **Make the memory manager initialize itself** and **break up regions
-that are bigger than needed.** `_allocate` now calls `_allocate_init`
-when `heap_begin` is still 0. When the chosen free region is bigger
-than the request plus a new header (plus a minimum of 8 bytes), it is
-split, and the rest becomes a new free region with its own header:
+that are bigger than needed.** `allocate` now calls `allocate_init`
+when `heap_begin` is still 0. It keeps its parameter in a local
+variable across that call, because `allocate_init` uses _%rdi_ for the
+system call. When the chosen free region is bigger than the request
+plus a new header (plus a minimum of 16 bytes), it is split, and the
+rest becomes a new free region with its own header. The sizes stay
+multiples of 16, so the new header is aligned too:
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-09-01-alloc.s}
 ```
 
 This test program checks that allocations don\'t overlap, that freed
-memory is reused, and that regions are split:
+memory is reused, that regions are split, and that every address is a
+multiple of 16 (it ORs all the addresses together and tests the lowest
+4 bits of the result):
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-09-02-alloc-test.s}
 ```
@@ -1224,14 +1253,23 @@ Linked with `0AK-09-01-alloc.o` it returns `0`; linked with the
 book\'s `009-02-alloc.o` it returns `4`, because the second request of
 40 bytes doesn\'t fit in what is left of the region. The program
 `0AK-09-03-alloc-auto-init.s` allocates memory without calling
-`_allocate_init`, writes 42 to it and returns that value.
+`allocate_init`, writes 42 to it and returns that value:
+
+```{.gnuassembler .numberLines include=resource/asm/0AK-09-03-alloc-auto-init.s}
+```
+
+Linked with the book\'s `009-02-alloc.o`, it returns 255: without
+`allocate_init`, `heap_begin` and `current_break` are 0, so `allocate`
+asks `brk` to put the break at address 32, Linux refuses and returns the
+real break, and `allocate` sees the error and returns 0.
 
 **Use the memory manager to get buffer memory instead of the
 `.bss`.** The book already does this in `009-02-read-records.s`, which
-gets the record buffer with `_allocate`. The same change works for the
-buffer of `005-01-toupper`: call `_allocate` with `BUFFER_SIZE` at the
-start, keep the returned address in a register or a local variable,
-use it instead of `$BUFFER_DATA`, and call `_deallocate` at the end.
+gets the record buffer with `allocate`. The same change works for the
+buffer of `005-01-toupper`: call `allocate` with `BUFFER_SIZE` at the
+start, keep the returned address in a callee-saved register (such as
+_%rbx_) or a local variable, use it instead of
+`leaq BUFFER_DATA(%rip)`, and call `deallocate` at the end.
 
 ### Going Further {#going-further-18}
 
@@ -1241,26 +1279,31 @@ use it instead of `$BUFFER_DATA`, and call `_deallocate` at the end.
     use of memory after it was freed, and simpler code. Disadvantages:
     it uses extra memory and processor time, it may pause the program
     at unpredictable moments, and the program doesn\'t control when
-    memory is released.
+    memory is released. Java, Go and JavaScript use one; Python uses
+    one only for the cycles that reference counting can\'t free.
 
 -   **Research reference counting.** Each block keeps a count of the
     pointers to it, and is freed when the count reaches 0. Advantages:
     memory is released as soon as it is no longer used, at predictable
     times, with no long pauses. Disadvantages: every pointer copy has
     to update the count, the count uses memory, and blocks that point
-    to each other (cycles) are never freed.
+    to each other (cycles) are never freed. Python objects work this
+    way, and so do Rust\'s `Rc` and `Arc`. Most Rust values need
+    neither: the compiler knows which variable owns each block, and
+    frees it when the owner goes out of scope.
 
 -   **Rename the functions to `malloc` and `free`, build them into a
     shared library and use it with `LD_PRELOAD`.** This exercise is
     yours, and it is harder than it looks. Besides the names, the C
     library expects `calloc`, `realloc` and `free(NULL)` to work, and
-    `malloc` to return memory aligned to 16 bytes on 32-bit Linux; it
-    may also call `malloc` before your library is ready. Programs that
-    use `brk` themselves, or other threads, would corrupt this simple
-    heap. Start with a small 32-bit C program of your own that only
-    calls `malloc` and `free`, and use the technique of
-    `0AK-08-04-exit-message.s` to reach your data from a shared
-    library.
+    `malloc` to return memory aligned to 16 bytes (ours already does);
+    it may also call `malloc` before your library is ready. Programs
+    that use `brk` themselves, or several threads, would corrupt this
+    simple heap. Start with a small program of your own that only calls
+    `malloc` and `free` (a Python program with `ctypes`, like the ones
+    of Chapter 8, is enough), and remember from Chapter 8 that the
+    variables of a shared library must be local and reached relative to
+    _%rip_, or through the GOT.
 
 Chapter 10. Counting Like a Computer {#chapter-10.-counting-like-a-computer}
 ------------------------------------
