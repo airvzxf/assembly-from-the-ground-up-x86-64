@@ -1,39 +1,34 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
+    .section .note.GNU-stack,"",@progbits
+
     .include "006-01-linux.s"      # Linux Definitions.
 
     .section .data          # This is where it will be
-        tmp_buffer:         # stored.
-            .ascii "\0\0\0\0\0\0\0\0\0\0\0"
+        tmp_buffer:         # stored: 21 bytes, enough
+            .fill 21, 1, 0  # for any 64-bit number.
 
     .section .text
         .globl _start
 
 _start:
-    movl  %esp, %ebp
+    movq  $824, %rdi        # Number to convert.
+    leaq  tmp_buffer(%rip), %rsi
+                            # Storage for the result.
+    call  integer2string
 
-    pushl $tmp_buffer       # Storage for the result.
-    pushl $824              # Number to convert.
-    call  _integer2string
-    addl  $8, %esp
+    leaq  tmp_buffer(%rip), %rdi
+                            # Get the character count
+    call  count_chars       # for our system call.
 
-    pushl $tmp_buffer       # Get the character count
-                            # for our system call.
-    call  _count_chars
-    addl  $4, %esp
-
-    movl  %eax, %edx        # The count goes in %edx
+    movq  %rax, %rdx        # The count goes in %rdx
                             # for SYS_WRITE.
+    movq  $SYS_WRITE, %rax  # Make the system call.
+    movq  $STDOUT, %rdi
+    leaq  tmp_buffer(%rip), %rsi
+    syscall
 
-    movl  $SYS_WRITE, %eax  # Make the system call.
-    movl  $STDOUT, %ebx
-    movl  $tmp_buffer, %ecx
+    movq  $STDOUT, %rdi     # Write a newline.
+    call  write_newline
 
-    int   $LINUX_SYSCALL
-
-    pushl $STDOUT           # Write a carriage return.
-    call  _write_newline
-
-    movl  $SYS_EXIT, %eax   # Exit.
-    movl  $0, %ebx
-    int   $LINUX_SYSCALL
+    movq  $SYS_EXIT, %rax   # Exit.
+    movq  $0, %rdi
+    syscall

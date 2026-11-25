@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
 # Clean up previous files
-rm -f ./*.o legacy32/*.o
+rm -f ./*.o
 rm -f ./*-bin
 rm -f ./*.so .gdb_history heynow.txt
 
@@ -155,6 +155,14 @@ link64 009-01-memory-layout 009-01-memory-layout.o
 link64 009-02-read-records 009-02-read-records.o 009-02-alloc.o \
   006-01-read-record.o 006-01-count-chars.o 006-01-write-newline.o
 
+# ----- Chapter 10 -----
+assemble64 010-01-shift-bit 010-02-integer-to-string \
+  010-02-conversion-program 010-03-floating-point
+link64 010-01-shift-bit 010-01-shift-bit.o
+link64 010-02-conversion-program 010-02-conversion-program.o \
+  010-02-integer-to-string.o 006-01-count-chars.o 006-01-write-newline.o
+link64 010-03-floating-point 010-03-floating-point.o "${LIBC[@]}"
+
 # ----- Appendix K, Chapters 3 and 4 -----
 for SOURCE in 0AK-03-*.s 0AK-04-*.s; do
   assemble64 "${SOURCE%.s}"
@@ -214,115 +222,41 @@ link64 0AK-09-03-alloc-auto-init 0AK-09-03-alloc-auto-init.o \
 link64 0AK-09-03-alloc-auto-init-book 0AK-09-03-alloc-auto-init.o \
   009-02-alloc.o
 
+# ----- Appendix K, Chapter 10 -----
+for SOURCE in 0AK-10-*.s; do
+  assemble64 "${SOURCE%.s}"
+done
+link64 0AK-10-02-print-numbers 0AK-10-02-print-numbers.o \
+  0AK-10-01-integer2string-base.o 0AK-08-01-factorial-lib.o \
+  006-01-write-newline.o
+link64 0AK-10-03-is-negative 0AK-10-03-is-negative.o
+link64 0AK-10-04-number2integer 0AK-10-04-number2integer.o \
+  0AK-10-01-integer2string-base.o 006-01-write-newline.o
+link64 0AK-10-05-likes 0AK-10-05-likes.o
+link64 0AK-10-06-celsius 0AK-10-06-celsius.o "${LIBC[@]}"
+
 echo ""
 
 # =====================================================
 # 32-bit programs inherited from the x86 32-bit edition.
 # =====================================================
 # Each chapter of the x86-64 edition removes its programs from here.
-#
-# legacy32/ holds the 32-bit versions of the files that are already
-# 64-bit but that these programs still need (for example
-# 006-01-linux.s and 006-01-count-chars.s). The 32-bit sources are
-# assembled from inside legacy32/, because `as` looks for the files of
-# `.include` in the current directory first: there it finds the 32-bit
-# definitions. legacy32/ is deleted when the last 32-bit program goes.
+# Only the GNOME example of Appendix A is left; as before, it is only
+# assembled, not linked.
 
-# as32 <name>: assemble ../<name>.s (a source of this directory) into
-# <name>.o, from inside legacy32/.
-as32() {
-  echo "Assembling (32-bit): $1"
-  (cd legacy32 && as --32 --gstabs+ -o "../$1.o" "../$1.s")
-}
-
-# The 32-bit copies of the files that are 64-bit now.
-for SOURCE in legacy32/*.s; do
-  NAME="$(basename "${SOURCE%.s}")"
-  case "${NAME}" in
-    006-01-linux) continue ;;  # Included.
-  esac
-  echo "Assembling (32-bit): legacy32/${NAME}"
-  (cd legacy32 && as --32 --gstabs+ -o "${NAME}.o" "${NAME}.s")
-done
-
-# -----------------------------------------------------
-# Compile all the files.
-# -----------------------------------------------------
-
-FILES=(
-  010-01-shift-bit
-  010-02-conversion-program
-  010-02-integer-to-string
-  0AA-01-gnome-example
-)
-
-for FILE in "${FILES[@]}"
-do
-    as32 "${FILE}"
-done
+echo "Assembling (32-bit): 0AA-01-gnome-example"
+as --32 --gstabs+ -o 0AA-01-gnome-example.o 0AA-01-gnome-example.s
 
 echo ""
 
-# -----------------------------------------------------
-# Link the generic files.
-# -----------------------------------------------------
+# =====================================================
+# C programs (Chapter 11 and its solutions).
+# =====================================================
 
-GENERIC_FILES=(
-  010-01-shift-bit
-)
-
-for FILE in "${GENERIC_FILES[@]}"
-do
-    echo "Linking #1: ${FILE}"
-    ld -o "${FILE}-bin" "${FILE}.o" -m elf_i386
-done
-
-echo ""
-
-# -----------------------------------------------------
-# Linked special files.
-# -----------------------------------------------------
-
-echo "Linking #2: 010-02-conversion-program"
-ld -o "010-02-conversion-program-bin" -m elf_i386 \
-  "legacy32/006-01-count-chars.o" \
-  "legacy32/006-01-write-newline.o" \
-  "010-02-conversion-program.o" \
-  "010-02-integer-to-string.o"
-
-echo ""
-
-echo "Linking #3: 011-01-hello-world-c"
-gcc -o "011-01-hello-world-c-bin" "011-01-hello-world.c"
-
-# -----------------------------------------------------
-# Solutions to the review questions (Appendix K).
-# -----------------------------------------------------
-
-for SOURCE in 0AK-*.s
-do
-    [[ "${SOURCE}" == 0AK-0[3-9]-* ]] && continue  # 64-bit.
-    as32 "${SOURCE%.s}"
-done
-
-# Link a solution: link_solution <program> [extra objects/options...]
-link_solution() {
-    local PROGRAM="$1"
-    shift
-    echo "Linking #4: ${PROGRAM}"
-    ld -o "${PROGRAM}-bin" -m elf_i386 "${PROGRAM}.o" "$@"
-}
-
-link_solution 0AK-10-02-print-numbers 0AK-10-01-integer2string-base.o \
-  legacy32/0AK-08-01-factorial-lib.o legacy32/006-01-write-newline.o
-link_solution 0AK-10-03-is-negative
-link_solution 0AK-10-04-number2integer \
-  0AK-10-01-integer2string-base.o legacy32/006-01-write-newline.o
-link_solution 0AK-10-05-likes
-
-echo "Linking #4: 0AK-11-01-maximum-c"
+echo "Compiling (C): 011-01-hello-world-c"
+gcc -o 011-01-hello-world-c-bin 011-01-hello-world.c
+echo "Compiling (C): 0AK-11-01-maximum-c"
 gcc -o 0AK-11-01-maximum-c-bin 0AK-11-01-maximum.c
-
 
 echo ""
 

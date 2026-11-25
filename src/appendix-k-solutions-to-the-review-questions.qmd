@@ -1333,10 +1333,11 @@ Chapter 10. Counting Like a Computer {#chapter-10.-counting-like-a-computer}
     the rest: AND with a mask keeps only the bits that are 1 in the
     mask, OR with a mask sets them, and XOR inverts them.
 
--   **What flags would you use for `open` to write a file, creating it
-    if it doesn\'t exist?** `O_WRONLY | O_CREAT`, which is **0101** in
-    octal (65 in decimal). Add `O_TRUNC` (01000) to also empty an
-    existing file: `01101`.
+-   **What flags would you use for `openat` to write a file, creating
+    it if it doesn\'t exist?** `O_WRONLY | O_CREAT`, which is **0101**
+    in octal (65 in decimal). Add `O_TRUNC` (01000) to also empty an
+    existing file: `01101`, the value that the programs of this book
+    use.
 
 -   **How would you represent -55 in a 32-bit register?** In
     two\'s complement: **0xFFFFFFC9**, that is
@@ -1346,28 +1347,50 @@ Chapter 10. Counting Like a Computer {#chapter-10.-counting-like-a-computer}
     the sign bit (1) into all the new bits: **0xFFFFFFFFFFFFFFC9**.
 
 -   **Describe the difference between little-endian and big-endian
-    storage of words.** Little-endian processors, like x86, store the
-    least significant byte of a word at the lowest address; big-endian
-    processors store the most significant byte first. The number
-    0x12345678 is stored as the bytes `78 56 34 12` on x86 and as
-    `12 34 56 78` on a big-endian machine.
+    storage of words.** Little-endian processors, like x86-64, store
+    the least significant byte of a number at the lowest address;
+    big-endian processors store the most significant byte first. The
+    32-bit number 0x12345678 is stored as the bytes `78 56 34 12` on
+    x86-64 and as `12 34 56 78` on a big-endian machine.
+
+-   **What does `movl $5, %eax` do to the upper half of _%rax_? And
+    `movw $5, %ax`?** `movl` writes a 32-bit register, so it also sets
+    the upper 32 bits of _%rax_ to 0: _%rax_ becomes 5. `movw` writes a
+    16-bit register and leaves the other 48 bits of _%rax_ unchanged.
+
+-   **Why must _%rdx_ be set before `divq` or `idivq`, and to what?**
+    Both divide the 128-bit number in _%rdx_:_%rax_. To divide the
+    64-bit number in _%rax_, _%rdx_ must be 0 for `divq` (unsigned), and
+    the sign extension of _%rax_ for `idivq` (signed), which `cqto`
+    produces. With anything else in _%rdx_, the result is wrong, or the
+    quotient doesn\'t fit in 64 bits and the program stops with
+    `SIGFPE`.
+
+-   **Where does a function receive its `double` parameters, and where
+    does it return a `double`?** The first eight floating-point
+    parameters go in _%xmm0_ to _%xmm7_, in order, and the result comes
+    back in _%xmm0_.
 
 ### Use the Concepts {#use-the-concepts-19}
 
 **Make the conversion base a parameter, and support bases greater than
-10.** This version of `_integer2string` takes the base as its third
-parameter and uses a table of digits, so bases from 2 to 36 work. It
-also returns the length of the text in _%eax_ and preserves the
-registers that the calling convention says it must, which the book\'s
-version doesn\'t do with _%edi_:
+10.** This version of `integer2string` takes the base as its third
+parameter (in _%rdx_, which it moves to _%r8_ because `divq` needs
+_%rdx_) and uses a table of digits, so bases from 2 to 36 work. It also
+returns the length of the text in _%rax_. In base 2, a 64-bit number can
+have 64 digits, so the buffer needs 65 bytes. The table is reached
+relative to _%rip_, and `movzbq (%r9,%rdx), %rdx` reads the digit whose
+index is the remainder:
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-10-01-integer2string-base.s}
 ```
 
 **Print the results of previous programs instead of returning them in
 the exit status**, and **return results in octal.** This program prints
-the factorial of 5, the factorial of 10 (which doesn\'t fit in an exit
-status code) and 255 in octal, hexadecimal, binary and base 36:
+the factorial of 5, the factorials of 10 and 20 (which don\'t fit in an
+exit status code) and 255 in octal, hexadecimal, binary and base 36. It
+links the `factorial` function of Chapter 8\'s solution,
+`0AK-08-01-factorial-lib.o`, directly into the program:
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-10-02-print-numbers.s}
 ```
@@ -1377,14 +1400,15 @@ It prints:
 ```
 120
 3628800
+2432902008176640000
 377
 ff
 11111111
 73
 ```
 
-**Write a function called `_is_negative`.** The sign bit is bit 31, so
-shifting the number 31 places to the right leaves 1 for negative
+**Write a function called `is_negative`.** The sign bit is bit 63, so
+shifting the number 63 places to the right leaves 1 for negative
 numbers and 0 for the rest:
 
 ```{.gnuassembler .numberLines include=resource/asm/0AK-10-03-is-negative.s}
@@ -1392,27 +1416,51 @@ numbers and 0 for the rest:
 
 It returns `100`.
 
+**Convert Fahrenheit to Celsius with SSE2.** The function receives the
+temperature in _%xmm0_ and returns the result there; it doesn\'t need a
+stack frame because it calls nothing. The program keeps its position in
+the table in _%rbx_ and _%r12_, which `celsius` and `printf` preserve,
+and passes two `double`s to `printf`, so _%al_ is 2:
+
+```{.gnuassembler .numberLines include=resource/asm/0AK-10-06-celsius.s}
+```
+
+It prints:
+
+```
+-40.0 F = -40.0 C
+32.0 F = 0.0 C
+98.6 F = 37.0 C
+212.0 F = 100.0 C
+```
+
 ### Going Further {#going-further-19}
 
 -   **Bases greater than 10.** See `0AK-10-01-integer2string-base.s`
     above.
 
--   **Write `_number2integer`**, and **read a number from STDIN and
+-   **Write `number2integer`**, and **read a number from STDIN and
     convert it.** The function multiplies the result by 10 and adds
     each digit, until it finds a character that is not a digit. It
     accepts a minus sign. The program prints the result back with
-    `_integer2string_base`, to check it:
+    `integer2string_base`, to check it:
 
     ```{.gnuassembler .numberLines include=resource/asm/0AK-10-04-number2integer.s}
     ```
 
     `echo -0042 | ./0AK-10-04-number2integer` prints `-42`, and the
-    limits `2147483647` and `-2147483648` come back unchanged.
+    limits `9223372036854775807` and `-9223372036854775808` come back
+    unchanged. The second one is a special case: `negq` of -2^63 gives
+    -2^63 again, because 2^63 doesn\'t fit in a signed 64-bit number,
+    but `integer2string_base` reads it as unsigned, and as an unsigned
+    number the bits are exactly 2^63, so the program prints the right
+    digits.
 
--   **Store likes and dislikes in a single machine word and compare
-    two of them.** The low 16 bits are the likes and the high 16 bits
-    the dislikes. An AND of the two words keeps what they have in
-    common:
+-   **Store likes and dislikes in a single register-sized number and
+    compare two of them.** The low 32 bits are the likes and the high
+    32 bits the dislikes. An AND of the two numbers keeps what they
+    have in common. `movl %ebx, %edi` keeps only the likes, because
+    writing a 32-bit register clears the upper half:
 
     ```{.gnuassembler .numberLines include=resource/asm/0AK-10-05-likes.s}
     ```

@@ -340,17 +340,30 @@ expect 0AK-09-03-alloc-auto-init 42
 expect 0AK-09-03-alloc-auto-init-book 255
 
 # ----- Chapter 10 -----
+expect_output 010-01-shift-bit "He likes dressy clothes." \
+  ./010-01-shift-bit-bin
+expect_output 010-02-conversion-program 824 ./010-02-conversion-program-bin
+expect_output 010-03-floating-point \
+  "$(printf '%s\n' '16777216 + 1 = 16777216.0 (float)' \
+     '16777216 + 1 = 16777217.0 (double)' \
+     '0.1 + 0.2 = 0.30000000000000004' '7 / 2 = 3.5, truncated to 3')" \
+  ./010-03-floating-point-bin
 expect_output 0AK-10-02-print-numbers \
-  "$(printf '120\n3628800\n377\nff\n11111111\n73')" \
+  "$(printf '%s\n' 120 3628800 2432902008176640000 377 ff 11111111 73)" \
   ./0AK-10-02-print-numbers-bin
 expect 0AK-10-03-is-negative 100
 for CASE in "1234:1234" "-56:-56" "007:7" "0:0" "42abc:42" \
-            "2147483647:2147483647" "-2147483648:-2147483648"; do
+            "9223372036854775807:9223372036854775807" \
+            "-9223372036854775808:-9223372036854775808"; do
   INPUT="${CASE%%:*}"$'\n' expect_output \
     "0AK-10-04-number2integer (${CASE%%:*})" "${CASE#*:}" \
     ./0AK-10-04-number2integer-bin
 done
 expect 0AK-10-05-likes 21
+expect_output 0AK-10-06-celsius \
+  "$(printf '%s\n' '-40.0 F = -40.0 C' '32.0 F = 0.0 C' \
+     '98.6 F = 37.0 C' '212.0 F = 100.0 C')" \
+  ./0AK-10-06-celsius-bin
 
 # ----- Chapter 11 -----
 expect 0AK-11-01-maximum-c 222

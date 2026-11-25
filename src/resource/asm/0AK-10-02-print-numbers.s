@@ -1,4 +1,3 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
     # Link with `0AK-10-01-integer2string-base.o`,
     # `0AK-08-01-factorial-lib.o` and
     # `006-01-write-newline.o`.
@@ -7,93 +6,88 @@
     #     Solution to Chapter 10, "Use the Concepts":
     #     print a result instead of returning it as
     #     the exit status (the factorial of 5, which
-    #     no longer has the 255 limit: 10! works too),
-    #     and print 255 in several bases.
+    #     no longer has the 255 limit: 10! and 20!
+    #     work too), and print 255 in several bases.
     #
     # OUTPUT:
     #     120
     #     3628800
+    #     2432902008176640000
     #     377
     #     ff
     #     11111111
     #     73
     #
+    .section .note.GNU-stack,"",@progbits
+
     .include "006-01-linux.s"
 
     .section .bss
-        .lcomm buffer, 33
+        .lcomm buffer, 65
 
     .section .text
         .globl _start
-
 _start:
-    pushl $5                 # 5!
-    call  _factorial
-    addl  $4, %esp
-    pushl $10                # In base 10.
-    pushl %eax
-    call  _print_number
-    addl  $8, %esp
+    movq  $5, %rdi           # 5!
+    call  factorial
+    movq  %rax, %rdi         # In base 10.
+    movq  $10, %rsi
+    call  print_number
 
-    pushl $10                # 10! = 3628800, too
-    call  _factorial         # big for an exit
-    addl  $4, %esp           # status code.
-    pushl $10
-    pushl %eax
-    call  _print_number
-    addl  $8, %esp
+    movq  $10, %rdi          # 10! = 3628800, too
+    call  factorial          # big for an exit
+    movq  %rax, %rdi         # status code.
+    movq  $10, %rsi
+    call  print_number
 
-    pushl $8                 # 255 in octal,
-    pushl $255
-    call  _print_number
-    addl  $8, %esp
-    pushl $16                # hexadecimal,
-    pushl $255
-    call  _print_number
-    addl  $8, %esp
-    pushl $2                 # binary
-    pushl $255
-    call  _print_number
-    addl  $8, %esp
-    pushl $36                # and base 36.
-    pushl $255
-    call  _print_number
-    addl  $8, %esp
+    movq  $20, %rdi          # 20!, the biggest that
+    call  factorial          # fits in 64 bits.
+    movq  %rax, %rdi
+    movq  $10, %rsi
+    call  print_number
 
-    movl  $SYS_EXIT, %eax
-    movl  $0, %ebx
-    int   $LINUX_SYSCALL
+    movq  $255, %rdi         # 255 in octal,
+    movq  $8, %rsi
+    call  print_number
+    movq  $255, %rdi         # hexadecimal,
+    movq  $16, %rsi
+    call  print_number
+    movq  $255, %rdi         # binary
+    movq  $2, %rsi
+    call  print_number
+    movq  $255, %rdi         # and base 36.
+    movq  $36, %rsi
+    call  print_number
+
+    movq  $SYS_EXIT, %rax
+    movq  $0, %rdi
+    syscall
 
     # PURPOSE:
     #     Print a number in a base and a newline.
     #
     # INPUT:
-    #     First argument  - The number.
-    #     Second argument - The base.
+    #     %rdi - The number.
+    #     %rsi - The base.
     #
-        .type _print_number, @function
-_print_number:
-    pushl %ebp
-    movl  %esp, %ebp
-    pushl %ebx
+        .type print_number, @function
+print_number:
+    pushq %rbp
+    movq  %rsp, %rbp
 
-    pushl 12(%ebp)           # Base.
-    pushl $buffer
-    pushl 8(%ebp)            # Number.
-    call  _integer2string_base
-    addl  $12, %esp
+    movq  %rsi, %rdx         # integer2string_base(
+    leaq  buffer(%rip), %rsi #   number, buffer,
+    call  integer2string_base  # base)
 
-    movl  %eax, %edx         # Length.
-    movl  $SYS_WRITE, %eax
-    movl  $STDOUT, %ebx
-    movl  $buffer, %ecx
-    int   $LINUX_SYSCALL
+    movq  %rax, %rdx         # Length.
+    movq  $SYS_WRITE, %rax
+    movq  $STDOUT, %rdi
+    leaq  buffer(%rip), %rsi
+    syscall
 
-    pushl $STDOUT
-    call  _write_newline
-    addl  $4, %esp
+    movq  $STDOUT, %rdi
+    call  write_newline
 
-    popl  %ebx
-    movl  %ebp, %esp
-    popl  %ebp
+    movq  %rbp, %rsp
+    popq  %rbp
     ret
