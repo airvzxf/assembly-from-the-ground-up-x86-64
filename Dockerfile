@@ -1,5 +1,6 @@
-# Build environment for the book (Quarto) and the 32-bit assembly
-# examples (gcc-multilib). Versions are pinned in scripts/install-deps.bash.
+# Build environment for the book (Quarto), the assembly examples, Rust
+# (Chapter 8) and the 32-bit examples (gcc-multilib). Versions are pinned
+# in scripts/install-deps.bash.
 #
 #   podman build -t pgu-book .
 #   podman run --rm -v "$PWD:/data:Z" pgu-book -c 'bash src/make.bash'

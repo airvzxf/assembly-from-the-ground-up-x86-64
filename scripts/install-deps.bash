@@ -3,11 +3,14 @@
 #
 # Used by the Dockerfile and by the GitHub Actions workflow so both build
 # with exactly the same versions. Quarto (which includes Pandoc and Typst)
-# comes from its official GitHub release and is verified by SHA-256.
+# comes from its official GitHub release, and Rust (rustc and its standard
+# library, used by the examples of Chapter 8) from static.rust-lang.org.
+# Both are verified by SHA-256.
 #
 # Usage:
-#   sudo bash scripts/install-deps.bash         System packages (apt) and
-#                                               Quarto in /opt/quarto.
+#   sudo bash scripts/install-deps.bash         System packages (apt),
+#                                               Quarto in /opt/quarto and
+#                                               Rust in /opt/rust.
 #   bash scripts/install-deps.bash --user       Only Quarto, in
 #                                               ~/.local/quarto, without
 #                                               root (used by Cloudflare
@@ -22,6 +25,13 @@ fi
 
 QUARTO_VERSION="1.11.9"
 QUARTO_SHA256="9d037baa3b38ffac7217edca1d2e53760b0fab4d5749220740a32056e03a1530"
+# The SHA-256 values come from the release manifest,
+# https://static.rust-lang.org/dist/channel-rust-<version>.toml.
+RUST_VERSION="1.100.0"
+RUST_DATE="2026-11-12"
+RUSTC_SHA256="f1d0b1dec81dab6f523cd098507763487b0d4bd7fd2c87582f154128719be03b"
+RUST_STD_SHA256="4591b6486594ded52ecd6135db95bf9355bbd3ca7a380888b141528bbcf9a5d4"
+RUST_DIR="/opt/rust"
 if [[ "${USER_MODE}" == 1 ]]; then
   PREFIX="${PREFIX:-${HOME}/.local}"
   QUARTO_DIR="${PREFIX}/quarto"
@@ -65,3 +75,22 @@ tar -xzf "${QUARTO_TGZ}" -C "${QUARTO_DIR}" --strip-components=1
 ln -sf "${QUARTO_DIR}/bin/quarto" "${PREFIX}/bin/quarto"
 
 "${PREFIX}/bin/quarto" --version
+
+# Rust: only the compiler and the standard library (no cargo), enough for
+# `rustc` to build the examples. Not needed in --user mode, which only
+# builds the book.
+if [[ "${USER_MODE}" == 0 ]]; then
+  RUST_TARGET="x86_64-unknown-linux-gnu"
+  rm -rf "${RUST_DIR}"
+  for COMPONENT in rustc:"${RUSTC_SHA256}" rust-std:"${RUST_STD_SHA256}"; do
+    NAME="${COMPONENT%%:*}-${RUST_VERSION}-${RUST_TARGET}"
+    download \
+      "https://static.rust-lang.org/dist/${RUST_DATE}/${NAME}.tar.xz" \
+      "${COMPONENT#*:}" "${TMP_DIR}/${NAME}.tar.xz"
+    tar -xJf "${TMP_DIR}/${NAME}.tar.xz" -C "${TMP_DIR}"
+    bash "${TMP_DIR}/${NAME}/install.sh" --prefix="${RUST_DIR}" \
+      --disable-ldconfig >/dev/null
+  done
+  ln -sf "${RUST_DIR}/bin/rustc" "${PREFIX}/bin/rustc"
+  "${PREFIX}/bin/rustc" --version
+fi

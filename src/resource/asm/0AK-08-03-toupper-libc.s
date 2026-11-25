@@ -1,6 +1,5 @@
-    # Assemble with `as --32`. Link with
-    # `0AK-05-00-convert-to-upper.o` and the C
-    # library (see `make.bash`).
+    # Link with `0AK-05-00-convert-to-upper.o` and
+    # the C library (see `make.bash`).
     #
     # PURPOSE:
     #     Solution to Chapter 8, "Use the Concepts":
@@ -12,10 +11,17 @@
     #     ./0AK-08-03-toupper-libc input.txt output.txt
     #
     # NOTES:
-    #     The C library functions preserve %ebx,
-    #     %esi, %edi and %ebp, so the FILE pointers
-    #     are kept in %esi and %edi.
+    #     The C library functions preserve %rbx, %rbp
+    #     and %r12 to %r15, so the FILE pointers are
+    #     kept in %rbx and %r12, and the number of
+    #     bytes read in %r13. No instruction pushes
+    #     anything, so %rsp stays a multiple of 16, as
+    #     it was when the program started.
+    #     `stderr` is a variable of the C library: its
+    #     address is in the GOT (see the solution).
     #
+    .section .note.GNU-stack,"",@progbits
+
     .section .data
         mode_read:
             .ascii "r\0"
@@ -30,66 +36,63 @@
 
     .section .text
         .globl _start
-        .equ ST_ARGV_1, 8
-        .equ ST_ARGV_2, 12
+        .equ ST_ARGC,   0
+        .equ ST_ARGV_1, 16
+        .equ ST_ARGV_2, 24
 
 _start:
-    movl  %esp, %ebp
+    movq  %rsp, %rbp
+    cmpq  $3, ST_ARGC(%rbp)  # Program name and two
+    jne   error              # file names.
 
-    pushl $mode_read         # fopen(argv[1], "r")
-    pushl ST_ARGV_1(%ebp)
-    call  fopen
-    addl  $8, %esp
-    movl  %eax, %esi         # FILE * or NULL.
+    movq  ST_ARGV_1(%rbp), %rdi  # fopen(argv[1], "r")
+    leaq  mode_read(%rip), %rsi
+    call  fopen@PLT
+    movq  %rax, %rbx         # FILE * or NULL.
 
-    pushl $mode_write        # fopen(argv[2], "w")
-    pushl ST_ARGV_2(%ebp)
-    call  fopen
-    addl  $8, %esp
-    movl  %eax, %edi
+    movq  ST_ARGV_2(%rbp), %rdi  # fopen(argv[2], "w")
+    leaq  mode_write(%rip), %rsi
+    call  fopen@PLT
+    movq  %rax, %r12
 
-    cmpl  $0, %esi           # NULL means error.
-    je    _error
-    cmpl  $0, %edi
-    je    _error
+    cmpq  $0, %rbx           # NULL means error.
+    je    error
+    cmpq  $0, %r12
+    je    error
 
-_read_loop:
-    pushl %esi               # fread(buffer, 1,
-    pushl $BUFFER_SIZE       #       size, in)
-    pushl $1
-    pushl $BUFFER_DATA
-    call  fread
-    addl  $16, %esp
-    cmpl  $0, %eax           # 0 = end of file or
-    je    _close_files       # error.
-    movl  %eax, %ebx         # Bytes read.
+read_loop:
+    leaq  BUFFER_DATA(%rip), %rdi  # fread(buffer, 1,
+    movq  $1, %rsi                 #       size, in)
+    movq  $BUFFER_SIZE, %rdx
+    movq  %rbx, %rcx
+    call  fread@PLT
+    cmpq  $0, %rax           # 0 = end of file or
+    je    close_files        # error.
+    movq  %rax, %r13         # Bytes read.
 
-    pushl $BUFFER_DATA
-    pushl %ebx
-    call  _convert_to_upper
-    addl  $8, %esp
+    leaq  BUFFER_DATA(%rip), %rdi
+    movq  %r13, %rsi
+    call  convert_to_upper
 
-    pushl %edi               # fwrite(buffer, 1,
-    pushl %ebx               #        count, out)
-    pushl $1
-    pushl $BUFFER_DATA
-    call  fwrite
-    addl  $16, %esp
-    jmp   _read_loop
+    leaq  BUFFER_DATA(%rip), %rdi  # fwrite(buffer, 1,
+    movq  $1, %rsi                 #     count, out)
+    movq  %r13, %rdx
+    movq  %r12, %rcx
+    call  fwrite@PLT
+    jmp   read_loop
 
-_close_files:
-    pushl %edi
-    call  fclose
-    addl  $4, %esp
-    pushl %esi
-    call  fclose
-    addl  $4, %esp
-    pushl $0
-    call  exit
+close_files:
+    movq  %r12, %rdi
+    call  fclose@PLT
+    movq  %rbx, %rdi
+    call  fclose@PLT
+    movq  $0, %rdi
+    call  exit@PLT
 
-_error:
-    pushl $msg_error         # printf(msg_error)
-    call  printf
-    addl  $4, %esp
-    pushl $1
-    call  exit
+error:
+    leaq  msg_error(%rip), %rdi  # fputs(msg_error,
+    movq  stderr@GOTPCREL(%rip), %rsi  #   stderr)
+    movq  (%rsi), %rsi
+    call  fputs@PLT
+    movq  $1, %rdi
+    call  exit@PLT

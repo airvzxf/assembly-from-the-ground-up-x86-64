@@ -1,9 +1,9 @@
-    # Assemble with `as --32` and `ld -m elf_i386`.
-    #
     # PURPOSE:
     #     This program writes the message "hello world"
-    #     and exits.
+    #     and exits, using the C library.
     #
+    .section .note.GNU-stack,"",@progbits
+
     .section .data
         helloworld:
             .ascii "hello world\n\0"
@@ -12,8 +12,9 @@
         .globl _start
 
 _start:
-    pushl $helloworld
-    call  printf
+    leaq  helloworld(%rip), %rdi
+    movq  $0, %rax          # No vector registers.
+    call  printf@PLT
 
-    pushl $0
-    call  exit
+    movq  $0, %rdi
+    call  exit@PLT

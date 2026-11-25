@@ -36,7 +36,7 @@ for a specific type of task, and add in your program-specific details.
 The third option is the one that is used the most often. The third
 option includes having a central repository of shared code. Then,
 instead of each program wasting space storing the same copies of
-functions, they can simply point to the *dynamic libraries*
+functions, they can simply point to the *shared libraries*
 which contain the functions they need. If a
 bug is found in one of these functions, it only has to be fixed within
 the single function library file, and all applications which use it are
@@ -55,16 +55,26 @@ creates some dependency problems, including:
     program depended on, it could cause that application to cease
     functioning.
 
-These problems are what lead to what is known as \"DLL hell\". However,
-it is generally assumed that the advantages outweigh the disadvantages.
+These problems are what lead to what is known as \"DLL hell\". Linux
+distributions solve most of them with package managers, which know
+which programs need which libraries, and with version numbers in the
+names of the libraries, as we will see. It is generally assumed that the
+advantages outweigh the disadvantages.
 
 In programming, these shared code files are referred to as *shared
 libraries*, *dynamic libraries*, *shared objects*, *dynamic-link
 libraries*, *DLLs*, or *.so files*.[^8-1] We will refer to all of
-these as *dynamic libraries*.
+these as *shared libraries*.
 
-Using a Dynamic Library {#using-a-dynamic-library}
------------------------
+This chapter uses the C library, the shared library that almost every
+Linux program uses, and then builds shared libraries of our own. At the
+end, we call our assembly functions from Rust and from Python. That is
+the real reason to follow the calling convention of
+[Chapter 4. All About Functions](04-all-about-functions.qmd#chapter-4-all-about-functions)
+so carefully: any language that knows the convention can use our code.
+
+Using a Shared Library {#using-a-shared-library}
+----------------------
 
 The program we will examine here is simple - it writes the characters
 `hello world` to the screen and exits. The regular program,
@@ -73,115 +83,136 @@ The program we will examine here is simple - it writes the characters
 ```{.gnuassembler .numberLines include=resource/asm/008-01-hello-world-nolib.s}
 ```
 
-That\'s not too long. However, take a look at how short `008-01-hello-world-lib`
-is which uses a library:
+That\'s not too long. However, take a look at how short
+`008-01-hello-world-lib` is, which uses a library:
 
 ```{.gnuassembler .numberLines include=resource/asm/008-01-hello-world-lib.s}
 ```
 
-It\'s even shorter!
+It\'s even shorter! It calls two functions of the C library: `printf`,
+which prints text, and `exit`, which ends the program. They follow the
+convention of Chapter 4, so the first parameter goes in _%rdi_. For
+`printf` it is the address of the text, which ends with a null byte
+(`\0`) instead of having its length in a separate register. Ignore the
+`movq $0, %rax` and the `@PLT` after the names for now; we will explain
+both soon.
 
-Now, building programs which use dynamic libraries is a
-little different than normal. You can build the first program normally
-by doing this:
+Now, building programs which use shared libraries is a little
+different than normal. You can build the first program normally by
+doing this:
 
 ```{.bash}
-as -o 008-01-hello-world-nolib.o  --32 \
-                                  --gstabs+ \
-                                  008-01-hello-world-nolib.s
-
-ld -o 008-01-hello-world-nolib    -m elf_i386 \
-                                  008-01-hello-world-nolib.o
+as --64 -g -o 008-01-hello-world-nolib.o 008-01-hello-world-nolib.s
+ld -o 008-01-hello-world-nolib 008-01-hello-world-nolib.o
 ```
 
 However, in order to build the second program, you have to do this:
 
 ```{.bash}
-as -o 008-01-hello-world-lib.o  --32 \
-                                --gstabs+ \
-                                008-01-hello-world-lib.s
-
-ld -o 008-01-hello-world-lib    -m elf_i386 \
-                                008-01-hello-world-lib.o \
-            --library        c \
-            --library-path   /usr/lib32/ \
-            -dynamic-linker  /usr/lib32/ld-linux.so.2
+as --64 -g -o 008-01-hello-world-lib.o 008-01-hello-world-lib.s
+ld -o 008-01-hello-world-lib 008-01-hello-world-lib.o \
+  -l c -dynamic-linker /lib64/ld-linux-x86-64.so.2
 ```
 
 Run both programs and you will get the classic message:
 
 ```{.bash}
 ./008-01-hello-world-lib
-```
-
-```{.bash}
 ./008-01-hello-world-nolib
 ```
 
-Remember, the backslash in the first line simply means that the command
-continues on the next line. The option `-dynamic-linker
- /usr/lib32/ld-linux.so.2` allows our program to be linked to libraries. This
-builds the executable so that before executing, the operating system
-will load the program `/usr/lib32/ld-linux.so.2` to load in external libraries
-and link them with the program. This program is known as a *dynamic
-linker*.
+Remember, the backslash at the end of a line simply means that the
+command continues on the next line. The option `-dynamic-linker
+/lib64/ld-linux-x86-64.so.2` allows our program to be linked to
+libraries. This builds the executable so that before executing, the
+operating system will load the program `/lib64/ld-linux-x86-64.so.2` to
+load in external libraries and link them with the program. This program
+is known as a *dynamic linker*. Its path is the same on almost every
+x86-64 Linux distribution.
 
-The `-l c` or `--library c` option says to link to the `C` library, named `libc.so` on
-GNU/Linux systems. Given a library name, `c` in this case (usually
-library names are longer than a single letter), the GNU/Linux linker
-prepends the string `lib` to the beginning of the library name and
-appends `.so` to the end of it to form the library\'s filename. This
-library contains many functions to automate all types of tasks. The two
-we are using are `printf`, which prints strings, and `exit`,
-which exits the program.
+The `-l c` (or `--library c`) option says to link to the C library,
+named `libc.so` on GNU/Linux systems. Given a library name, `c` in this
+case (usually library names are longer than a single letter), the
+GNU/Linux linker prepends the string `lib` to the beginning of the
+library name and appends `.so` to the end of it to form the library\'s
+filename. This library contains many functions to automate all types of
+tasks. The two we are using are `printf`, which prints strings, and
+`exit`, which exits the program.
+
+Why `exit` and not the `exit` system call we have always used? The C
+library keeps the text of `printf` in a buffer, in memory, and writes
+it to the file descriptor later, with a single `write`, which is much
+faster than one system call per `printf`. The `exit` function writes
+whatever is left in the buffers and then makes the system call. If we
+ended the program with the system call directly, the text could be
+lost.
 
 Notice that the symbols `printf` and `exit` are simply referred to by
 name within the program. In previous chapters, the linker would resolve
-all of the names to physical memory addresses, and the names would be
-thrown away. When using dynamic linking, the name itself
-resides within the executable, and is resolved by the dynamic linker
-when it is run. When the program is run by the user, the dynamic
-linker loads the dynamic libraries listed
-in our link statement, and then finds all of the function and variable
-names that were named by our program but not found at link time, and
-matches them up with corresponding entries in the shared libraries it
-loads. It then replaces all of the names with the addresses which they
-are loaded at. This sounds time-consuming. It is to a small degree, but
-it only happens once - at program startup time.
+all of the names to memory addresses, and the names would be thrown
+away. When using dynamic linking, the name itself resides within the
+executable, and is resolved by the dynamic linker when it is run. When
+the program is run by the user, the dynamic linker loads the shared
+libraries listed in our link statement, and then finds all of the
+function and variable names that were named by our program but not
+found at link time, and matches them up with corresponding entries in
+the shared libraries it loads. It then replaces all of the names with
+the addresses which they are loaded at. This sounds time-consuming. It
+is to a small degree, but it only happens once for each name.
 
-How Dynamic Libraries Work {#how-dynamic-libraries-work}
---------------------------
+How Shared Libraries Work {#how-shared-libraries-work}
+-------------------------
 
 In our first programs, all of the code was contained within the source
 file. Such programs are called *statically-linked executables*, because
 they contained all of the necessary functionality for the program that
 wasn\'t handled by the kernel. In the programs we wrote in
 [Chapter 6. Reading and Writing Simple Records](06-reading-and-writing-simple-records.qmd#chapter-6-reading-and-writing-simple-records),
-we used both our
-main program file and files containing routines used by multiple
-programs. In these cases, we combined all of the code together using the
-linker at link-time, so it was still statically-linked. However, in the
-`008-01-hello-world-lib` program, we started using dynamic libraries. When you
-use dynamic libraries, your program is then
-*dynamically-linked*, which means that not all of the
+we used both our main program file and files containing routines used
+by multiple programs. In these cases, we combined all of the code
+together using the linker at link-time, so it was still
+statically-linked. However, in the `008-01-hello-world-lib` program, we
+started using shared libraries. When you use shared libraries, your
+program is then *dynamically-linked*, which means that not all of the
 code needed to run the program is actually contained within the program
 file itself, but in external libraries.
 
-When we put the `--library c` on the command to link the `008-01-hello-world-lib` program,
-it told the linker to use the `C` library (`libc.so`) to look up any
-symbols that weren\'t already defined in `008-01-hello-world-lib.o`. However,
-it doesn\'t actually add any code to our program, it just notes in the
-program where to look. When the `008-01-hello-world-lib` program begins, the file
-`/usr/lib32/ld-linux.so.2` is loaded first. This is the
-dynamic linker. This looks at our `008-01-hello-world-lib` program and
-sees that it needs the `C` library to run. So, it searches for a file
-called `libc.so` in the standard places (listed in
-`/etc/ld.so.conf` and in the contents of the
-`LD_LIBRARY_PATH` environment variable), then looks in it
-for all the needed symbols (`printf` and `exit` in this case), and then
-loads the library into the program\'s virtual memory. Finally, it
-replaces all instances of `printf` in the program with the actual
-location of `printf` in the library.
+When we put the `-l c` on the command to link the
+`008-01-hello-world-lib` program, it told the linker to use the C
+library to look up any symbols that weren\'t already defined in
+`008-01-hello-world-lib.o`. However, it doesn\'t actually add any code
+to our program, it just notes in the program where to look. You can see
+those notes with `readelf -d`, which prints the *dynamic section* of
+the file. Its first line says:
+
+     0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+
+The file that `ld` found was `libc.so`, but the note says `libc.so.6`.
+On Ubuntu 24.04, `libc.so` is not a library but a small text file, a
+script for the linker, which names the real library:
+
+    GROUP ( /lib/x86_64-linux-gnu/libc.so.6 /usr/lib/x86_64-linux-gnu/libc_nonshared.a  AS_NEEDED ( /lib64/ld-linux-x86-64.so.2 ) )
+
+The `.6` is the version of the library\'s interface. If the C library
+ever changed in a way that broke old programs, it would be called
+`libc.so.7`, and the old programs would keep using `libc.so.6`. This is
+one of the ways Linux avoids \"DLL hell\".
+
+When the `008-01-hello-world-lib` program begins, the file
+`/lib64/ld-linux-x86-64.so.2` is loaded first. This is the dynamic
+linker. This looks at our `008-01-hello-world-lib` program and sees that
+it needs `libc.so.6` to run. So, it searches for that file in the
+standard places (the directories listed in `/etc/ld.so.conf`, and in the
+contents of the `LD_LIBRARY_PATH` environment variable), then looks in
+it for all the needed symbols (`printf` and `exit` in this case), and
+then loads the library into the program\'s virtual memory. Finally, it
+connects every use of `printf` in the program with the actual location
+of `printf` in the library.
+
+The dynamic linker also prepares the C library itself before our
+program starts. That is why our `_start` can call `printf` right away.
+Programs written in C don\'t have a `_start` of their own: the compiler
+adds one, which calls a function named `main`.
 
 Run the following command:
 
@@ -190,26 +221,72 @@ ldd ./008-01-hello-world-nolib
 ```
 
 It should report back `not a dynamic executable`. This is just like we
-said - `008-01-hello-world-nolib` is a statically-linked executable. However,
-try this:
+said - `008-01-hello-world-nolib` is a statically-linked executable.
+However, try this:
 
 ```{.bash}
 ldd ./008-01-hello-world-lib
 ```
 
-It will report back something like:
+On Ubuntu 24.04 it reports:
 
-    linux-gate.so.1 (0xf7f17000)
-    libc.so.6 => /usr/lib32/libc.so.6 (0xf7ce5000)
-    /usr/lib32/ld-linux.so.2 => /usr/lib/ld-linux.so.2 (0xf7f19000)
+    linux-vdso.so.1 (0x00007fe52a56a000)
+    libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fe52a200000)
+    /lib64/ld-linux-x86-64.so.2 (0x00007fe52a56c000)
 
-The numbers in parentheses may be different on your system. This means
-that the program `008-01-hello-world-lib` is linked to `libc.so.6` (the `.6` is the
-version number), which is found at `/usr/lib32/`, and
-`ld-linux.so.2` is found at `/usr/lib32/`. These libraries
-have to be loaded before the program can be run. If you are interested,
-run the `ldd` program on various programs that are on your Linux
-distribution, and see what libraries they rely on.
+The numbers in parentheses are the addresses where each library was
+loaded, and they change every time you run it, because Linux loads
+libraries at random addresses (we will see why in
+[Chapter 9. Intermediate Memory Topics](09-intermediate-memory-topics.qmd#chapter-9.-intermediate-memory-topics)).
+This means that the program `008-01-hello-world-lib` is linked to
+`libc.so.6`, which is found at `/lib/x86_64-linux-gnu/` on Ubuntu (other
+distributions use `/usr/lib/` or `/lib64/`), and that it needs the
+dynamic linker. `linux-vdso.so.1` is not a file at all: it is a small
+library that the kernel puts into every program, with a few functions
+(such as reading the clock) that run without a real system call. If
+you are interested, run the `ldd` program on various programs that are
+on your Linux distribution, and see what libraries they rely on.
+
+Two Rules for Calling Library Functions {#two-rules-for-calling-library-functions}
+---------------------------------------
+
+Our own functions only depend on each other, so a small mistake in the
+calling convention may go unnoticed. The functions of a library were
+compiled to follow the convention exactly, and they rely on two rules
+that our functions never needed.
+
+The first rule is the one from the note on stack alignment in
+[Chapter 4](04-all-about-functions.qmd#chapter-4-all-about-functions):
+_%rsp_ must be a multiple of 16 whenever a `call` instruction runs.
+When Linux starts a program, _%rsp_ is already a multiple of 16, and
+`008-01-hello-world-lib` doesn\'t push anything, so it is still aligned
+at each `call`. A function with the usual `pushq %rbp` and locals in
+blocks of 16 bytes is aligned too.
+
+The second rule is for functions like `printf` that accept a variable
+number of parameters. Some parameters, the floating-point numbers that
+we will meet in
+[Chapter 10. Counting Like a Computer](10-counting-like-a-computer.qmd#chapter-10-counting-like-a-computer),
+go in other registers, the *vector registers* _%xmm0_ to _%xmm7_.
+`printf` can\'t know in advance which of them hold parameters, so the
+caller says how many it used in _%al_, the lowest byte of _%rax_. We
+pass no floating-point numbers, so we put 0 there: `movq $0, %rax`.
+
+What happens if you break them? We tried it with `008-02-printf-example`
+(the next program), adding a `pushq $0` just before the call to
+`printf` to break the alignment. On Ubuntu 24.04 (C library 2.39) the
+program still worked when _%al_ was 0. With _%al_ set to 1, it crashed
+with a segmentation fault. gdb shows the instruction that failed:
+
+    => 0x7ff826260136 <printf+54>:  movaps %xmm0,-0x80(%rbp)
+
+When _%al_ is not 0, `printf` starts by saving the vector registers on
+its stack with `movaps`, an instruction that moves 16 bytes and requires
+an address that is a multiple of 16. Notice that the program didn\'t
+fail because of either rule alone: with the wrong alignment and _%al_
+= 0 it worked by luck, and another version of the library could crash
+in the same case. This is why both rules must be followed every time,
+even when breaking them seems to work.
 
 Finding Information about Libraries {#finding-information-about-libraries}
 -----------------------------------
@@ -218,48 +295,56 @@ Okay, so now that you know about libraries, the question is, how do you
 find out what libraries you have on your system and what they do? Well,
 let\'s skip that question for a minute and ask another question: How do
 programmers describe functions to each other in their documentation?
-Let\'s take a look at the function `printf`. Its calling
-interface (usually referred to as a *prototype*) looks like this:
+Let\'s take a look at the function `printf`. Its calling interface
+(usually referred to as a *prototype*) looks like this:
 
 ```{.c}
-int printf(char *string, ...);
+int printf(const char *format, ...);
 ```
 
-In Linux, functions are described in the C programming
-language. In fact, most Linux programs are written
-in C. That is why most documentation and binary compatibility is defined
-using the C language. The interface to the `printf` function above is
-described using the C programming language.
+In Linux, functions are described in the C programming language. The
+system and most of its libraries were written in C, so their
+documentation, their header files and the calling convention itself
+are defined in terms of C, which is why the convention is often called
+the \"C ABI\". You don\'t need to know how to program in C to read a
+prototype; you only need to know the meaning of a few words, which we
+will see now. The same function in Rust would be declared like this:
+
+```{.rust}
+fn printf(format: *const c_char, ...) -> c_int;
+```
 
 This definition means that there is a function `printf`. The things
-inside the parenthesis are the function\'s parameters or
-arguments. The first parameter here is `char *string`. This means there
-is a parameter named `string` (the name isn\'t important, except to use
-for talking about it), which has a type `char *`. `char` means that
-it wants a single-byte character. The `*` after it means that it
-doesn\'t actually want a character as an argument, but instead it wants
-the address of a character or sequence of characters. If you look back
-at our `008-01-hello-world-lib` program, you will notice that the function call
-looked like this:
+inside the parenthesis are the function\'s parameters or arguments. The
+first parameter here is `const char *format`. This means there is a
+parameter named `format` (the name isn\'t important, except to use for
+talking about it), which has a type `char *`. `char` means that it
+wants a single-byte character. The `*` after it means that it doesn\'t
+actually want a character as an argument, but instead it wants the
+address of a character or sequence of characters, and `const` means
+that `printf` promises not to change them. If you look back at our
+`008-01-hello-world-lib` program, you will notice that the function
+call looked like this:
 
-```{.gnuassembler .numberLines include=resource/asm/008-01-hello-world-lib.s startLine=15 endLine=16}
+```{.gnuassembler .numberLines include=resource/asm/008-01-hello-world-lib.s startLine=15 endLine=17}
 ```
 
-So, we pushed the address of the `hello` string, rather than the actual
-characters. You might notice that we didn\'t push the length of the
-string. The way that `printf` found the end of the string was
-because we ended it with a null character (`\0`). Many
-functions work that way, especially C language functions. The `int`
-before the function definition tell what type of value the function will
-return in _%eax_ when it returns. `printf` will return an `int`
-when it\'s through. Now, after the `char *string`, we have a series of
-periods, `...`. This means that it can take an indefinite number of
-additional arguments after the string. Most functions can only take a
-specified number of arguments. `printf`, however, can take many. It will
-look into the `string` parameter, and everywhere it sees the characters
-`%s`, it will look for another string from the stack to insert, and
-everywhere it sees `%d` it will look for a number from the stack to
-insert. This is best described using an example `008-02-printf-example.s`:
+So, we passed the address of the `helloworld` string in _%rdi_, rather
+than the actual characters. You might notice that we didn\'t pass the
+length of the string. The way that `printf` found the end of the string
+was because we ended it with a null character (`\0`). Many functions
+work that way, especially C language functions. The `int` before the
+function name tells what type of value the function will return in
+_%rax_ when it returns. `printf` will return an `int` (the number of
+bytes it printed) when it\'s through. Now, after the `const char
+*format`, we have a series of periods, `...`. This means that it can
+take an indefinite number of additional arguments after the string.
+Most functions can only take a specified number of arguments. `printf`,
+however, can take many. It will look into the `format` parameter, and
+everywhere it sees the characters `%s`, it will look for another string
+to insert, and everywhere it sees `%ld` it will look for a number to
+insert. This is best described using an example,
+`008-02-printf-example.s`:
 
 ```{.gnuassembler .numberLines include=resource/asm/008-02-printf-example.s}
 ```
@@ -268,326 +353,554 @@ Type it in with the filename `008-02-printf-example.s`, and then do the
 following commands:
 
 ```{.bash}
-as -o 008-02-printf-example.o  --32 \
-                               --gstabs+ \
-                               008-02-printf-example.s
-
-ld -o 008-02-printf-example    -m elf_i386 \
-                               008-02-printf-example.o \
-            --library-path   /usr/lib32/ \
-            --library        c \
-            -dynamic-linker  /usr/lib32/ld-linux.so.2
+as --64 -g -o 008-02-printf-example.o 008-02-printf-example.s
+ld -o 008-02-printf-example 008-02-printf-example.o \
+  -l c -dynamic-linker /lib64/ld-linux-x86-64.so.2
 ```
 
-Then run the program with `./008-02-printf-example`, and it should say this:
+Then run the program with `./008-02-printf-example`, and it should say
+this:
 
     Hi! Jonathan is the person number #3.
 
-Now, if you look at the code, you\'ll see that we actually push the
-format string last, even though it\'s the first parameter listed. You
-always push a functions parameters in reverse order.[^8-2] You may be
-wondering how the `printf` function knows how many parameters
-there are. Well, it searches through your string, and counts how many
-`%d`s and `%s`s it finds, and then grabs that number of parameters from
-the stack. If the parameter matches a `%d`, it treats it as a number,
-and if it matches a `%s`, it treats it as a pointer to a null-terminated
-string. `printf` has many more features than this, but these are the
-most-used ones. So, as you can see, `printf` can make output a lot
-easier, but it also has a lot of overhead, because it has to count the
-number of characters in the string, look through it for all of the
-control characters it needs to replace, pull them off the stack, convert
-them to a suitable representation (numbers have to be converted to
-strings, etc), and stick them all together appropriately.
+The parameters go in _%rdi_, _%rsi_, _%rdx_ and _%rcx_, in the same
+order as in the prototype: the format string first. If there were more
+than six, the rest would go on the stack, as we saw in Chapter 4.[^8-2]
+You may be wondering how the `printf` function knows how many
+parameters there are. Well, it searches through your string, and counts
+how many `%ld`s and `%s`s it finds, and then takes that number of
+parameters from the registers (and the stack, if needed). If the
+parameter matches a `%ld`, it treats it as a number, and if it matches
+a `%s`, it treats it as a pointer to a null-terminated string. `printf`
+has many more features than this, but these are the most-used ones. So,
+as you can see, `printf` can make output a lot easier, but it also has
+a lot of overhead, because it has to count the number of characters in
+the string, look through it for all of the control characters it needs
+to replace, take the parameters, convert them to a suitable
+representation (numbers have to be converted to strings, etc), and
+stick them all together appropriately.
 
-We\'ve seen how to use the C programming language
-prototypes to call library functions. To use them effectively,
-however, you need to know several more of the possible data types for
-reading functions. Here are the main ones:
+Why `%ld` and not `%d`? `%d` is for an `int`, which is 4 bytes, and
+`%ld` for a `long`, which is 8 bytes like our `.quad`. With `%d`,
+`printf` would only look at _%ecx_, the lower half of _%rcx_. Our number
+is small, so it would print the same thing, but a number bigger than
+2,147,483,647 would come out wrong. The sizes matter, so let\'s see
+them.
 
-`int`:
-
-:   An `int` is an integer number. The size of 4 bytes (32 bits ~ 2^32)
-    on x86 processor provide a maximum value of _4,294,967,295_; negative
-    values between _-2,147,483,648_ and _2,147,483,647_.
-
-`long`:
-
-:   A `long` is also an integer number. The size of 4 bytes (32 bits ~ 2^32)
-    on x86 processor provide a maximum value of _4,294,967,295_; negative
-    values between _-2,147,483,648_ and _2,147,483,647_.
-
-`long long`:
-
-:   A `long long` is an integer number that\'s larger than a `long`.
-    The size of 8 bytes (64 bits ~ 2^64) on x86 processor provide a maximum
-    value of _18,446,744,073,709,551,615_; negative values between
-    _-9,223,372,036,854,775,808_ and _9,223,372,036,854,775,807_.
-
-`short`:
-
-:   A short is an integer number that\'s shorter than an `int`.
-    The size of 2 bytes (16 bits ~ 2^16) on x86 processor provide a
-    maximum value of _65,535_; negative values between _-32,768_ and _32,767_.
+We\'ve seen how to use the C programming language prototypes to call
+library functions. To use them effectively, however, you need to know
+several more of the possible data types for reading functions. Here are
+the main ones, with their sizes on 64-bit Linux and the equivalent
+types in Rust and in the `ctypes` module of Python, which we will use
+later in this chapter:
 
 `char`:
 
-:   A `char` is a single-byte integer number. The size of 1 byte (8 bits ~ 2^8)
-    on x86 processor provide a maximum value of _255_; negative  values
-    between _-128_ and _127_. This is mostly used for storing character data,
-    since ASCII strings usually are represented with one byte per character.
+:   A `char` is a single-byte integer number, from _-128_ to _127_
+    (Rust `i8` or `c_char`; Python `ctypes.c_char`). This is mostly used
+    for storing character data, since ASCII strings usually are
+    represented with one byte per character.
+
+`short`:
+
+:   A `short` is an integer number of 2 bytes, from _-32,768_ to
+    _32,767_ (Rust `i16`; Python `ctypes.c_short`).
+
+`int`:
+
+:   An `int` is an integer number of 4 bytes, from _-2,147,483,648_ to
+    _2,147,483,647_ (Rust `i32`; Python `ctypes.c_int`). A function
+    that returns an `int` only sets _%eax_, and a function that
+    receives one only reads the lower 4 bytes of its register (for
+    example, _%edi_). Don\'t trust the upper half.
+
+`long`:
+
+:   A `long` is an integer number of 8 bytes on 64-bit Linux (but 4
+    bytes on 64-bit Windows), from _-9,223,372,036,854,775,808_ to
+    _9,223,372,036,854,775,807_ (Rust `i64`; Python `ctypes.c_long`).
+    It is the size of a register and of our `.quad` numbers. `long long`
+    is also 8 bytes.
 
 `float`:
 
-:   A `float` is a floating-point number. (4 bytes on an x86 processor).
-    Floating-point numbers will be explained in more depth in
+:   A `float` is a floating-point number of 4 bytes. Floating-point
+    numbers will be explained in more depth in
     [Floating-point Numbers](10-counting-like-a-computer.qmd#floating-point-numbers).
 
 `double`:
 
-:   A `double` is a floating-point number that is larger than a float. (8
-    bytes on an x86 processor).
+:   A `double` is a floating-point number of 8 bytes, more precise than
+    a `float` (Rust `f64`; Python `ctypes.c_double`, or simply a Python
+    `float`).
 
 `unsigned`:
 
-:   `unsigned` is a modifier used for any of the above types which keeps
-    them from being used as signed quantities. The difference between
-    signed and unsigned numbers will be discussed in
+:   `unsigned` is a modifier used for any of the above integer types
+    which keeps them from being used as signed quantities, for example
+    `unsigned long` (Rust `u64`). The difference between signed and
+    unsigned numbers will be discussed in
     [Chapter 10. Counting Like a Computer](10-counting-like-a-computer.qmd#chapter-10-counting-like-a-computer).
+    `size_t` is an `unsigned long` used for sizes and lengths (Rust
+    `usize`).
 
 `*`:
 
 :   An asterisk (`*`) is used to denote that the data isn\'t an actual
     value, but instead is a pointer to a location holding the given
-    value (4 bytes on an x86 processor). So, let\'s say in memory
-    location `my_location` you have the number 20 stored. If the
-    prototype said to pass an `int`, you would use direct addressing
-    mode and do `pushl my_location`. However, if
-    the prototype said to pass an `int *`, you would do
-    `pushl $my_location` - an immediate mode addressing
-    push of the address that the value resides in. In addition to
-    indicating the address of a single value, pointers can also be used
-    to pass a sequence of consecutive locations, starting with the one
-    pointed to by the given value. This is called an array.
+    value. Every pointer is 8 bytes, an address. So, let\'s say in
+    memory location `my_location` you have the number 20 stored. If the
+    prototype said to pass a `long`, you would load the value with
+    `movq my_location(%rip), %rdi`. However, if the prototype said to
+    pass a `long *`, you would load the address of the value with
+    `leaq my_location(%rip), %rdi`. In addition to indicating the
+    address of a single value, pointers can also be used to pass a
+    sequence of consecutive locations, starting with the one pointed to
+    by the given value. This is called an array. In Rust, a pointer is
+    `*const T` or `*mut T`; in Python, `ctypes.POINTER(T)`, or
+    `ctypes.c_char_p` for strings.
 
 `struct`:
 
 :   A `struct` is a set of data items that have been put together under
-    a name. For example you could declare:
+    a name, like the records of Chapter 6. For example you could
+    declare:
+
+    ```{.c}
+    struct teststruct {
+        int a;
+        char *b;
+    };
+    ```
 
     And any time you ran into `struct teststruct` you would know that it
-    is actually two words right next to each other, the first being an
-    integer, and the second a pointer to a character or group of
-    characters. You never see structs passed as arguments to functions.
-    Instead, you usually see pointers to structs passed as arguments.
-    This is because passing structs to functions is fairly complicated,
-    since they can take up so many storage locations.
-
-```{.c}
-struct teststruct {
-    int a;
-    char *b;
-};
-```
+    is actually an integer and a pointer to a character or group of
+    characters. In memory, the integer takes 4 bytes, then come 4
+    unused bytes, and then the 8-byte pointer, because each member must
+    be at an address that is a multiple of its size. Rust uses the same
+    layout when the struct is marked `#[repr(C)]`. Structs are rarely
+    passed to functions directly; usually you see pointers to structs
+    passed as arguments, because a struct can take up a lot of space.
 
 `typedef`:
 
 :   A `typedef` basically allows you to rename a type. For example, I
-    can do `typedef int myowntype;` in a C program, and any time I typed
-    `myowntype`, it would be just as if I typed `int`. This can get kind
-    of annoying, because you have to look up what all of the typedefs
-    and structs in a function prototype really mean. However, `typedef`s
+    can do `typedef long myowntype;` in a C program, and any time I
+    typed `myowntype`, it would be just as if I typed `long` (Rust does
+    the same with `type MyOwnType = i64;`). This can get kind of
+    annoying, because you have to look up what all of the typedefs and
+    structs in a function prototype really mean. However, `typedef`s
     are useful for giving types more meaningful and descriptive names.
 
 > **NOTE.**
 >
 > **Compatibility:**
-> The listed sizes are for intel-compatible (x86) machines. Other machines
-> will have different sizes. Also, even when parameters shorter than a
-> word are passed to functions, they are passed as longs on the stack.
+> The listed sizes are for 64-bit Linux on x86-64 and most other 64-bit
+> Unix systems, where `long` and pointers are 8 bytes. Other systems use
+> other sizes (on 64-bit Windows, `long` is 4 bytes). When the size
+> matters, libraries use types with the size in the name, such as
+> `int64_t` and `uint8_t`, which mean the same everywhere.
 
 That\'s how to read function documentation. Now, let\'s get back to the
 question of how to find out about libraries. Most of your system
-libraries are in `/usr/lib` or `/lib`. If you want to just
-see what symbols they define, just run `objdump -R FILENAME`
-where `FILENAME` is the full path to the library. The output of that
-isn\'t too helpful, though, for finding an interface that you might
-need. Usually, you have to know what library you want at the beginning,
-and then just read the documentation. Most libraries have manuals or man
-pages for their functions. The web is the best source of documentation
-for libraries. Most libraries from the GNU project also have info pages
-on them, which are a little more thorough than man pages.
-
-Let\'s see the `objdump` of the last program:
-
-```{.bash}
-objdump -R  008-02-printf-example-bin
-```
-
-It should display something like this:
-
-    008-02-printf-example-bin:     file format elf32-i386
-
-    DYNAMIC RELOCATION RECORDS
-    OFFSET   TYPE              VALUE
-    0804b00c R_386_JUMP_SLOT   printf@GLIBC_2.0
-    0804b010 R_386_JUMP_SLOT   exit@GLIBC_2.0
+libraries are in `/usr/lib` or `/lib` and their subdirectories (such as
+`/usr/lib/x86_64-linux-gnu` on Ubuntu). If you want to just see what
+functions and variables they offer, run `objdump -T FILENAME` where
+`FILENAME` is the full path to the library. The output of that isn\'t
+too helpful, though, for finding an interface that you might need.
+Usually, you have to know what library you want at the beginning, and
+then just read the documentation. Most libraries have manuals or man
+pages for their functions: `man 3 printf` describes `printf` (section 3
+of the manual is for library functions, section 2 for system calls).
+The web is the best source of documentation for libraries. Most
+libraries from the GNU project also have info pages on them, which are
+a little more thorough than man pages.
 
 Useful Functions {#useful-functions}
 ----------------
 
-Several useful functions you will want to be aware of from the `C`
+Several useful functions you will want to be aware of from the C
 library include:
 
--   `size_t strlen (const char *s)`{.c} calculates the size of
+-   `size_t strlen(const char *s)`{.c} calculates the size of
     null-terminated strings.
 
--   `int strcmp (const char *s1, const char *s2)`{.c} compares two
+-   `int strcmp(const char *s1, const char *s2)`{.c} compares two
     strings alphabetically.
 
--   `char * strdup (const char *s)`{.c} takes the pointer to a string,
+-   `char *strdup(const char *s)`{.c} takes the pointer to a string,
     and creates a new copy in a new location, and returns the new
     location.
 
--   `FILE * fopen (const char *filename, const char *opentype)`{.c}
+-   `FILE *fopen(const char *filename, const char *opentype)`{.c}
     opens a managed, buffered file (allows easier reading and writing
     than using file descriptors directly).[^8-3] [^8-4]
 
--   `int fclose (FILE *stream)`{.c} closes a file opened with `fopen`.
+-   `int fclose(FILE *stream)`{.c} closes a file opened with `fopen`.
 
--   `char * fgets (char *s, int count, FILE *stream)`{.c} fetches a
+-   `char *fgets(char *s, int count, FILE *stream)`{.c} fetches a
     line of characters into string `s`.
 
--   `int fputs (const char *s, FILE *stream)`{.c} writes a string to
+-   `int fputs(const char *s, FILE *stream)`{.c} writes a string to
     the given open file.
 
--   `int fprintf (FILE *stream, const char *template, ...)`{.c} is
+-   `int fprintf(FILE *stream, const char *template, ...)`{.c} is
     just like `printf`, but it uses an open file rather than defaulting
     to using standard output.
 
 You can find the complete manual on this library by going to
-[The GNU C Library manual][8-GNU-Libc]
+[The GNU C Library manual][8-GNU-Libc].
 
-Building a Dynamic Library {#building-a-dynamic-library}
---------------------------
+How a Call Reaches the Library {#how-a-call-reaches-the-library}
+------------------------------
+
+Let\'s see now what `@PLT` means. When the linker builds our program, it
+doesn\'t know where the C library will be loaded, so it can\'t put the
+address of `printf` in our `call`. Instead, it adds two small tables to
+the program: the *procedure linkage table* (PLT), with a few
+instructions for each library function, and the *global offset table*
+(GOT), with an 8-byte slot for the address of each one. Our `call`
+jumps to the PLT entry, and the PLT entry jumps to the address that is
+in the GOT slot. The dynamic linker only has to fill the GOT; the code
+of the program is never changed. `call printf@PLT` asks the assembler
+for exactly that: a call to the PLT entry of `printf`.
+
+`objdump -d` shows the result. This is part of its output for
+`008-02-printf-example` (with `--no-show-raw-insn`, which hides the
+bytes of each instruction):
+
+    0000000000401010 <printf@plt>:
+      401010:   jmp    *0x1fea(%rip)        # 403000 <printf@GLIBC_2.2.5>
+      401016:   push   $0x0
+      40101b:   jmp    401000 <printf@plt-0x10>
+
+    ...
+
+    0000000000401030 <_start>:
+      401030:   lea    0x1fd9(%rip),%rdi        # 403010 <first_string>
+      ...
+      401053:   call   401010 <printf@plt>
+
+The `call` goes to `printf@plt`, and its first instruction jumps to the
+address stored at `403000`, the GOT slot of `printf`. Notice that this
+`jmp` uses _%rip_-relative addressing too, and that it has a `*`: it
+jumps to the address *stored* in that memory, not to the memory itself.
+The other two instructions are used the first time: the slot initially
+points back to them, and they ask the dynamic linker to find `printf`,
+store its address in the slot and jump there. The following calls go
+straight to `printf`. This is called *lazy binding*.[^8-5]
+
+`objdump -R` lists the slots that the dynamic linker has to fill, the
+*dynamic relocations* of the program:
+
+```{.bash}
+objdump -R 008-02-printf-example
+```
+
+```
+008-02-printf-example:     file format elf64-x86-64
+
+DYNAMIC RELOCATION RECORDS
+OFFSET           TYPE              VALUE
+0000000000403000 R_X86_64_JUMP_SLOT  printf@GLIBC_2.2.5
+0000000000403008 R_X86_64_JUMP_SLOT  exit@GLIBC_2.2.5
+```
+
+`GLIBC_2.2.5` is the version of each function: the first version of the
+GNU C library for x86-64. A library can keep the old version of a
+function for old programs while new programs get a new one.
+
+Building a Shared Library {#building-a-shared-library}
+-------------------------
 
 Let\'s say that we wanted to take all of our shared code from
 [Chapter 6. Reading and Writing Simple Records](06-reading-and-writing-simple-records.qmd#chapter-6-reading-and-writing-simple-records)
-and build it into a dynamic library to
-use in our programs. The first thing we would do is assemble them like
-normal:
+and build it into a shared library to use in our programs. The first
+thing we would do is assemble them like normal:
 
 ```{.bash}
-as -o 006-01-write-record.o  --32 \
-                             --gstabs+ \
-                             006-01-write-record.s
-
-as -o 006-01-read-record.o   --32 \
-                             --gstabs+ \
-                             006-01-read-record.s
+as --64 -g -o 006-01-write-record.o 006-01-write-record.s
+as --64 -g -o 006-01-read-record.o 006-01-read-record.s
 ```
 
 Now, instead of linking them into a program, we want to link them into a
-dynamic library. This changes our linker command to this:
+shared library. This changes our linker command to this:
 
 ```{.bash}
-ld -o librecord.so  -m elf_i386 \
-                    -shared \
-                    006-01-write-record.o \
-                    006-01-read-record.o
+ld -shared -o librecord.so 006-01-write-record.o 006-01-read-record.o
 ```
 
-This links both of these files together into a dynamic library called
+This links both of these files together into a shared library called
 `librecord.so`. This file can now be used for multiple
 programs. If we need to update the functions contained within it, we can
 just update this one file and not have to worry about which programs use
 it.
 
 Let\'s look at how we would link against this library. To link the
-`008-03-write-records` program, we would do the following:
+`006-01-write-records` program of Chapter 6 with it, we would do the
+following:
 
 ```{.bash}
-as -o 006-01-write-records.o  --32 \
-                              --gstabs+ \
-                              006-01-write-records.s
-
-ld -o 008-03-write-records    -m elf_i386 \
-                              006-01-write-records.o \
-                --library        record \
-                --library-path   . \
-                -dynamic-linker  /lib32/ld-linux.so.2
+as --64 -g -o 006-01-write-records.o 006-01-write-records.s
+ld -o 008-03-write-records 006-01-write-records.o \
+  -L . -l record -dynamic-linker /lib64/ld-linux-x86-64.so.2
 ```
 
-In this command, `-L .` or `--library-path .` told the linker to look
-for libraries in the current directory (it usually only searches `/lib`
-directory, `/usr/lib` directory, and a few others). As we\'ve seen, the
-option `-dynamic-linker /usr/lib32/ld-linux.so.2` specified the dynamic
-linker. The option `--library record` tells the linker to search for functions
-in the file named `librecord.so`.
+In this command, `-L .` (or `--library-path .`) told the linker to look
+for libraries in the current directory (it usually only searches the
+system directories, such as `/lib` and `/usr/lib`). As we\'ve seen, the
+option `-dynamic-linker /lib64/ld-linux-x86-64.so.2` specified the
+dynamic linker. The option `-l record` tells the linker to search for
+functions in the file named `librecord.so`. The program doesn\'t need
+`-l c`, because it doesn\'t use the C library.
 
-Now the `008-03-write-records` program is built, but it will not run. If we try
-it, we will get an error like the following:
+Now the `008-03-write-records` program is built, but it will not run.
+If we try it, we will get this error (and the exit status 127):
 
-    `./008-03-write-records`: error while loading shared libraries:
-    librecord.so: cannot open shared object file: No such file or directory
+    ./008-03-write-records: error while loading shared libraries: librecord.so: cannot open shared object file: No such file or directory
 
-This is because, by default, the dynamic linker only searches `/lib`,
-`/usr/lib`, and whatever directories are listed in
-`/etc/ld.so.conf` for libraries. In order to run the
-program, you either need to move the library to one of these
-directories, or execute the following command:
+This is because, by default, the dynamic linker only searches the
+system directories, and whatever directories are listed in
+`/etc/ld.so.conf`, for libraries. In order to run the program, you
+either need to move the library to one of these directories, or execute
+the following command:
 
 ```{.bash}
-LD_LIBRARY_PATH=.  ./008-03-write-records
+LD_LIBRARY_PATH=. ./008-03-write-records
 ```
 
-The next solution store the library directory in the session, it keeps
-alive until the session is done or the terminal/console is closed:
+Setting `LD_LIBRARY_PATH` tells the dynamic linker to add whatever
+paths you give it to the library search path for shared libraries.
+Written before the command, as above, it only applies to that command.
+To set it for the rest of the session (until the terminal is closed),
+export it:
 
 ```{.bash}
-LD_LIBRARY_PATH=.
-export LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=.
 ```
 
-Alternatively, if that gives you an error, do this instead:
+Now, you can run `008-03-write-records` normally by typing
+`./008-03-write-records`. It creates the same `test.dat` as
+`006-01-write-records`. Let\'s print the shared object dependencies of
+`008-03-write-records`:
 
 ```{.bash}
-setenv LD_LIBRARY_PATH .
-```
-
-Now, you can run `008-03-write-records` normally by typing `./008-03-write-records`.
-Setting `LD_LIBRARY_PATH` tells the linker to add whatever paths you
-give it to the library search path for dynamic libraries.
-
-Let\'s print the shared object dependencies for `./008-03-write-records`.
-It is a shared library. Try this:
-
-```{.bash}
-LD_LIBRARY_PATH=.  ldd ./008-03-write-records
+LD_LIBRARY_PATH=. ldd ./008-03-write-records
 ```
 
 It will report back something like:
 
-        linux-gate.so.1 (0xf7fa9000)
-        librecord.so => ./librecord.so (0xf7fa0000)
+    linux-vdso.so.1 (0x00007f53f7fcf000)
+    librecord.so => ./librecord.so (0x00007f53f7fc4000)
 
-And it's the `objdump` result:
+The C library doesn\'t appear: neither the program nor `librecord.so`
+use it. And this is the `objdump -R` result:
 
 ```{.bash}
-LD_LIBRARY_PATH=.  objdump -R ./008-03-write-records
+objdump -R ./008-03-write-records
 ```
 
-    ./008-03-write-records-bin:     file format elf32-i386
+```
+./008-03-write-records:     file format elf64-x86-64
 
-    DYNAMIC RELOCATION RECORDS
-    OFFSET   TYPE              VALUE
-    0804b00c R_386_JUMP_SLOT   _write_record
+DYNAMIC RELOCATION RECORDS
+OFFSET           TYPE              VALUE
+0000000000403000 R_X86_64_JUMP_SLOT  write_record
+```
 
+Our function is reached through the PLT, just like `printf`. Our
+`call write_record` didn\'t say `@PLT`: for a call to a function that
+isn\'t in the same file, the assembler creates the same kind of
+reference anyway (you can see it with `readelf -r`, as the relocation
+type `R_X86_64_PLT32`), and the linker decides whether the call goes to
+a PLT entry or directly to the function. Writing `@PLT` simply makes the
+intent clear, and the programs of this book write it for every library
+function.
 
-For further information about dynamic linking, see the following sources
-on the Internet:
+Position-Independent Code {#position-independent-code}
+-------------------------
+
+A shared library is loaded at a different address in every program, and
+in every run. So its code can\'t contain any absolute address: if
+`librecord.so` had an instruction like `movq $buffer, %rax` with the
+address of its `buffer` written into it, that address would only be
+right at one place in memory. Code that works at any address is called
+*position-independent code*, or *PIC*, and every shared library has to
+be made of it.
+
+This is the reason why this book reaches data relative to _%rip_ since
+Chapter 3. The distance from an instruction to the data it uses is
+fixed when the library is linked, wherever the library is loaded, so
+`leaq buffer(%rip), %rax` gives the right address everywhere. The
+program `003-03-maximum-absolute` from the box \"Absolute Addresses and
+PIE\" in Chapter 3 uses absolute addresses on purpose; try to put it in
+a shared library:
+
+```{.bash}
+ld -shared -o absolute.so 003-03-maximum-absolute.o
+```
+
+`ld` refuses:
+
+    ld: 003-03-maximum-absolute.o: relocation R_X86_64_32S against `.data' can not be used when making a shared object; recompile with -fPIC
+    ld: failed to set dynamic section sizes: bad value
+
+`-fPIC` is the option that tells a C compiler to generate
+position-independent code; in assembly, it is our job.
+
+There is one more detail, and it has to do with data. The following
+function, `008-04-call-count.s`, will be part of a library. It counts
+how many times it is called, in a variable of its own, `calls`:
+
+```{.gnuassembler .numberLines include=resource/asm/008-04-call-count.s}
+```
+
+The variable is reached relative to _%rip_, and it works. But try
+adding the line `.globl calls`, which makes the variable visible to
+other files, and link the library again:
+
+    ld: global.o: warning: relocation against `calls' in read-only section `.text'
+    ld: global.o: relocation R_X86_64_PC32 against symbol `calls' can not be used when making a shared object; recompile with -fPIC
+    ld: final link failed: bad value
+
+The address is still relative to _%rip_, so what is wrong? A global name
+in a shared library can be *replaced*: if the program, or a library
+loaded before this one, also defines `calls`, the dynamic linker uses
+that definition everywhere, including inside our library. The
+`LD_PRELOAD` exercise at the end of this chapter uses exactly that to
+replace a function of the C library. Then `calls` wouldn\'t be at a
+fixed distance from our code, and `ld` won\'t pretend it is. There are
+two ways out. If the variable is private to the library, keep it local
+(without `.globl`), as `008-04-call-count.s` does. If it must be global,
+or if it belongs to another library, read its address from the GOT:
+
+```{.gnuassembler}
+    movq  calls@GOTPCREL(%rip), %rax  # %rax = &calls
+    incq  (%rax)
+```
+
+`calls@GOTPCREL(%rip)` is the GOT slot that holds the address of
+`calls`, which the dynamic linker fills; the solution of the exercise
+that rewrites `005-01-toupper` with the C library uses it to reach the
+C library\'s `stderr`. Functions have the same issue, but `@PLT`
+already solves it, since the call goes through the GOT.
+
+Programs can be position-independent too. Such a program is called a
+*position-independent executable*, or PIE, and Linux loads it at a
+random address, like a library. Compilers produce PIE programs by
+default today, and `ld -pie` links ours that way: since all of our
+data is reached relative to _%rip_, they work without changes. Your
+first PIE program is in the next section.
+
+Calling Assembly from Rust and Python {#calling-assembly-from-rust-and-python}
+-------------------------------------
+
+A shared library doesn\'t care which language its callers are written
+in. Let\'s put two assembly functions in a library, `count_chars` from
+Chapter 6 (it returns the length of a null-terminated string) and
+`call_count` from the previous section:
+
+```{.bash}
+as --64 -g -o 006-01-count-chars.o 006-01-count-chars.s
+as --64 -g -o 008-04-call-count.o 008-04-call-count.s
+ld -shared -o libbook.so 006-01-count-chars.o 008-04-call-count.o
+```
+
+`objdump -T` shows the functions that the library offers:
+
+```
+libbook.so:     file format elf64-x86-64
+
+DYNAMIC SYMBOL TABLE:
+0000000000001000 g    DF .text  0000000000000000 count_chars
+0000000000001024 g    DF .text  0000000000000000 call_count
+```
+
+Only the global names are there. `calls` is not, so nobody outside the
+library can see it or replace it.
+
+This Rust program, `008-05-use-library.rs`, calls both functions:
+
+```{.rust .numberLines include=resource/asm/008-05-use-library.rs}
+```
+
+`unsafe extern "C"` declares functions that exist somewhere else and
+follow the system calling convention, which Rust calls `"C"`. They are
+declared the way a prototype would declare them: `count_chars` receives
+a pointer to characters and returns an unsigned 64-bit number, which
+Rust expects in _%rax_. Rust can\'t check that the library really has
+these functions with these parameters, so each call has to be written
+inside an `unsafe` block: the programmer promises that the declaration
+is right. The `c"hello world"` literal is a string with a null byte at
+the end, exactly what `count_chars` expects. Build it with `rustc`, the
+Rust compiler, which also accepts `-L` and `-l`:
+
+```{.bash}
+rustc --edition 2024 -L . -l book -o 008-05-use-library \
+  008-05-use-library.rs
+LD_LIBRARY_PATH=. ./008-05-use-library
+```
+
+With Rust 1.100.0 on Ubuntu 24.04 it prints:
+
+    count_chars("hello world") = 11
+    call_count() = 1
+    call_count() = 2
+    call_count() = 3
+
+The value of `calls` stayed in the library between the calls. `ldd`
+shows that the Rust program uses our library and the C library, like
+almost every Linux program:
+
+    linux-vdso.so.1 (0x00007ff3bd0d9000)
+    libbook.so => ./libbook.so (0x00007ff3bd077000)
+    libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007ff3bd046000)
+    libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007ff3bce00000)
+    /lib64/ld-linux-x86-64.so.2 (0x00007ff3bd0db000)
+
+`rustc` builds PIE programs, so this is the PIE program we promised.
+The `rustc` command uses the system\'s C compiler (`cc`) to link, so it
+needs one installed (on Ubuntu, the package `build-essential`).
+
+Python doesn\'t need to be compiled at all. Its `ctypes` module loads a
+shared library while the program runs and calls its functions. This is
+`008-06-use-library.py`:
+
+```{.python .numberLines include=resource/asm/008-06-use-library.py}
+```
+
+```{.bash}
+python3 008-06-use-library.py
+```
+
+It prints the same four lines (Python 3.12). `ctypes.CDLL` loads the
+library; it needs a path with a `/`, here the absolute path, because a
+bare name like `libbook.so` is only searched in the standard places,
+like with the dynamic linker. Then the program describes each function:
+`argtypes` lists the types of the parameters, so that `ctypes` can
+convert Python values (here, a `bytes` string becomes the address of
+its characters, followed by a null byte), and `restype` is the type of
+the result. A shared library doesn\'t record the types of its
+functions, so this description is the program\'s job, as it was in
+Rust. Without `restype`, `ctypes` assumes that the function returns an
+`int`, 4 bytes, and would throw away the upper half of _%rax_.
+
+That is the real use of the calling convention: the same machine code,
+in the same library, is called from assembly language, from Rust and
+from Python.
+
+More Information about Shared Libraries {#more-information-about-shared-libraries}
+---------------------------------------
+
+For further information about dynamic linking, see the following
+sources:
 
 -   The man page for `ld.so` contains a lot of information about how the
-    Linux dynamic linker works, execute in the terminal: `man ld.so`.
+    Linux dynamic linker works: `man 8 ld.so`.
+
+-   The [System V AMD64 psABI][8-ABI], the document that defines the
+    calling convention, also defines the PLT, the GOT and the
+    relocation types such as `R_X86_64_PLT32`.
 
 -   Introduction to the ELF Format:
     [The ELF Header][8-Elf-Makan-01],
@@ -611,8 +924,11 @@ on the Internet:
     is a great presentation on dynamic linking in Linux.
 
 -   [Program Library HOWTO Shared Libraries][8-shared-libraries]
-    contains a good introduction to programming position-independent
-    code for shared libraries under Linux.
+    contains a good introduction to shared libraries under Linux.
+
+-   The chapter [FFI][8-Rust-FFI] of *The Rustonomicon* and the
+    documentation of [ctypes][8-Python-ctypes] explain how Rust and
+    Python call code in other languages.
 
 Review {#review-6}
 ------
@@ -635,13 +951,19 @@ Review {#review-6}
 
 -   What are *struct*s for?
 
--   What is the difference between a data element of type *int* and
-    *int \**? How would you access them differently in your program?
+-   What is the difference between a data element of type *long* and
+    *long \**? How would you access them differently in your program?
 
 -   If you had an object file called `foo.o`, what would be the command
     to create a shared library called \'bar\'?
 
 -   What is the purpose of LD_LIBRARY_PATH?
+
+-   What two rules must a program follow before it calls `printf`?
+
+-   What are the PLT and the GOT for?
+
+-   Why must the code of a shared library be position-independent?
 
 ### Use the Concepts {#use-the-concepts-6}
 
@@ -650,16 +972,19 @@ Review {#review-6}
     returning the result as the exit status code. Also, make the exit
     status code be 0.
 
--   Use the `_factorial` function you developed in
-    [Recursive Functions](04-all-about-functions.qmd#recursive-functions) to make a shared library.
-    Then re-write the main program so that it links with the library
-    dynamically.
+-   Use the `factorial` function you developed in
+    [Recursive Functions](04-all-about-functions.qmd#recursive-functions)
+    to make a shared library. Then re-write the main program so that it
+    links with the library dynamically.
 
--   Rewrite the program above so that it also links with the \'C\'
-    library. Use the \'C\' library\'s `printf` function to display the
-    result of the `_factorial` call.
+-   Rewrite the program above so that it also links with the C library.
+    Use the C library\'s `printf` function to display the result of the
+    `factorial` call.
 
--   Rewrite the `005-01-toupper` program so that it uses the `C` library
+-   Call the `factorial` function of your library from Python with
+    `ctypes`.
+
+-   Rewrite the `005-01-toupper` program so that it uses the C library
     functions for files rather than system calls.
 
 ### Going Further {#going-further-6}
@@ -681,34 +1006,36 @@ Review {#review-6}
     various programs with it. What are the results?
 
 [^8-1]: Each of these terms have slightly different meanings, but most
-    people use them interchangeably anyway. Specifically, this chapter
-    will cover dynamic libraries, but not shared libraries. Shared
-    libraries are dynamic libraries which are built using
-    *position-independent code* (often
-    abbreviated PIC) which is outside the scope of this book.
-    However, shared libraries and dynamic libraries are used in the same
-    way by users and programs; the linker just links them differently.
+    people use them interchangeably anyway. *DLL* is the name used on
+    Windows, and *shared object* (hence `.so`) the name used on Linux.
 
-[^8-2]: The reason that parameters are pushed in the reverse order is
-    because of functions which take a variable number of parameters like
-    `printf`. The parameters pushed in last will be in a known position
-    relative to the top of the stack. The program can then use these
-    parameters to determine where on the stack the additional arguments
-    are, and what type they are. For example, `printf` uses the format
-    string to determine how many other parameters are being sent. If we
-    pushed the known arguments first, you wouldn\'t be able to tell
-    where they were on the stack.
+[^8-2]: The 32-bit convention passed every parameter on the stack, in
+    reverse order, so that the format string was always at the top,
+    in a known position, whatever the number of parameters. In the
+    64-bit convention, the first parameter is always in _%rdi_, which
+    solves the same problem.
 
 [^8-3]: `stdin`, `stdout`, and `stderr` (all lower case) can be used in
     these programs to refer to the files of their corresponding file
-    descriptors.
+    descriptors. They are variables of the C library that hold a
+    `FILE *`.
 
 [^8-4]: `FILE` is a struct. You don\'t need to know its contents to use
     it. You only have to store the pointer and pass it to the relevant
     other functions.
 
+[^8-5]: Many distributions link their programs with `-z now`, which
+    tells the dynamic linker to fill every slot before the program
+    starts, and with `-z relro`, which makes the GOT read-only after
+    that, so that an attacker who can write to memory can\'t redirect a
+    library call. You can ask for the same with the environment variable
+    `LD_BIND_NOW=1`.
 
-[8-GNU-Libc]: http://www.gnu.org/software/libc/manual/
+
+[8-GNU-Libc]: https://www.gnu.org/software/libc/manual/
+[8-ABI]: https://gitlab.com/x86-psABIs/x86-64-ABI
+[8-Rust-FFI]: https://doc.rust-lang.org/nomicon/ffi.html
+[8-Python-ctypes]: https://docs.python.org/3/library/ctypes.html
 [8-Elf-Makan-01]: https://blog.k3170makan.com/2018/09/introduction-to-elf-format-elf-header.html
 [8-Elf-Makan-02]: https://blog.k3170makan.com/2018/09/introduction-to-elf-format-part-ii.html
 [8-Elf-Makan-03]: https://blog.k3170makan.com/2018/09/introduction-to-elf-file-format-part.html

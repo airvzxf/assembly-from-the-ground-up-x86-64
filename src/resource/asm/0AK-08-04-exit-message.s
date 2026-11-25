@@ -1,9 +1,8 @@
-    # Assemble with `as --32`.
     # Build the shared library with:
-    #     ld -shared -m elf_i386 \
-    #       -o libexitmsg.so 0AK-08-04-exit-message.o
-    # Use it with a 32-bit program linked with the
-    # C library:
+    #     ld -shared -o libexitmsg.so \
+    #       0AK-08-04-exit-message.o
+    # Use it with a program linked with the C
+    # library:
     #     LD_PRELOAD=./libexitmsg.so \
     #       ./008-02-printf-example
     #
@@ -17,37 +16,32 @@
     #
     # NOTES:
     #     This `exit` doesn't flush the C library
-    #     buffers, so text that `printf` wrote
-    #     without a final newline may be lost.
-    #     A shared library can't use the absolute
-    #     address of its data, because it doesn't
-    #     know where it will be loaded. `call` +
-    #     `popl` gets the current address, and the
-    #     message is found relative to it.
+    #     buffers, so text that `printf` wrote may be
+    #     lost. The message is local to the library
+    #     and is reached relative to %rip.
     #
-        .equ SYS_WRITE, 4
-        .equ SYS_EXIT,  1
-        .equ STDERR,    2
+    .section .note.GNU-stack,"",@progbits
+
+    .include "006-01-linux.s"
+
+    .section .rodata
+        message:
+            .ascii "exit() called: bye!\n"
+        message_end:
+            .equ MESSAGE_LEN, message_end - message
 
     .section .text
         .globl exit
         .type  exit, @function
 exit:
-    call  _here              # Pushes the address of
-_here:                       # `_here` and jumps to
-    popl  %ecx               # it; pop it to %ecx.
-    addl  $message - _here, %ecx  # %ecx = &message
+    movq  %rdi, %rbx         # The status. This
+                             # function never returns.
+    movq  $SYS_WRITE, %rax
+    movq  $STDERR, %rdi
+    leaq  message(%rip), %rsi
+    movq  $MESSAGE_LEN, %rdx
+    syscall
 
-    movl  $SYS_WRITE, %eax
-    movl  $STDERR, %ebx
-    movl  $MESSAGE_LEN, %edx
-    int   $0x80
-
-    movl  $SYS_EXIT, %eax
-    movl  4(%esp), %ebx      # exit(status)
-    int   $0x80
-
-    message:
-        .ascii "exit() called: bye!\n"
-    message_end:
-        .equ MESSAGE_LEN, message_end - message
+    movq  $SYS_EXIT, %rax
+    movq  %rbx, %rdi         # exit(status)
+    syscall

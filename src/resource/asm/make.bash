@@ -130,6 +130,25 @@ link64 007-01-add-year 007-01-add-year.o 007-01-error-exit.o \
   006-01-read-record.o 006-01-write-record.o 006-01-count-chars.o \
   006-01-write-newline.o
 
+# ----- Chapter 8 -----
+# The programs that use shared libraries name the dynamic linker.
+LIBC=(-l c -dynamic-linker /lib64/ld-linux-x86-64.so.2)
+assemble64 008-01-hello-world-nolib 008-01-hello-world-lib \
+  008-02-printf-example 008-04-call-count
+link64 008-01-hello-world-nolib 008-01-hello-world-nolib.o
+link64 008-01-hello-world-lib 008-01-hello-world-lib.o "${LIBC[@]}"
+link64 008-02-printf-example 008-02-printf-example.o "${LIBC[@]}"
+link64_shared librecord.so 006-01-read-record.o 006-01-write-record.o
+link64 008-03-write-records 006-01-write-records.o -L . -l record \
+  -dynamic-linker /lib64/ld-linux-x86-64.so.2
+link64_shared libbook.so 006-01-count-chars.o 008-04-call-count.o
+command -v rustc >/dev/null \
+  || fail_build "rustc is not installed (see scripts/install-deps.bash)"
+echo "Compiling (Rust): 008-05-use-library"
+rustc --edition 2024 -L . -l book -o 008-05-use-library-bin \
+  008-05-use-library.rs
+check_elf64 008-05-use-library-bin
+
 # ----- Appendix K, Chapters 3 and 4 -----
 for SOURCE in 0AK-03-*.s 0AK-04-*.s; do
   assemble64 "${SOURCE%.s}"
@@ -170,6 +189,16 @@ link64 0AK-07-01-add-year-robust 0AK-07-01-add-year-robust.o \
   006-01-read-record.o 006-01-write-record.o 007-01-error-exit.o \
   006-01-count-chars.o 006-01-write-newline.o
 
+# ----- Appendix K, Chapter 8 -----
+assemble64 0AK-08-01-factorial-lib 0AK-08-02-factorial-printf \
+  0AK-08-03-toupper-libc 0AK-08-04-exit-message
+link64_shared libfactorial.so 0AK-08-01-factorial-lib.o
+link64 0AK-08-02-factorial-printf 0AK-08-02-factorial-printf.o \
+  -L . -l factorial "${LIBC[@]}"
+link64 0AK-08-03-toupper-libc 0AK-08-03-toupper-libc.o \
+  0AK-05-00-convert-to-upper.o "${LIBC[@]}"
+link64_shared libexitmsg.so 0AK-08-04-exit-message.o
+
 echo ""
 
 # =====================================================
@@ -206,9 +235,6 @@ done
 # -----------------------------------------------------
 
 FILES=(
-  008-01-hello-world-lib
-  008-01-hello-world-nolib
-  008-02-printf-example
   009-01-memory-layout
   009-02-alloc
   009-02-read-records
@@ -230,7 +256,6 @@ echo ""
 # -----------------------------------------------------
 
 GENERIC_FILES=(
-  008-01-hello-world-nolib
   009-01-memory-layout
   010-01-shift-bit
 )
@@ -246,33 +271,6 @@ echo ""
 # -----------------------------------------------------
 # Linked special files.
 # -----------------------------------------------------
-
-echo "Linking #2: 008-01-hello-world-lib"
-ld -o "008-01-hello-world-lib-bin" -m elf_i386 \
-  "008-01-hello-world-lib.o" \
-  --library c \
-  --library-path /usr/lib32/ \
-  -dynamic-linker /usr/lib32/ld-linux.so.2
-
-echo "Linking #2: 008-02-printf-example"
-ld -o "008-02-printf-example-bin" -m elf_i386 \
-  "008-02-printf-example.o" \
-  --library c \
-  --library-path /usr/lib32/ \
-  -dynamic-linker /usr/lib32/ld-linux.so.2
-
-echo "Linking #2: librecord.so"
-ld -o "librecord.so" -m elf_i386 \
-  -shared \
-  "legacy32/006-01-read-record.o" \
-  "legacy32/006-01-write-record.o"
-
-echo "Linking #2: 008-03-write-records"
-ld -o "008-03-write-records-bin" -m elf_i386 \
-  "legacy32/006-01-write-records.o" \
-  --library record \
-  --library-path . \
-  -dynamic-linker /usr/lib32/ld-linux.so.2
 
 echo "Linking #2: 009-02-read-records"
 ld -o "009-02-read-records-bin" -m elf_i386 \
@@ -300,7 +298,7 @@ gcc -o "011-01-hello-world-c-bin" "011-01-hello-world.c"
 
 for SOURCE in 0AK-*.s
 do
-    [[ "${SOURCE}" == 0AK-0[34567]-* ]] && continue  # 64-bit.
+    [[ "${SOURCE}" == 0AK-0[345678]-* ]] && continue  # 64-bit.
     as32 "${SOURCE%.s}"
 done
 
@@ -312,19 +310,6 @@ link_solution() {
     ld -o "${PROGRAM}-bin" -m elf_i386 "${PROGRAM}.o" "$@"
 }
 
-LIBC=(--library c --library-path /usr/lib32/
-      -dynamic-linker /usr/lib32/ld-linux.so.2)
-
-echo "Linking #4: libfactorial.so"
-ld -shared -m elf_i386 -o libfactorial.so 0AK-08-01-factorial-lib.o
-link_solution 0AK-08-02-factorial-printf \
-  --library-path . --library factorial "${LIBC[@]}"
-link_solution 0AK-08-03-toupper-libc \
-  legacy32/0AK-05-00-convert-to-upper.o \
-  "${LIBC[@]}"
-echo "Linking #4: libexitmsg.so"
-ld -shared -m elf_i386 -o libexitmsg.so 0AK-08-04-exit-message.o
-
 link_solution 0AK-09-02-alloc-test 0AK-09-01-alloc.o
 echo "Linking #4: 0AK-09-02-alloc-test-book (with 009-02-alloc.o)"
 ld -o 0AK-09-02-alloc-test-book-bin -m elf_i386 \
@@ -332,7 +317,7 @@ ld -o 0AK-09-02-alloc-test-book-bin -m elf_i386 \
 link_solution 0AK-09-03-alloc-auto-init 0AK-09-01-alloc.o
 
 link_solution 0AK-10-02-print-numbers 0AK-10-01-integer2string-base.o \
-  0AK-08-01-factorial-lib.o legacy32/006-01-write-newline.o
+  legacy32/0AK-08-01-factorial-lib.o legacy32/006-01-write-newline.o
 link_solution 0AK-10-03-is-negative
 link_solution 0AK-10-04-number2integer \
   0AK-10-01-integer2string-base.o legacy32/006-01-write-newline.o
