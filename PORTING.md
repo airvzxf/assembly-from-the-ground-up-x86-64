@@ -95,11 +95,9 @@ material. This file records the decisions and tracks the work, one block
   list), solutions.
 - [x] **10. Appendices B, E and F, then A** (instructions, high-level
   language idioms, gdb sessions captured from the 64-bit programs, GTK 4).
-- [ ] **11. Close-out**: Chapter 1, Appendices J and G, README, remove
+- [x] **11. Close-out**: Chapter 1, Appendices J and G, README, remove
   `gcc-multilib`, every 32-bit program (`src/resource/asm/legacy32/`
   already went in block 8, when no 32-bit program used it any more),
-  PDF and ePUB, release tag,
-  custom domain `asm64.rovisoft.net` on Cloudflare Pages. Done in a
-  pull request: Chapter 1, Appendices J and G, README, `gcc-multilib`,
-  the 32-bit programs, PDF and ePUB. Pending, outside a pull request:
-  the release tag and the custom domain.
+  PDF and ePUB, the release `v2026.11.25` with the PDF, the ePUB and
+  `resource.zip`, and the custom domain `asm64.rovisoft.net` on
+  Cloudflare Pages.
