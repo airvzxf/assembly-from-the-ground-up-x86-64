@@ -182,7 +182,7 @@ only the registers you name:
     rbx            0x402000            4202496
     rcx            0x0                 0
     rdi            0x3                 3
-    rip            0x401022            0x401022 <_start_loop+13>
+    rip            0x40101b            0x40101b <_start_loop+6>
 
 This indicates that _%rcx_ is set to zero, which is why it keeps on
 loading the first element of the list. This should cause you to ask

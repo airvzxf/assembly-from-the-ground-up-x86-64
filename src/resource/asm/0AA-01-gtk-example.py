@@ -18,7 +18,8 @@ YES, NO = 0, 1
 
 def response_handler(dialog, result, window):
     # Button 0 is the Yes button. If this is the button
-    # they clicked on, tell GTK to leave its event loop.
+    # they clicked on, tell GTK to leave its event
+    # loop.
     if dialog.choose_finish(result) == YES:
         window.get_application().quit()
 

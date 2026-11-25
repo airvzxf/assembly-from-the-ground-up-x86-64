@@ -445,11 +445,12 @@ Table B-5. Floating-Point Instructions.
   the part after the point). `cvtss2sd` and `cvtsd2ss` convert between
   `float` and `double`.
 
-**ucomisd** _X/M_, _X_ -----> Z/P/C:
+**ucomisd** _X/M_, _X_ -----> O/S/Z/A/P/C:
 
-> Compares two `double`s and sets the flags like an unsigned comparison
-  (use `ja`, `jb`, `jae`, `jbe` after it). The parity flag is set if
-  one of the numbers is not a number (NaN).
+> Compares two `double`s and sets the zero, parity and carry flags like
+  an unsigned comparison (use `ja`, `jb`, `jae`, `jbe` after it); it
+  clears the overflow, sign and auxiliary carry flags. The parity flag
+  is set if one of the numbers is not a number (NaN).
 
 ---
 
