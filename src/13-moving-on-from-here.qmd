@@ -262,7 +262,7 @@ In assembly language, your best resources are on the web.
 -   Paul Hsieh\'s [x86 Assembly Page][13-x86-Assembly-page].
 
 
-[13-Epigrams-in-programming]: http://www.cs.yale.edu/homes/perlis-alan/quotes.html
+[13-Epigrams-in-programming]: https://web.archive.org/web/20241229115350/http://www.cs.yale.edu/homes/perlis-alan/quotes.html
 [13-CSAPP]: http://csapp.cs.cmu.edu/
 [13-Introduction-Algorithms]: https://mitpress.mit.edu/9780262046305/introduction-to-algorithms/
 [13-OSTEP]: https://pages.cs.wisc.edu/~remzi/OSTEP/
@@ -309,9 +309,9 @@ In assembly language, your best resources are on the web.
 [13-Mythical-Man-Month]: https://en.wikipedia.org/wiki/The_Mythical_Man-Month
 [13-The-Art-UNIX]: http://www.catb.org/%7Eesr/writings/taoup/
 [13-Advanced-programming-UNIX]: https://openlibrary.org/isbn/9780321637734
-[13-UNIX-network-programming]: http://www.unpbook.com/
+[13-UNIX-network-programming]: https://unpbook.com/
 [13-Modern-C-plus-plus]: https://openlibrary.org/isbn/9780201704310
-[13-Art-of-compiler-design]: https://www.pearson.com/us/higher-education/program/Pittman-Art-of-Compiler-Design-The-Theory-and-Practice/PGM320140.html
+[13-Art-of-compiler-design]: https://web.archive.org/web/20210316231552/https://www.pearson.com/us/higher-education/program/Pittman-Art-of-Compiler-Design-The-Theory-and-Practice/PGM320140.html
 [13-Advanced-compiler-design]: https://openlibrary.org/works/OL2655436W/Advanced_compiler_design_and_implementation?edition=advancedcompiler00much
 [13-Refactoring-improving]: https://openlibrary.org/books/OL7407595M/Refactoring
 [13-Typesetting]: https://en.wikipedia.org/wiki/Computers_and_Typesetting

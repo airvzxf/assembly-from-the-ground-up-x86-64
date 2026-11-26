@@ -111,6 +111,17 @@ rust64() {
 command -v rustc >/dev/null \
   || fail_build "rustc is not installed (see scripts/install-deps.bash)"
 
+# Every line of a source shown in the book (.s, .rs, .py) must fit in 55
+# columns, the width of a code line in the ePUB. Tabs are not allowed,
+# because their width depends on the reader.
+MAX_COLUMNS=55
+long_lines="$(LC_ALL=C.UTF-8 awk -v max="${MAX_COLUMNS}" '
+  /\t/ { print FILENAME ":" FNR ": has a tab" }
+  length > max { print FILENAME ":" FNR ": " length " columns" }
+' ./*.s ./*.rs ./*.py)"
+[[ -z "${long_lines}" ]] \
+  || fail_build "lines wider than ${MAX_COLUMNS} columns or with tabs:"$'\n'"${long_lines}"
+
 # The 64-bit programs are added here, chapter by chapter, as they replace
 # the 32-bit programs below.
 
