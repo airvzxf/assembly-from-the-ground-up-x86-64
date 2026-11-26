@@ -1,0 +1,20 @@
+# Configuration of the link check (.github/workflows/links.yml).
+# Run it locally with: lychee --config lychee.toml 'src/**/*.qmd' '*.md'
+
+max_concurrency = 8
+max_retries = 3
+timeout = 30
+
+# 429 Too Many Requests means the site is up but limits robots.
+accept = ["200..=299", "429"]
+
+# Sites that can't be checked by a robot. Check them by hand from time
+# to time with a browser.
+exclude = [
+  # Refuses connections from many networks, including CI runners.
+  '^https?://openlibrary\.org/',
+  # Answer 403 Forbidden to robots, but work in a browser.
+  '^https?://www\.intel\.com/',
+  '^https?://mitpress\.mit\.edu/',
+  '^https?://www\.oreilly\.com/',
+]
