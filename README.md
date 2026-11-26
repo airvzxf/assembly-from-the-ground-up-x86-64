@@ -83,7 +83,7 @@ You're able to find my documents about assembly in my GitHub repository [airvzxf
 - License: GNU Free Documentation License, Version 1.1 or any later version published
 - License link: [https://www.gnu.org/licenses/licenses.html#FDL](https://www.gnu.org/licenses/licenses.html#FDL)
 - Resource page: [https://savannah.nongnu.org/projects/pgubook](https://savannah.nongnu.org/projects/pgubook)
-- Source code: [https://cvs.savannah.nongnu.org/viewvc/pgubook/pgubook/ProgrammingGroundUp/](https://cvs.savannah.nongnu.org/viewvc/pgubook/pgubook/ProgrammingGroundUp/)
+- Source code: [https://savannah.nongnu.org/cvs/?group=pgubook](https://savannah.nongnu.org/cvs/?group=pgubook)
 
 ### Original source: Programming under the hood.
 - Title: Programming under the hood
