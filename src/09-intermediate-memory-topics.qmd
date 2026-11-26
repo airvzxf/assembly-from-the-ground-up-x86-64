@@ -430,6 +430,65 @@ Compilers create PIE programs by default today, so in a real program
 almost nothing is at a fixed address. That is one more reason to never
 write an absolute address in your code.
 
+> **Control-Flow Enforcement (CET):**
+> NX stops an attacker from running code they wrote into the data, and
+> ASLR makes it hard to know where to jump. So attackers stopped
+> writing code: they overwrite a return address, or a function pointer,
+> so that it points into code that is already in the program, and they
+> chain small pieces of it. *Control-flow Enforcement Technology*, or
+> *CET*, is the answer of the processor. It has two parts (Intel
+> processors since 2020 have both; AMD processors since Zen 3 have the
+> shadow stack):
+>
+> -   A *shadow stack*. Every `call` also pushes the return address on a
+>     second stack, which the program can\'t write with normal
+>     instructions. Every `ret` compares the two copies, and if they
+>     differ, the processor stops the program.
+>
+> -   *Indirect branch tracking*, or *IBT*. After an indirect `call` or
+>     `jmp` (one through a register or memory, like `call *%rax` or the
+>     jumps of the PLT), the next instruction must be `endbr64`. If it
+>     isn\'t, the processor stops the program. Compilers put `endbr64`
+>     at the start of functions. On a processor without CET it is a
+>     `nop`.
+>
+> CET breaks programs that weren\'t written for it, so, even when the
+> processor, Linux and the C library support it, it is only turned on
+> for programs that say they support it. That is written in
+> a note of the ELF file, which `readelf -n` shows. A small C program
+> built by the GCC of Ubuntu 24.04, and its C library, have it:
+>
+>     Properties: x86 feature: IBT, SHSTK
+>
+> The Rust program of
+> [Chapter 11](11-high-level-languages.qmd#chapter-11-high-level-languages)
+> (`011-01-hello-world`, built by Rust 1.100) has only two notes, and
+> neither one says anything about CET:
+>
+>     Displaying notes found in: .note.ABI-tag
+>     ...
+>     Displaying notes found in: .note.gnu.build-id
+>     ...
+>
+> and `readelf -n 003-01-exit` prints nothing at all: our programs have
+> no notes. A process gets the shadow stack only if the program *and*
+> every library it loads are marked (it is all or nothing), so the Rust
+> program runs without it, even though its C library is marked. That is
+> why every program in this book keeps working, on processors with and
+> without CET. Not that our code would break it: every `call` has its
+> `ret`, and we never change a return address on the stack. You can
+> mark a program yourself, and `ld` tells you what is missing:
+>
+> ```{.bash}
+> ld -z cet-report=warning -o 003-01-exit 003-01-exit.o
+> ```
+>
+>     ld: 003-01-exit.o: warning: missing IBT and SHSTK properties
+>
+> With `ld -z shstk` the program gets the `SHSTK` mark and still exits
+> with `0`. Don\'t claim IBT, though, unless you also add `endbr64` to
+> every place an indirect branch can reach.
+
 Virtual Memory {#virtual-memory}
 --------------
 
