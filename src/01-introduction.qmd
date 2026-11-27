@@ -75,8 +75,10 @@ learning how to look ahead are all a major part of a programmer\'s work.
 
 If you have problems that you just can\'t get past, or you find a
 mistake in this edition, open an issue in its
-[repository][1-Repository]. All of the example programs, and the
-solutions to the review questions, are there too.
+[repository][1-Repository] (the *Errata* form asks where the mistake
+is and what it should say). All of the example programs, and the
+solutions to the review questions, are there too, and in
+[resource.zip](https://asm64.rovisoft.net/resource.zip).
 
 Your Tools {#your-tools}
 ----------
