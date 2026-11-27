@@ -141,7 +141,27 @@ Table B-1. Data Transfer Instructions.
 
 **xchgq** _R/M_, _R/M_ -----> none:
 
-> Exchange the values of the given operands.
+> Exchange the values of the given operands. With a memory operand it
+  is *atomic* (see `lock` in the integer instructions).
+
+**bswapq** _R_ -----> none:
+
+> Reverses the order of the 8 bytes of a register: `0x0102030405060708`
+  becomes `0x0807060504030201`. It converts between the little-endian
+  order of x86-64 and the big-endian order of network protocols (see
+  [Order of Bytes in a Word](10-counting-like-a-computer.qmd#order-of-bytes-in-a-word)).
+
+**cltq** _Not Applicable_ -----> none:
+
+> Sign-extends _%eax_ into _%rax_, like `movslq %eax, %rax` but one
+  byte shorter. Intel calls it `cdqe`.
+
+**setcc** _R/M_ -----> none:
+
+> Sets a byte to 1 if the condition `cc` is true and to 0 if it is not
+  (the same conditions as the conditional jumps, for example `setl`).
+  Follow it with `movzbq` to get a 64-bit 0 or 1:
+  `cmpq %rsi, %rdi; setl %al; movzbq %al, %rax`.
 
 ---
 
@@ -245,6 +265,29 @@ Table B-2. Integer Instructions.
   second, and stores the result in the second operand. This instruction
   can be used on both signed and unsigned numbers.
 
+**xaddq** _R_, _R/M_ -----> O/S/Z/A/P/C:
+
+> Exchange and add: the second operand gets the sum of both, and the
+  first operand gets the old value of the second. With the `lock`
+  prefix, `lock xaddq %rax, counter(%rip)` adds to a counter shared by
+  several threads and returns its old value, as one indivisible step.
+
+**cmpxchgq** _R_, _R/M_ -----> O/S/Z/A/P/C:
+
+> Compare and exchange: compares _%rax_ with the second operand. If
+  they are equal, it sets the zero flag and stores the first operand in
+  the second; if not, it clears the zero flag and loads the second
+  operand into _%rax_. With `lock`, it is the basis of locks and other
+  structures shared by threads.
+
+**lock** _prefix_ -----> none:
+
+> Makes the instruction that follows (an `add`, `sub`, `inc`, `dec`,
+  `and`, `or`, `xor`, `xadd`, `cmpxchg`, `bts`, `btr` or `btc` on
+  memory) one
+  indivisible operation, so that no other processor core sees or
+  changes the memory in the middle of it.
+
 ---
 
 Logic Instructions {#logic-instructions}
@@ -343,6 +386,30 @@ Table B-3. Logic Instructions.
   the second operand. Sets the overflow and carry flags to false.
   `xorl %eax, %eax` is the usual way to set _%rax_ to 0.
 
+**btq** _I/R_, _R/M_ -----> C:
+
+> Bit test: copies the bit of the second operand whose number is the
+  first operand into the carry flag; `btq $2, %rax` followed by `jc`
+  jumps if bit 2 of _%rax_ is 1. `btsq`, `btrq` and `btcq` also set the
+  bit to 1, reset it to 0 or complement it. The zero flag doesn\'t
+  change; the other flags are undefined.
+
+**bsfq**, **bsrq** _R/M_, _R_ -----> Z:
+
+> Bit scan forward and reverse: the number of the lowest (`bsf`) or the
+  highest (`bsr`) bit that is 1 in the first operand goes to the second.
+  For `0x50` (`0101 0000`) they give 4 and 6. If the first operand is 0
+  they set the zero flag and the result is undefined; the other flags
+  are undefined.
+
+**tzcntq**, **lzcntq** _R/M_, _R_ -----> Z/C:
+
+> Count the trailing (lowest) or leading (highest) zero bits. Unlike
+  `bsf` and `bsr` they work for 0, which gives 64 and sets the carry
+  flag; the zero flag says the result is 0. They need a processor with
+  the BMI1 and LZCNT extensions (Intel since 2013, AMD since 2012);
+  older ones run them as `bsf` and `bsr` without warning.
+
 ---
 
 In the shifts and rotations, the flags are only changed when the count
@@ -396,6 +463,11 @@ Table B-4. Flow Control Instructions.
   address. Alternatively, the destination address can be an asterisk
   followed by a register for an indirect jump. For example, `jmp *%rax`
   will jump to the address in _%rax_.
+
+**leave** _Not Applicable_ -----> none:
+
+> Ends a stack frame: the same as `movq %rbp, %rsp` followed by
+  `popq %rbp`. Compilers put it before `ret`.
 
 **ret** _Not Applicable_ -----> none:
 
@@ -457,6 +529,113 @@ Table B-5. Floating-Point Instructions.
 
 ---
 
+String Instructions {#string-instructions}
+-------------------
+
+These instructions work on blocks of memory. They use _%rsi_ as the
+source address and _%rdi_ as the destination, and after each element
+they move both forward by its size (1, 2, 4 or 8 bytes, the suffix `b`,
+`w`, `l` or `q`), or backwards if the direction flag is 1. The calling
+convention guarantees that it is 0 when a function starts.
+
+Table B-6. String Instructions.
+
+**Instruction** _Operands_ -----> Affected Flags.
+
+---
+
+**movsb**, **movsq** _Not Applicable_ -----> none:
+
+> Copy one element from `(%rsi)` to `(%rdi)`. With the `rep` prefix,
+  repeat it _%rcx_ times: `rep movsb` copies _%rcx_ bytes, and is how
+  `memcpy` copies big blocks on current processors.
+
+**stosb**, **stosq** _Not Applicable_ -----> none:
+
+> Store _%al_ (or _%rax_) at `(%rdi)`. `rep stosb` fills _%rcx_ bytes,
+  like `memset`.
+
+**lodsb**, **lodsq** _Not Applicable_ -----> none:
+
+> Load `(%rsi)` into _%al_ (or _%rax_).
+
+**cmpsb**, **cmpsq** _Not Applicable_ -----> O/S/Z/A/P/C:
+
+> Compare `(%rsi)` with `(%rdi)`, like `cmp`. With `repe`, repeat
+  while they are equal and _%rcx_ isn\'t 0, which compares two blocks.
+
+**scasb**, **scasq** _Not Applicable_ -----> O/S/Z/A/P/C:
+
+> Compare _%al_ (or _%rax_) with `(%rdi)`. With `repne`, repeat while
+  they are different: with _%al_ = 0 and _%rcx_ = -1, `repne scasb`
+  finds the end of a string, and the length is `not` _%rcx_ minus 1.
+
+**cld**, **std** _Not Applicable_ -----> D:
+
+> Clear or set the direction flag. A function that sets it must clear
+  it before calling another function or returning.
+
+---
+
+Other Instructions {#other-instructions}
+------------------
+
+Table B-7. Other Instructions.
+
+**Instruction** _Operands_ -----> Affected Flags.
+
+---
+
+**nop** _Not Applicable_ -----> none:
+
+> Does nothing. Assemblers and compilers use longer forms (up to 15
+  bytes) to align code, for example the start of a loop.
+
+**endbr64** _Not Applicable_ -----> none:
+
+> Marks a place where an indirect `call` or `jmp` may land, for CET
+  (see
+  [Chapter 9](09-intermediate-memory-topics.qmd#chapter-9.-intermediate-memory-topics)).
+  On processors without CET it is a `nop`.
+
+**pause** _Not Applicable_ -----> none:
+
+> A hint for loops that wait for another thread to change a value: it
+  saves power and lets the other thread of the same core run.
+
+**rdtsc** _Not Applicable_ -----> none:
+
+> Reads the processor\'s time-stamp counter, which grows at a constant
+  rate, into _%rdx_:_%rax_ (the high and the low 32 bits). Programs use
+  it to measure short times in cycles.
+
+**cpuid** _Not Applicable_ -----> none:
+
+> Tells which processor this is and what it supports. The question goes
+  in _%rax_ (and sometimes _%rcx_), and the answer comes back in _%rax_,
+  _%rbx_, _%rcx_ and _%rdx_; for example, `cpuid` with _%rax_ = 7 and
+  _%rcx_ = 0 says in bit 3 of _%rbx_ whether BMI1 exists.
+
+**int3** _Not Applicable_ -----> none:
+
+> A one-byte breakpoint: Linux stops the program with the signal
+  `SIGTRAP` (status 133 in the shell). A debugger puts it over the
+  instruction where you set a breakpoint.
+
+**ud2** _Not Applicable_ -----> none:
+
+> An instruction that is guaranteed not to exist: Linux stops the
+  program with `SIGILL` (status 132). Compilers put it where the program
+  must never arrive.
+
+**hlt** _Not Applicable_ -----> none:
+
+> Stops the processor until the next interrupt. Only the kernel may run
+  it; in a user program it is a segmentation fault (status 139), like
+  every other privileged instruction.
+
+---
+
 Assembler Directives {#assembler-directives}
 --------------------
 
@@ -464,7 +643,7 @@ These are instructions to the assembler and linker, instead of
 instructions to the processor. These are used to help the assembler put
 your code together properly, and make it easier to use.
 
-Table B-6. Assembler Directives.
+Table B-8. Assembler Directives.
 
 **Directive** _Operands_.
 
