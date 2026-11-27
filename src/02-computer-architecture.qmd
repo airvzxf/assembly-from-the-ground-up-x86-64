@@ -216,6 +216,41 @@ another. If the instruction pointer points to a memory word, it is
 loaded as an instruction. Other than that, the computer has no way of
 knowing the difference between programs and other types of data.[^2-3]
 
+### Registers and Memory {#registers-and-memory}
+
+Registers and memory both hold numbers, and instructions can use both,
+so it is easy to mix them up. They are different things, and the
+differences decide how we write programs:
+
+| | Registers | Memory |
+|-------------|----------------------|----------------------|
+| Where | Inside the processor | Outside it, in the memory chips |
+| How many | 16 for numbers (two of them, _%rsp_ and _%rbp_, have special jobs; Chapter 3 lists them), and a few others like the instruction pointer | Billions of locations |
+| Size | 8 bytes each | 1 byte each; a bigger number uses several locations in a row |
+| Named by | Its name, like _%rax_ | Its address, a number |
+| Speed | Ready for the next instruction | Several cycles from the cache, and hundreds from the memory chips |
+
+Some consequences:
+
+-   A register has no address. You can\'t have a pointer to a register,
+    and you can\'t pick a register with a number computed while the
+    program runs: the register is written in the instruction. Memory
+    locations are numbered, so the program can compute which one to use,
+    which is what the addressing modes of the next section do.
+
+-   Most x86-64 instructions can use *at most one* memory location. The
+    other operand has to be a register or a number. So to copy a value
+    from one memory location to another, you load it into a register
+    first and store it from there.
+
+-   There are only a few registers, so values that a program needs for
+    a long time, or that are too many or too big, live in memory, and
+    the program brings them into registers when it works on them.
+
+-   When a program ends, its registers and its memory are both gone.
+    Only what it wrote to a file stays (see
+    [Chapter 5](05-dealing-with-files.qmd#chapter-5-dealing-with-files)).
+
 Interpreting Memory {#interpreting-memory}
 -------------------
 
@@ -447,6 +482,8 @@ Review {#review}
 
 -   What is a register? How would computation be more difficult without
     registers?
+
+-   Name three differences between a register and a memory location.
 
 -   How do you represent numbers larger than 255?
 
