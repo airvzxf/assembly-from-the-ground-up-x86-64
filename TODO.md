@@ -65,7 +65,8 @@
   - [ ] Appendices.
     - [x] A full description of the calling sequence for UNIX.
       - Appendix M. The System V Calling Sequence.
-    - [ ] A complete examination of the fetch-execute cycle.
+    - [x] A complete examination of the fetch-execute cycle.
+      - Appendix N. The Fetch-Execute Cycle.
     - [x] A complete listing of registers and flags.
       - Appendix L.
 

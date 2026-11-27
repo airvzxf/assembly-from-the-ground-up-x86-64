@@ -53,6 +53,7 @@ book:
     - appendix-k-solutions-to-the-review-questions.qmd
     - appendix-l-registers-and-flags.qmd
     - appendix-m-the-system-v-calling-sequence.qmd
+    - appendix-n-the-fetch-execute-cycle.qmd
 
 lang: en-US
 rights: >-
