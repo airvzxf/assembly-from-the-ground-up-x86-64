@@ -258,7 +258,9 @@ special-purpose registers, including:
 
 -   _%rflags_
 
-We\'ll discuss these later, just be aware that they exist.[^3-5] Some of
+We\'ll discuss these later, just be aware that they exist.[^3-5]
+([Appendix L](appendix-l-registers-and-flags.qmd#appendix-l-registers-and-flags)
+lists every register and what it is used for.) Some of
 these registers, like _%rip_ and _%rflags_ can only be
 accessed through special instructions. The others can be accessed using
 the same instructions as general-purpose registers, but they have

@@ -70,6 +70,9 @@ C:
     signal an error, or ignore it entirely).
 
 Other flags exist, but they are much less important.
+[Appendix L](appendix-l-registers-and-flags.qmd#appendix-l-registers-and-flags)
+lists every bit of _%rflags_ and the flags that each conditional jump
+tests.
 
 Data Transfer Instructions {#data-transfer-instructions}
 --------------------------
