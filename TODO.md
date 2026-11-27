@@ -96,8 +96,9 @@
       - In this new format, I'm replacing the table images with ASCII tables, this format is fine.
     - [x] Need floating point reference. For more information on using floating point numbers in assembly language, `see:`.
       - Added references.
-  - [ ] Chapter 12. Optimization
-    - [ ] Dominique suggestion - have an appendix with multiple versions of optimized code
+  - [x] Chapter 12. Optimization
+    - [x] Dominique suggestion - have an appendix with multiple versions of optimized code
+      - Appendix O: four versions of `strlen`, tested with Python and timed against the C library.
 
 
 ### My notes.

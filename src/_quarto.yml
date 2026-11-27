@@ -54,6 +54,7 @@ book:
     - appendix-l-registers-and-flags.qmd
     - appendix-m-the-system-v-calling-sequence.qmd
     - appendix-n-the-fetch-execute-cycle.qmd
+    - appendix-o-optimized-versions.qmd
 
 lang: en-US
 rights: >-

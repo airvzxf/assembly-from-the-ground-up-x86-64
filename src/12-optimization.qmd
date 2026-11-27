@@ -468,6 +468,11 @@ what doesn\'t. Deciding how to tackle optimization problems in code
 involves looking at all the issues, and knowing that fixing some issues
 may cause others.
 
+To see local and global optimization at work on one function, read
+[Appendix O](appendix-o-optimized-versions.qmd#appendix-o-optimized-versions-of-a-function):
+four versions of the length of a string, tested and timed, from the
+loop of Chapter 6 to one that handles 16 bytes at a time.
+
 Review {#review-10}
 ------
 

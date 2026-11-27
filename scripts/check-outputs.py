@@ -25,9 +25,10 @@ output with the block:
   sessions, the lines of the book must appear in the output in the same
   order.
 
-Not checked: the `perf` outputs of Chapter 12 (their numbers change in
-every run, and `perf` needs a kernel that allows it) and the control-c
-of Appendix F (it stops at a different line every time).
+Not checked: the `perf` outputs of Chapter 12 and the times of Appendix
+O (their numbers change in every run, and `perf` needs a kernel that
+allows it) and the control-c of Appendix F (it stops at a different
+line every time).
 
 Run src/resource/asm/make.bash first. `setarch -R` (Chapter 9) needs
 the personality system call: run the container with
@@ -284,6 +285,9 @@ CHECKS = {
     "appn-gdb-rip": gdb("003-02-maximum"),
     "appn-objdump-bytes": dict(sh("objdump -d 003-02-maximum"),
                                subset=True),
+    # Appendix O (the times of 0AO-03-strlen-time.py change in every
+    # run, so they aren't checked).
+    "appo-strlen-test": sh("python3 0AO-02-strlen-test.py"),
     # Appendix F
     "appf-start": dict(sh("gdb -nx ./003-02-maximum < /dev/null"),
                        setup=BROKEN_MAXIMUM, subset=True),
