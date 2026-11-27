@@ -18,6 +18,7 @@ exclude = [
   '^https?://www\.intel\.com/',
   '^https?://mitpress\.mit\.edu/',
   '^https?://www\.oreilly\.com/',
+  '^https?://developer\.arm\.com/',
   # Work with curl and browsers, but lychee can't agree on TLS with
   # them (HandshakeFailure).
   '^https?://(board\.)?flatassembler\.net/',
