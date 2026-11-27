@@ -41,8 +41,7 @@ Goals:
   - [x] Convert the original _DocBook_ to _Markdown_ with [pandoc](https://pandoc.org/). The book is now built with [Quarto](https://quarto.org/) as a website, an _ePUB_ and a _PDF_ (_MOBI_ is obsolete: Kindle reads _ePUB_).
   - [ ] Improve and update the sections where I am missing.
   - [ ] Try to fix the [bugs](https://savannah.nongnu.org/bugs/?group=pgubook) and [support tickets](https://savannah.nongnu.org/support/?group=pgubook), since 2004 is not updated this [book](https://savannah.nongnu.org/projects/pgubook).
-- [ ] Programming under the hood (another book by Jonathan Bartlett, see below).
-  - [ ] Convert the original _LaTeX_ to _Markdown_ with [pandoc](https://pandoc.org/).
+- [ ] ~~Programming under the hood (another book by Jonathan Bartlett, see below): convert the original _LaTeX_ to _Markdown_.~~ Dropped: the author discontinued it, and the 64-bit rewrite became his new book _Learn to Program with Assembly_.
 - [ ] Final version.
   - [x] Create a version for x64 architecture.
 - [ ] ~~Create my own book from scratch, based on the experience that I gained in this project, in a new GitHub repository.~~ Dropped.
