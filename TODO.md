@@ -73,8 +73,9 @@
   - [x] Chapter 3. Your First Programs.
     - [x] Dominique suggests an extended example of this: Anything strange your program does and why it does it.
       - Added "When a Program Does Something Strange": four changes to the first two programs, run, with their real results explained.
-  - [ ] Chapter 4. All About Functions Dealing with Complexity
-    - [ ] Dominique says "This part can be confusing until one gets to the sample illustration code and then it makes sense."
+  - [x] Chapter 4. All About Functions Dealing with Complexity
+    - [x] Dominique says "This part can be confusing until one gets to the sample illustration code and then it makes sense."
+      - The calling-convention section now starts with the whole call (caller, prologue, epilogue) in one listing, and "The Rule" box was rewritten.
   - [ ] Chapter 5. Dealing with Files
     - [ ] Do I need to introduce flowcharting or reference it here?
     - [ ] Needs to be re-sectionalized and reviewed

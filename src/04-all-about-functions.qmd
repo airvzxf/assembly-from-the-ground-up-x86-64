@@ -141,6 +141,39 @@ language uses to talk to every other language on Linux.[^4-7]
 Assembly-Language Functions using the System V Calling Convention {#assembly-language-functions-using-the-system-v-calling-convention}
 -----------------------------------------------------------------
 
+This section is long, because it explains every step of a function call
+one at a time, and the steps only make sense together. So here they are
+all at once, as the `power` function of the next section does them.
+Read the rest of the section as the explanation of these lines, and come
+back to this listing whenever you get lost:
+
+```{.gnuassembler}
+# The caller:
+    movq  $2, %rdi    # First parameter.
+    movq  $3, %rsi    # Second parameter.
+    call  power       # Push the return address
+                      # and jump to power.
+    # ... the answer is now in %rax ...
+
+# The function:
+power:
+    pushq %rbp        # Save the caller's %rbp.
+    movq  %rsp, %rbp  # Our stack frame starts here.
+    subq  $16, %rsp   # Room for local variables.
+    # ... the work: the parameters are in %rdi
+    # and %rsi, a local variable is at -8(%rbp),
+    # and the answer goes in %rax ...
+    movq  %rbp, %rsp  # Free the local variables.
+    popq  %rbp        # Restore the caller's %rbp.
+    ret               # Pop the return address
+                      # and go back there.
+```
+
+Most functions of this book start and end with these same
+instructions. In between, the stack, a region of memory, keeps the
+return address, the old base pointer and the local variables, so the
+first thing to understand is the stack.
+
 You cannot write assembly-language functions without understanding how
 the computer\'s *stack* works. Each computer program that runs uses
 a region of memory called the stack to enable functions to work
@@ -323,22 +356,26 @@ Now we have two words for local storage. Our stack now looks like this:
 
 > **The Rule:**
 >
-> The positive numbers or operations take the old stored values,
-> negative numbers or operations take the new stored values.
+> From _%rbp_, *positive* offsets reach what was on the stack before the
+> function started (its stack parameters and the return address), and
+> *negative* offsets reach what the function added itself (its local
+> variables). From _%rsp_, which is at the bottom, every offset is
+> positive or zero.
 
-Get the values before `%rbp` (old values):
+Above _%rbp_, with positive offsets (put there before the function
+started):
 
     0x7fffffffe0c8: Parameter 7    <--- 16(%rbp)
     0x7fffffffe0c0: Return Address <---  8(%rbp)
     0x7fffffffe0b8: Old %rbp       <---   (%rbp)
 
-Get the values after `%rbp` (new values):
+Below _%rbp_, with negative offsets (added by the function):
 
     0x7fffffffe0b8: Old %rbp         <---    (%rbp)
     0x7fffffffe0b0: Local Variable 1 <---  -8(%rbp)
     0x7fffffffe0a8: Local Variable 2 <--- -16(%rbp)
 
-Also this rule apply for the %rsp, get the values before `%rsp` (old values):
+The same values from _%rsp_, with positive offsets:
 
     0x7fffffffe0b8: Old %rbp         <---  16(%rsp)
     0x7fffffffe0b0: Local Variable 1 <---   8(%rsp)
