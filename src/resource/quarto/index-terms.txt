@@ -1,0 +1,201 @@
+# Terms of the PDF index (resource/pandoc/lua/index.lua).
+# Each line: the entry | the texts that mark it (case-sensitive; a
+# text inside `code` counts too). Without texts, the entry itself is
+# searched. `Group!entry` makes a sub-entry under Group.
+
+Addressing modes | addressing mode | addressing modes
+Alignment | aligned | alignment
+ASCII | ASCII
+ASLR | ASLR
+AArch64 | AArch64
+ABI | ABI
+Assembler directives | directive | directives
+.bss section | .bss
+.data section | .data
+.text section | .text
+Base pointer | base pointer
+Big-endian | big-endian
+Little-endian | little-endian
+Branch prediction | branch prediction | predict
+Buffer | buffer | buffers
+Bytecode | bytecode
+Cache | cache | caches
+Callee-saved registers | callee-saved
+Caller-saved registers | caller-saved
+Calling convention | calling convention
+Carry flag | carry flag
+CET | CET | shadow stack
+Command-line arguments | command-line argument | command-line arguments | argv
+Constants | constant | constants | .equ
+C library | C library
+Current break | current break
+Dynamic linker | dynamic linker
+ELF | ELF
+Endianness | byte order | order of bytes
+Error codes | error code | error codes | errno
+Exit status | exit status
+Fetch-execute cycle | fetch-execute
+File descriptor | file descriptor | file descriptors
+Flags | flags register | status register | the flags
+Floating point | floating-point | floating point
+Frame pointer | frame pointer
+GOT | GOT | global offset table
+GTK | GTK
+Heap | heap
+Hexadecimal | hexadecimal
+Immediate mode | immediate mode
+Indexed addressing | indexed addressing
+Indirect addressing | indirect addressing
+Instruction pointer | instruction pointer
+Instruction-pointer-relative addressing | instruction-pointer-relative | relative to %rip | relative to _%rip_
+Interpreter | interpreter | interpreted
+Linker | linker
+Local variables | local variable | local variables
+Memory manager | memory manager | allocator
+Negative numbers | two's complement | two’s complement | negative number | negative numbers
+Null character | null character | null byte | null-terminated
+Object file | object file | object files
+Octal | octal
+Optimization | optimization | optimize | optimizing
+Overflow flag | overflow flag
+Page (memory) | page of memory | pages of memory | 4096 bytes
+PIE | PIE | position-independent executable
+Pipelining | pipelining | pipeline
+PLT | PLT | procedure linkage table
+Position-independent code | position-independent code | PIC
+Records | record | records
+Recursion | recursive | recursion
+Red zone | red zone
+Relocation | relocation | relocations
+Return address | return address
+Return value | return value
+Segmentation fault | segmentation fault
+Shared library | shared library | shared libraries | dynamic library
+Sign flag | sign flag
+Signal | signal | SIGSEGV | SIGILL | SIGTRAP
+SSE2 | SSE2 | SSE
+Stack | stack
+Stack frame | stack frame
+Standard error (STDERR) | STDERR | standard error
+Standard input (STDIN) | STDIN | standard input
+Standard output (STDOUT) | STDOUT | standard output
+Static linking | statically-linked | statically linked | static linking
+System call | system call | system calls
+System V calling convention | System V
+Two's complement | two's complement | two’s complement
+Unsigned numbers | unsigned
+Virtual memory | virtual memory | virtual address
+Word | word size | quadword
+Zero flag | zero flag
+
+Registers!%rax
+Registers!%rbx
+Registers!%rcx
+Registers!%rdx
+Registers!%rsi
+Registers!%rdi
+Registers!%rbp
+Registers!%rsp
+Registers!%r8
+Registers!%r9
+Registers!%r10
+Registers!%r11
+Registers!%r12
+Registers!%r13
+Registers!%r14
+Registers!%r15
+Registers!%rip
+Registers!%rflags
+Registers!%xmm0
+
+Instructions!movq
+Instructions!movb
+Instructions!movl
+Instructions!movzbq
+Instructions!movslq
+Instructions!leaq
+Instructions!pushq
+Instructions!popq
+Instructions!addq
+Instructions!subq
+Instructions!imulq
+Instructions!mulq
+Instructions!divq
+Instructions!idivq
+Instructions!incq
+Instructions!decq
+Instructions!negq
+Instructions!cmpq
+Instructions!testq
+Instructions!andq
+Instructions!orq
+Instructions!xorq
+Instructions!notq
+Instructions!shlq
+Instructions!shrq
+Instructions!sarq
+Instructions!jmp
+Instructions!je
+Instructions!jne
+Instructions!jg
+Instructions!jge
+Instructions!jl
+Instructions!jle
+Instructions!ja
+Instructions!jb
+Instructions!call
+Instructions!ret
+Instructions!syscall
+Instructions!cmov
+Instructions!setcc
+Instructions!bswapq
+Instructions!xaddq
+Instructions!cmpxchgq
+Instructions!lock
+Instructions!btq
+Instructions!bsfq
+Instructions!bsrq
+Instructions!tzcntq
+Instructions!lzcntq
+Instructions!rep movsb
+Instructions!repne scasb
+Instructions!nop
+Instructions!endbr64
+Instructions!cpuid
+Instructions!rdtsc
+Instructions!int3
+Instructions!ud2
+Instructions!leave
+Instructions!cqto
+Instructions!movsd
+Instructions!addsd
+Instructions!ucomisd
+Instructions!cvtsi2sdq
+Instructions!pcmpeqb
+Instructions!pmovmskb
+
+System calls!read
+System calls!write
+System calls!openat
+System calls!close
+System calls!exit
+System calls!brk
+System calls!mmap
+System calls!munmap
+System calls!lseek
+
+Tools!as
+Tools!ld
+Tools!gdb
+Tools!strace
+Tools!objdump
+Tools!readelf
+Tools!ldd
+Tools!hexdump
+Tools!od
+Tools!perf
+Tools!rustc
+Tools!python3
+Tools!setarch
+Tools!qemu-aarch64
+Tools!pkg-config

@@ -83,7 +83,7 @@ solutions to the review questions, are there too, and in
 Your Tools {#your-tools}
 ----------
 
-This book teaches assembly language for x86-64 processors (the 64-bit
+This book teaches assembly language`#index("Tools")`{=typst} for x86-64 processors (the 64-bit
 processors made by Intel and AMD, found in most desktop computers,
 laptops and servers) and the GNU/Linux operating system. Therefore we
 will be giving all of the examples using the standard GNU tools: the
