@@ -179,9 +179,59 @@ following:
 This will cause a file called `test.dat` to be created containing the
 records. However, since they contain non-printable characters (the null
 character, specifically), they may not be viewable by a text editor.
-Therefore we need the next program to read them for us. (If you are
-curious, `od -c test.dat` shows every byte of the file, including the
-null characters.)
+Therefore we need the next program to read them for us. But first,
+let\'s look at the bytes themselves.
+
+### Looking at the Bytes of a File {#looking-at-the-bytes-of-a-file}
+
+A *hex dump* prints every byte of a file as a number, together with the
+character that the byte stands for. It is the tool to use when you want
+to know exactly what a program wrote. `hexdump -C test.dat` (on Ubuntu,
+`hexdump` comes in the package `bsdextrautils`) starts like this:
+
+```{.text check=ch06-hexdump-records}
+00000000  46 72 65 64 72 69 63 6b  00 00 00 00 00 00 00 00  |Fredrick........|
+00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000020  00 00 00 00 00 00 00 00  42 61 72 74 6c 65 74 74  |........Bartlett|
+00000030  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+*
+00000050  34 32 34 32 20 53 20 50  72 61 69 72 69 65 0a 54  |4242 S Prairie.T|
+00000060  75 6c 73 61 2c 20 4f 4b  20 35 35 35 35 35 00 00  |ulsa, OK 55555..|
+00000070  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+*
+00000140  2d 00 00 00 00 00 00 00  4d 61 72 69 6c 79 6e 00  |-.......Marilyn.|
+```
+
+Each line shows 16 bytes. The first column is the *offset* of the
+first byte of the line, its position in the file, counted from 0 and
+written in hexadecimal (`0x10` is 16, `0x28` is 40, `0x50` is 80 and
+`0x140` is 320; see
+[Octal and Hexadecimal Numbers](10-counting-like-a-computer.qmd#octal-and-hexadecimal-numbers)).
+Then come the 16 bytes, also in hexadecimal, and between the bars the
+same bytes as characters, with a dot for every byte that isn\'t a
+printable character. A `*` stands for one or more lines that are the
+same as the line above it; here, all zeros.
+
+Now we can find every field of the first record:
+
+-   The first name, `Fredrick` (`46 72 65 ...`, the ASCII codes of its
+    letters, see
+    [Appendix D](appendix-d-table-of-ascii-codes.qmd#appendix-d-table-of-ascii-codes)),
+    starts at offset 0. `.ascii "Fredrick\0"` wrote 9 bytes, and
+    `.rept` filled the rest of the 40 bytes with zeros.
+
+-   The last name, `Bartlett`, starts at offset 40 (`0x28`).
+
+-   The address starts at offset 80 (`0x50`). The `0a` in it is the
+    newline character, shown as a dot on the right.
+
+-   The age is at offset 320 (`0x140`): `2d 00 00 00 00 00 00 00`,
+    the number 45 (`0x2d`) in 8 bytes, with its lowest byte first (see
+    [Order of Bytes in a Word](10-counting-like-a-computer.qmd#order-of-bytes-in-a-word)).
+
+Right after the age, at offset 328 (`0x148`), the second record
+begins: `Marilyn`. Other tools show the same view: `od -A x -t x1z`
+(part of every Linux system) and `xxd` (which comes with Vim).
 
 Reading Records {#reading-records}
 ---------------
@@ -370,6 +420,9 @@ Review {#review-4}
 
 -   Create a program to find the smallest age in the file and return
     that age as the status code of the program.
+
+-   Use `hexdump -C` to find the age of the third record of `test.dat`.
+    At which offset is it?
 
 ### Going Further {#going-further-4}
 

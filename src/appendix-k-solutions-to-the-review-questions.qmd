@@ -817,6 +817,20 @@ The minimum program only changes `jle` to `jge` (see
 `0AK-06-04-min-age.s`). With the `test.dat` of `006-01-write-records`,
 they return `45` and `29`.
 
+**Find the age of the third record with `hexdump -C`.** The third
+record starts after two records, at offset 2 × 328 = 656 (`0x290`),
+and its age is 320 bytes further, at offset 976 (`0x3d0`). The last line
+of `hexdump -C test.dat` is that age (`-s 976 -n 8` would show only those
+8 bytes):
+
+```{.text check=appk-hexdump-third-age}
+000003d0  24 00 00 00 00 00 00 00                           |$.......|
+000003d8
+```
+
+`0x24` is 36, the age of Derrick McIntire. The last line, `000003d8`
+(984), is the size of the file: 3 × 328.
+
 ### Going Further {#going-further-15}
 
 -   **Use command-line arguments to specify the filenames.** As in

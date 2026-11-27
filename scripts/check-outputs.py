@@ -158,6 +158,9 @@ CHECKS = {
         sh("printf 'Hey diddle diddle,\\nthe cat and the fiddle.\\n'"
            " > input.txt; strace ./005-01-toupper input.txt output.txt"),
         subs=[ENVP]),
+    # Chapter 6
+    "ch06-hexdump-records": dict(
+        sh("./006-01-write-records && hexdump -C test.dat"), subset=True),
     # Chapter 8
     "ch08-readelf-needed": dict(sh("readelf -d 008-01-hello-world-lib"),
                                 subset=True),
@@ -268,6 +271,8 @@ CHECKS = {
         subs=[ENVP]),
     "appk-records": sh("./0AK-06-01-write-records"
                        " && ./0AK-06-01-read-records"),
+    "appk-hexdump-third-age": dict(
+        sh("./006-01-write-records && hexdump -C test.dat"), subset=True),
     "appk-factorial-python": sh("python3 0AK-08-05-factorial.py"),
     "appk-print-numbers": sh("./0AK-10-02-print-numbers"),
     "appk-celsius": sh("./0AK-10-06-celsius"),

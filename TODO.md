@@ -76,8 +76,9 @@
     - [ ] Do I need to introduce flowcharting or reference it here?
     - [ ] Needs to be re-sectionalized and reviewed
     - [ ] Probably need to start with a "hello world" program
-  - [ ] Chapter 6. Reading and Writing Simple Records
-    - [ ] Need to add info on how to use a hexdump to read the values
+  - [x] Chapter 6. Reading and Writing Simple Records
+    - [x] Need to add info on how to use a hexdump to read the values
+      - Added the section "Looking at the Bytes of a File" (`hexdump -C test.dat`) and a review question.
   - [x] Chapter 10. Counting Like a Computer Counting
     - [x] These need to be converted to tables.
       - In this new format, I'm replacing the table images with ASCII tables, this format is fine.
