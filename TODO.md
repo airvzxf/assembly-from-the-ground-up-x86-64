@@ -61,7 +61,8 @@
   - [ ] Need to find places that need more filling out.  Reviews, definitely.
   - [x] Go back through and make sure that registers and memory are both fully described and fully distinguished.
     - Added "Registers and Memory" to Chapter 2: a comparison table, its consequences and a review question.
-  - [ ] Instructions needs some more beef from reference books.
+  - [x] Instructions needs some more beef from reference books.
+    - Appendix B now also has `bswap`, `cltq`, `set`*cc*, `xadd`, `cmpxchg`, `lock`, the bit tests and scans, `leave`, the string instructions and a table of other instructions, from the Intel manuals; each one was run in the container.
   - [ ] Appendices.
     - [x] A full description of the calling sequence for UNIX.
       - Appendix M. The System V Calling Sequence.
