@@ -53,8 +53,10 @@ the debugger, you would type in `gdb ./003-02-maximum`. Be sure that the
 source files are in the current directory. GDB prints its version and a
 few lines about its license and its help, and then:
 
-    Reading symbols from ./003-02-maximum...
-    (gdb)
+```{.text check=appf-start}
+Reading symbols from ./003-02-maximum...
+(gdb)
+```
 
 The sessions in this appendix were made with GDB 15.1 on Ubuntu 24.04.
 Depending on which version of GDB you are running, the output may vary
@@ -84,18 +86,20 @@ of this program, keep on entering `stepi` (for \"step instruction\"),
 which will cause the computer to execute one instruction at a time. If
 you do this several times, your output will look something like this:
 
-    (gdb) stepi
-    41      jle _start_loop         # Jump to loop beginning if
-    (gdb) stepi
-    37      cmpq $0, %rax           # Check to see if we have
-    (gdb) stepi
-    38      je _loop_exit           # hit the end.
-    (gdb) stepi
-    39      movq (%rbx,%rcx,8), %rax  # Load next value.
-    (gdb) stepi
-    40      cmpq %rdi, %rax         # Compare values.
-    (gdb) stepi
-    41      jle _start_loop         # Jump to loop beginning if
+```{.text check=appf-stepi}
+(gdb) stepi
+41      jle _start_loop         # Jump to loop beginning if
+(gdb) stepi
+37      cmpq $0, %rax           # Check to see if we have
+(gdb) stepi
+38      je _loop_exit           # hit the end.
+(gdb) stepi
+39      movq (%rbx,%rcx,8), %rax  # Load next value.
+(gdb) stepi
+40      cmpq %rdi, %rax         # Compare values.
+(gdb) stepi
+41      jle _start_loop         # Jump to loop beginning if
+```
 
 As you can tell, it has looped. In general, this is good, since we wrote
 it to loop. However, the problem is that it is *never stopping*.
@@ -126,18 +130,20 @@ format to choose how it is shown: `print/d $rax` prints it in decimal,
 are prefixed with dollar signs rather than percent signs. Your screen
 should have this on it:
 
-    (gdb) print $rax
-    $1 = 3
-    (gdb) print/d $rax
-    $2 = 3
-    (gdb) print/t $rax
-    $3 = 11
-    (gdb) print/o $rax
-    $4 = 03
-    (gdb) print/x $rax
-    $5 = 0x3
-    (gdb) print/c $rax
-    $6 = 3 '\003'
+```{.text check=appf-print}
+(gdb) print $rax
+$1 = 3
+(gdb) print/d $rax
+$2 = 3
+(gdb) print/t $rax
+$3 = 11
+(gdb) print/o $rax
+$4 = 03
+(gdb) print/x $rax
+$5 = 0x3
+(gdb) print/c $rax
+$6 = 3 '\003'
+```
 
 The formats are `d` (decimal), `t` (binary), `o` (octal), `x`
 (hexadecimal) and `c` (character). This means that the result of your
@@ -149,12 +155,14 @@ list with the `x` command, which examines memory: `x/9gd &data_items`
 shows 9 giant words (`g`, 8 bytes each) in decimal (`d`), starting at
 the address of `data_items`:
 
-    (gdb) x/9gd &data_items
-    0x402000:       3       67
-    0x402010:       34      222
-    0x402020:       45      22
-    0x402030:       11      125
-    0x402040:       0
+```{.text check=appf-examine}
+(gdb) x/9gd &data_items
+0x402000:       3       67
+0x402010:       34      222
+0x402020:       45      22
+0x402030:       11      125
+0x402040:       0
+```
 
 If you step through the loop a few more times, you will find that in
 every loop iteration _%rax_ has the number 3. This is not what should be
@@ -177,12 +185,14 @@ the label is in front of the right data, but in our case it is.
 Therefore, we need to look at _%rcx_. `info registers` can also show
 only the registers you name:
 
-    (gdb) info registers rax rbx rcx rdi rip
-    rax            0x3                 3
-    rbx            0x402000            4202496
-    rcx            0x0                 0
-    rdi            0x3                 3
-    rip            0x40101b            0x40101b <_start_loop+6>
+```{.text check=appf-info-registers}
+(gdb) info registers rax rbx rcx rdi rip
+rax            0x3                 3
+rbx            0x402000            4202496
+rcx            0x0                 0
+rdi            0x3                 3
+rip            0x40101b            0x40101b <_start_loop+6>
+```
 
 This indicates that _%rcx_ is set to zero, which is why it keeps on
 loading the first element of the list. This should cause you to ask
@@ -229,17 +239,19 @@ program with line numbers, ten lines at a time; `list 25,29` prints
 those lines. Let\'s try it with the factorial program of
 [Chapter 4. All About Functions](04-all-about-functions.qmd#chapter-4-all-about-functions):
 
-    (gdb) break 27
-    Breakpoint 1 at 0x401007: file 004-02-factorial.s, line 27.
-    (gdb) run
-    Breakpoint 1, _start () at 004-02-factorial.s:27
-    27          call factorial          # Run the factorial
-    (gdb) list 25,29
-    25                                  # want a factorial of. It
-    26                                  # goes in %rdi.
-    27          call factorial          # Run the factorial
-    28                                  # function.
-    29
+```{.text check=appf-break-line}
+(gdb) break 27
+Breakpoint 1 at 0x401007: file 004-02-factorial.s, line 27.
+(gdb) run
+Breakpoint 1, _start () at 004-02-factorial.s:27
+27          call factorial          # Run the factorial
+(gdb) list 25,29
+25                                  # want a factorial of. It
+26                                  # goes in %rdi.
+27          call factorial          # Run the factorial
+28                                  # function.
+29
+```
 
 When stepping through code, you often don\'t want to have to step
 through every instruction of every function. Well-tested functions are
@@ -250,10 +262,12 @@ on. Otherwise, with `stepi`, GDB would step you through every
 instruction within every called function. Here, `nexti` runs the whole
 calculation, with all its recursive calls, and stops after the `call`:
 
-    (gdb) nexti
-    30          movq %rax, %rdi         # factorial returns the
-    (gdb) print $rax
-    $1 = 24
+```{.text check=appf-nexti}
+(gdb) nexti
+30          movq %rax, %rdi         # factorial returns the
+(gdb) print $rax
+$1 = 24
+```
 
 The commands `step` and `next` do the same as `stepi` and `nexti`, but
 one source line at a time instead of one instruction at a time. In
@@ -269,15 +283,17 @@ To pass arguments to a program, type them after `run`, or use
 `set args` before it, as you would on the command line. Let\'s use the
 breakpoint to watch the recursion:
 
-    (gdb) break factorial
-    Breakpoint 1 at 0x401018: file 004-02-factorial.s, line 44.
-    (gdb) run
-    Breakpoint 1, factorial () at 004-02-factorial.s:44
-    44          pushq %rbp              # Standard function stuff
-    (gdb) print $rdi
-    $1 = 4
-    (gdb) print (long)$rsp % 16
-    $2 = 8
+```{.text check=appf-break-function}
+(gdb) break factorial
+Breakpoint 1 at 0x401018: file 004-02-factorial.s, line 44.
+(gdb) run
+Breakpoint 1, factorial () at 004-02-factorial.s:44
+44          pushq %rbp              # Standard function stuff
+(gdb) print $rdi
+$1 = 4
+(gdb) print (long)$rsp % 16
+$2 = 8
+```
 
 The parameter is 4, in _%rdi_. The second command checks the alignment
 rule of Chapter 4: when a function starts, the `call` has just pushed
@@ -287,17 +303,19 @@ next call to `factorial`, and prints the same two lines as the first
 breakpoint (we show them only once). Then print _%rdi_ again, and ask
 for a *backtrace*, the list of functions that are waiting for a return:
 
-    (gdb) continue
-    Breakpoint 1, factorial () at 004-02-factorial.s:44
-    44          pushq %rbp              # Standard function stuff
-    (gdb) print $rdi
-    $3 = 1
-    (gdb) backtrace
-    #0  factorial () at 004-02-factorial.s:44
-    #1  0x0000000000401035 in factorial () at 004-02-factorial.s:66
-    #2  0x0000000000401035 in factorial () at 004-02-factorial.s:66
-    #3  0x0000000000401035 in factorial () at 004-02-factorial.s:66
-    #4  0x000000000040100c in _start () at 004-02-factorial.s:27
+```{.text check=appf-continue}
+(gdb) continue
+Breakpoint 1, factorial () at 004-02-factorial.s:44
+44          pushq %rbp              # Standard function stuff
+(gdb) print $rdi
+$3 = 1
+(gdb) backtrace
+#0  factorial () at 004-02-factorial.s:44
+#1  0x0000000000401035 in factorial () at 004-02-factorial.s:66
+#2  0x0000000000401035 in factorial () at 004-02-factorial.s:66
+#3  0x0000000000401035 in factorial () at 004-02-factorial.s:66
+#4  0x000000000040100c in _start () at 004-02-factorial.s:27
+```
 
 This is the recursion of Chapter 4, seen from inside: `_start` called
 `factorial(4)`, which called `factorial(3)`, which called
@@ -308,20 +326,22 @@ of saved _%rbp_ values (see
 [The Frame Pointer](12-optimization.qmd#the-frame-pointer)). `finish`
 runs until the current function returns, and stops in its caller:
 
-    (gdb) finish
-    factorial () at 004-02-factorial.s:68
-    68          imulq -8(%rbp), %rax    # Multiply our number by
-    (gdb) print $rax
-    $4 = 1
-    (gdb) info frame
-    Stack level 0, frame at 0x7fffffffecd0:
-     rip = 0x401035 in factorial (004-02-factorial.s:68); saved rip = 0x401035
-     called by frame at 0x7fffffffecf0
-     source language asm.
-     Arglist at 0x7fffffffecc0, args:
-     Locals at 0x7fffffffecc0, Previous frame's sp is 0x7fffffffecd0
-     Saved registers:
-      rbp at 0x7fffffffecc0, rip at 0x7fffffffecc8
+```{.text check=appf-finish}
+(gdb) finish
+factorial () at 004-02-factorial.s:68
+68          imulq -8(%rbp), %rax    # Multiply our number by
+(gdb) print $rax
+$4 = 1
+(gdb) info frame
+Stack level 0, frame at 0x7fffffffecd0:
+ rip = 0x401035 in factorial (004-02-factorial.s:68); saved rip = 0x401035
+ called by frame at 0x7fffffffecf0
+ source language asm.
+ Arglist at 0x7fffffffecc0, args:
+ Locals at 0x7fffffffecc0, Previous frame's sp is 0x7fffffffecd0
+ Saved registers:
+  rbp at 0x7fffffffecc0, rip at 0x7fffffffecc8
+```
 
 `factorial(1)` returned 1, and we are back in `factorial(2)`, about to
 multiply. `info frame` describes the current frame: where the caller\'s

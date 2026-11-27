@@ -345,10 +345,12 @@ upper 32 bits of the 64-bit register*. So `xorl %eax, %eax` sets all of
 _%rax_ to 0, and it is one byte shorter than `xorq %rax, %rax`.
 `objdump -d` shows the bytes of each version:
 
-    48 c7 c0 00 00 00 00    mov    $0x0,%rax
-    b8 00 00 00 00          mov    $0x0,%eax
-    31 c0                   xor    %eax,%eax
-    48 31 c0                xor    %rax,%rax
+```{.text check=ch10-objdump-zero}
+48 c7 c0 00 00 00 00    mov    $0x0,%rax
+b8 00 00 00 00          mov    $0x0,%eax
+31 c0                   xor    %eax,%eax
+48 31 c0                xor    %rax,%rax
+```
 
 The rule only applies to 32-bit registers. Writing an 8-bit or a 16-bit
 register (_%al_, _%bx_) leaves the rest of the 64-bit register as it
@@ -361,10 +363,12 @@ movq  $-1, %rbx
 movw  $5, %bx           # %rbx is 0xffffffffffff0005.
 ```
 
-    (gdb) p/x $rax
-    $1 = 0x5
-    (gdb) p/x $rbx
-    $2 = 0xffffffffffff0005
+```{.text check=ch10-gdb-registers}
+(gdb) p/x $rax
+$1 = 0x5
+(gdb) p/x $rbx
+$2 = 0xffffffffffff0005
+```
 
 Keep this rule in mind with the `int` parameters and results of the C
 library (see
@@ -790,10 +794,12 @@ ld -o 010-03-floating-point 010-03-floating-point.o \
 
 And this is what it prints:
 
-    16777216 + 1 = 16777216.0 (float)
-    16777216 + 1 = 16777217.0 (double)
-    0.1 + 0.2 = 0.30000000000000004
-    7 / 2 = 3.5, truncated to 3
+```{.text check=ch10-floating-point}
+16777216 + 1 = 16777216.0 (float)
+16777216 + 1 = 16777217.0 (double)
+0.1 + 0.2 = 0.30000000000000004
+7 / 2 = 3.5, truncated to 3
+```
 
 `%.1f` prints one digit after the point, and `%.17g` prints 17
 significant digits, enough to show exactly which `double` we have. Run
@@ -1011,8 +1017,10 @@ can print those 8 bytes one by one, in hexadecimal:
 od -A d -t x1 -j 320 -N 8 test.dat
 ```
 
-    0000320 2d 00 00 00 00 00 00 00
-    0000328
+```{.text check=ch10-od-age}
+0000320 2d 00 00 00 00 00 00 00
+0000328
+```
 
 The byte with the value 0x2d, the least significant one, comes first.
 

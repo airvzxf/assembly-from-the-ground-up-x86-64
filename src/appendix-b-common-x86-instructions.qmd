@@ -635,7 +635,7 @@ assembler itself accepts it after the directive
 (`objdump -d` and `objdump -d -M intel`, with `--no-show-raw-insn`):
 
 
-```
+```{.text check=appb-objdump-att}
 0000000000401000 <_start>:
   401000:       lea    0xff9(%rip),%rbx        # 402000 <data_items>
   401007:       mov    $0x0,%rcx
@@ -653,7 +653,7 @@ assembler itself accepts it after the directive
   40102a:       jmp    401015 <_start_loop>
 ```
 
-```
+```{.text check=appb-objdump-intel}
 0000000000401000 <_start>:
   401000:       lea    rbx,[rip+0xff9]        # 402000 <data_items>
   401007:       mov    rcx,0x0

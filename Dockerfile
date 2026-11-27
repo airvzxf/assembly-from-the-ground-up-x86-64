@@ -4,6 +4,9 @@
 #
 #   podman build -t pgu-book .
 #   podman run --rm -v "$PWD:/data:Z" pgu-book -c 'bash src/make.bash'
+#
+# scripts/check-outputs.py also needs `--security-opt seccomp=unconfined`
+# for its `setarch -R` check (see README.md).
 FROM ubuntu:24.04
 
 COPY scripts/install-deps.bash /tmp/install-deps.bash

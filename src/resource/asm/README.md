@@ -39,4 +39,7 @@ program is compiled with `rustc` (the version is pinned in
 `python3`.
 
 Every 64-bit program also needs a test in `test.bash` before it is
-included in the book.
+included in the book. An output of a program or a tool shown in the book
+goes in a block with a `check=<name>` attribute and an entry in the
+`CHECKS` table of `scripts/check-outputs.py`, which runs it and compares
+it with the book.

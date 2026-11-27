@@ -14,11 +14,14 @@ The book is a [Quarto](https://quarto.org/) book project in `src/`: one Markdown
 podman build -t pgu-book .                 # or docker
 podman run --rm -v "$PWD:/data:Z" pgu-book -c 'bash src/make.bash'
 podman run --rm -v "$PWD:/data:Z" pgu-book -c 'bash src/resource/asm/make.bash && bash src/resource/asm/test.bash'
+podman run --rm --security-opt seccomp=unconfined -v "$PWD:/data:Z" pgu-book -c 'bash src/resource/asm/make.bash && python3 scripts/check-outputs.py'
 ```
+
+Every output that the book shows from running a program or a tool (`strace`, `objdump`, `readelf`, `ldd`, gdb sessions, `/proc/self/maps`, the output of the examples) is a code block with a `check=<name>` attribute. `scripts/check-outputs.py` runs the command of each one and compares the output with the book, after replacing the values that change from run to run (addresses chosen by ASLR, inode numbers, the size of the environment); `...` in the book skips lines. CI runs it on every pull request, so a capture that no longer matches the tools fails the build. `--security-opt seccomp=unconfined` lets `setarch -R` turn ASLR off for one check of Chapter 9; without it that check is skipped. The `perf` outputs of Chapter 12 aren't checked, because their numbers change in every run.
 
 A code block shows a part of an example source with `snippet=<name>` instead of line numbers; `src/resource/asm/snippets.lua` gives each name a file and the text of its first and last line, so a snippet follows its code when the file changes, and the build fails if the text is not found.
 
-The container also has the tools of the examples: Rust (pinned like Quarto), GTK 4 and PyGObject for Appendix A, and Xvfb and xdotool to test the GUI example without a screen.
+The container also has the tools of the examples: Rust (pinned like Quarto), GTK 4 and PyGObject for Appendix A, Xvfb and xdotool to test the GUI example without a screen, and gdb and strace for the sessions that the book shows.
 
 The output is in `release/latest/`: the PDF, the ePUB, `resource.zip` with the example programs, and `site/`, the website. To preview the website while you write, run `quarto preview` in `src/`.
 

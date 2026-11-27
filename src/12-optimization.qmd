@@ -376,10 +376,12 @@ address into the caller. This is what gdb shows inside `count_chars`,
 called from `009-02-read-records` (the return address goes back into
 `record_read_loop`, the loop of `_start`):
 
-    (gdb) x/2gx $rbp
-    0x7ffcdaf1a720: 0x00007ffcdaf1a740      0x0000000000401078
-    (gdb) info symbol *(long *)($rbp+8)
-    record_read_loop + 40 in section .text of /tmp/w/009-02-read-records
+```{.text check=ch12-gdb-frame-chain}
+(gdb) x/2gx $rbp
+0x7ffcdaf1a720: 0x00007ffcdaf1a740      0x0000000000401078
+(gdb) info symbol *(long *)($rbp+8)
+record_read_loop + 40 in section .text of /tmp/w/009-02-read-records
+```
 
 Following the saved _%rbp_ values from one frame to the next, a
 debugger or a profiler finds every function that is waiting for a

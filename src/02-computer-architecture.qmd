@@ -407,7 +407,7 @@ Review {#review}
     you be trying to access?
 
 -   In instruction-pointer-relative addressing mode, if the next
-    instruction starts at address 4198407 and the offset is 8233, what
+    instruction starts at address 4198407 and the offset is 4089, what
     address would you be trying to access?
 
 ### Going Further {#going-further}
