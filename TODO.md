@@ -66,8 +66,9 @@
     - [ ] A complete listing of registers and flags.
 
 - [ ] Chapters.
-  - [ ] Chapter 2. Data Accessing Methods.
-    - [ ] This would be a good section for diagrams.
+  - [x] Chapter 2. Data Accessing Methods.
+    - [x] This would be a good section for diagrams.
+      - Added a text diagram for each addressing mode.
   - [ ] Chapter 3. Your First Programs.
     - [ ] Dominique suggests an extended example of this: Anything strange your program does and why it does it.
   - [ ] Chapter 4. All About Functions Dealing with Complexity
