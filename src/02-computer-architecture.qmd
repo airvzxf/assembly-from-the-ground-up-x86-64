@@ -282,9 +282,10 @@ record.
 Data Accessing Methods {#data-accessing-methods}
 ----------------------
 
-This is a quick review try to focus in understand the big picture
-of the accessing methods the next chapter will explain in detail
-everyone with examples.
+This section is a quick overview, so focus on the big picture: the
+next chapter explains each of these methods in detail, with examples.
+The pictures show memory as a row of numbered storage locations, like
+in [Structure of Computer Memory](#structure-of-computer-memory).
 
 Processors have a number of different ways of accessing data, known as
 addressing modes. The simplest mode is *immediate
@@ -293,14 +294,40 @@ in the instruction itself. For example, if we want to initialize a
 register to 0, instead of giving the computer an address to read the 0
 from, we would specify immediate mode, and give it the number 0.
 
+```{.text}
+movq $0, %rax
+
+Instruction:  | movq | 0 | %rax |
+                       |
+                       | the 0 is in the instruction
+                       v
+%rax:                  0
+```
+
 In the *register addressing mode*, the
 instruction contains a register to access, rather than a memory
 location. The rest of the modes will deal with addresses.
+
+```{.text}
+movq %rbx, %rax
+
+%rbx:  5  ---------- copy ---------->  %rax:  5
+```
 
 In the *direct addressing mode*, the instruction
 contains the memory address to access. For example, I could say, please
 load this register with the data at address 2002. The computer would go
 directly to byte number 2002 and copy the contents into our register.
+
+```{.text}
+Load the byte at address 2002
+
+Address:   2000   2001   2002   2003   2004
+Memory:   |  12  |   7  |  33  |   9  |  31  |
+                           |
+                           v
+Register:                  33
+```
 
 In the *indexed addressing mode*, the instruction
 contains a memory address to access, and also specifies an *index
@@ -322,6 +349,20 @@ register with 3 and set the multiplier to 8. This would load from
 location 2026 - the fourth word. Take the time to calculate these
 yourself to make sure you understand how it works.
 
+```{.text}
+Address 2002, index register 3, multiplier 8:
+2002 + 3 * 8 = 2026
+
+Address:   2002   2010   2018   2026   2034
+Memory:   |  w0  |  w1  |  w2  |  w3  |  w4  |
+           <---->                 |
+           8 bytes                v
+Register:                         w3
+
+With the multiplier 1, 2002 + 3 * 1 = 2005, the
+fourth byte.
+```
+
 In the *indirect addressing mode*, the
 instruction contains a register that contains a pointer to where the
 data should be accessed. For example, if we used indirect addressing
@@ -329,6 +370,17 @@ mode and specified the _%rax_ register, and the _%rax_ register contained the
 value 4, whatever value was at memory location 4 would be used. In
 direct addressing, we would just load the value 4, but in indirect
 addressing, we use 4 as the address to use to find the data we want.
+
+```{.text}
+%rax:  4 ------------+
+                     | 4 is the address
+                     v
+Address:   2    3    4    5    6
+Memory:   | 8  | 1  | 99 | 0  | 7  |
+                      |
+                      v
+Register:             99
+```
 
 Then there is the *base pointer addressing mode*.
 This is similar to indirect addressing, but you also
@@ -347,6 +399,18 @@ with the difference that the offset is constant and the pointer is held
 in a register, and in indexed addressing the offset is in a register and
 the pointer is constant.
 
+```{.text}
+%rbx: 5000 (the start of the record), offset 16:
+5000 + 16 = 5016
+
+Address:   5000      5008      5016   5024
+Memory:   | name    | address | age  | id   |
+          | pointer | pointer |      |      |
+                                 |
+                                 v
+Register:                     the age
+```
+
 Finally, x86-64 adds the *instruction-pointer-relative addressing
 mode*. It is base pointer addressing where the register is always the
 instruction pointer: the instruction contains the distance from itself
@@ -356,6 +420,20 @@ every time it runs, so the addresses of its data change, but the
 distance from each instruction to each piece of data never does. This is
 how 64-bit programs normally find their data, and we will use it from
 our second program on.
+
+```{.text}
+Instruction at 0x401000, 7 bytes long:
+    lea 0xff9(%rip), %rbx
+
+%rip (the next instruction):   0x401007
+Offset in the instruction:   +    0xff9
+                               --------
+Address of data_items:         0x402000
+```
+
+These are the numbers of the first instruction of our second program,
+as `objdump` shows them in
+[Chapter 3](03-your-first-programs.qmd#chapter-3-your-first-programs).
 
 There are other forms of addressing, but these are the most important
 ones.
