@@ -1,10 +1,11 @@
 // Copy of Quarto 1.11.9's orange-book partial
 // (share/extension-subtrees/orange-book/_extensions/orange-book/typst-show.typ)
-// with one addition: `paper-size` from `papersize` in _quarto.yml.
+// with two additions: `paper-size` from `papersize` in _quarto.yml, and
+// `index` and `make-index` for the PDF index (resource/pandoc/lua/index.lua).
 // Quarto's partial does not pass it, so orange-book always uses A4.
 // Compare with Quarto's copy when Quarto is updated; remove this file
 // once Quarto passes `papersize` itself.
-#import "@preview/orange-book:0.7.1": book, part, chapter, appendices
+#import "@preview/orange-book:0.7.1": book, part, chapter, appendices, index, make-index
 
 #show: book.with(
 $if(title)$

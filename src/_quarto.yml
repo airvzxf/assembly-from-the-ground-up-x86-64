@@ -72,6 +72,8 @@ filters:
   - resource/pandoc/lua/include-code-files.lua
   # Fails the build if a line of prose was read as a numbered list.
   - resource/pandoc/lua/check-ordered-lists.lua
+  # The entries of the PDF index (Typst only).
+  - resource/pandoc/lua/index.lua
 
 highlight-style: resource/pandoc/theme/default.theme
 syntax-definitions:
@@ -92,6 +94,9 @@ format:
     papersize: us-letter
     template-partials:
       - resource/quarto/typst-show.typ
+    # The index at the end of the PDF; resource/pandoc/lua/index.lua marks
+    # its entries.
+    include-after-body: resource/quarto/index-page.typ
     mainfont: Libertinus Serif
     codefont: DejaVu Sans Mono
     fontsize: 11pt

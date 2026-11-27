@@ -3,7 +3,7 @@
 Reading the Tables {#reading-the-tables}
 ------------------
 
-The tables of instructions presented in this appendix include:
+The tables of instructions`#index("Instructions")`{=typst} presented in this appendix include:
 
 -   The instruction code.
 

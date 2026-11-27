@@ -1,6 +1,6 @@
 # Registers and Flags {#appendix-l-registers-and-flags}
 
-This appendix was added in this edition. It collects in one place what
+This appendix was added in this edition.`#index("Registers")`{=typst} It collects in one place what
 the book says about each register of x86-64 as it meets them: which
 registers there are, what the calling convention and the system calls
 use each one for, and what every bit of the flags register means. For

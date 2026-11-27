@@ -1,7 +1,7 @@
 # Important System Calls {#appendix-c-important-system-calls}
 
 These are some of the more important system calls to use when dealing
-with Linux. For most cases, however, it is best to use library functions
+with Linux.`#index("System calls")`{=typst} For most cases, however, it is best to use library functions
 rather than direct system calls, because the system calls were designed
 to be minimalistic while the library functions were designed to be easy
 to program with. Most programs on Linux, whatever the language they are
