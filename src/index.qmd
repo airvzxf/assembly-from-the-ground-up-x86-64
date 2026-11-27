@@ -30,7 +30,9 @@ The transparent copy (Markdown source) of this edition, together with
 the source code of every example, is available at
 [github.com/airvzxf/assembly-from-the-ground-up-x86-64][0-ThisEdition].
 You can read this edition online, and download it as PDF and ePUB, at
-[asm64.rovisoft.net](https://asm64.rovisoft.net/).
+[asm64.rovisoft.net](https://asm64.rovisoft.net/), and the example
+programs with the scripts that build and test them as
+[resource.zip](https://asm64.rovisoft.net/resource.zip).
 The transparent copy of the original book is available at
 [savannah.nongnu.org/projects/pgubook][0-SavannahPguBook].
 
