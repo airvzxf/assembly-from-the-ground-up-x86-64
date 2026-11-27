@@ -498,8 +498,9 @@ parameters to _%rsp_ using the `addq` instruction.[^4-5]
 > known as the ABI, or Application Binary Interface) are available online.
 > We have oversimplified and left out
 > several important pieces to make this simpler for new programmers,
-> such as how floating-point numbers and structures are passed. For
-> full details, you should check out the
+> such as how floating-point numbers and structures are passed
+> ([Appendix M](appendix-m-the-system-v-calling-sequence.qmd#appendix-m-the-system-v-calling-sequence)
+> has them). For full details, you should check out the
 > [System V Application Binary Interface - AMD64 Architecture Processor
 > Supplement][4-ABI], maintained by the people who write compilers and
 > operating systems for x86-64.

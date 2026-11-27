@@ -267,6 +267,11 @@ rust64 0AK-11-01-toupper 0AK-11-01-toupper.rs -C opt-level=2
 
 echo ""
 
+# ----- Appendix M -----
+assemble64 0AM-01-sum8
+link64 0AM-01-sum8 0AM-01-sum8.o
+rust64 0AM-02-structs 0AM-02-structs.rs -C opt-level=2
+
 # ----- Appendix A -----
 # The GTK 4 example is linked by gcc, which adds the C start-up code that
 # calls `main`, and gets the libraries from pkg-config.

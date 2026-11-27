@@ -121,6 +121,8 @@ def gdb(program, *prelude, args=""):
 
 MAXIMUM = ("as -o 003-02-maximum.o 003-02-maximum.s"
            " && ld -o 003-02-maximum 003-02-maximum.o && ./003-02-maximum")
+RUST_STRUCTS = ("rustc --edition 2024 -C opt-level=2 --emit asm"
+                " 0AM-02-structs.rs && cat 0AM-02-structs.s")
 # Appendix F debugs a 003-02-maximum without its `incq %rcx` line.
 BROKEN_MAXIMUM = (
     "sed -i '/incq  *%rcx/d' 003-02-maximum.s"
@@ -274,6 +276,10 @@ CHECKS = {
         subset=True),
     # Appendix L
     "appl-gdb-flags": gdb("003-02-maximum"),
+    # Appendix M
+    "appm-gdb-stack-parameters": gdb("0AM-01-sum8"),
+    "appm-rust-swap-pair": dict(sh(RUST_STRUCTS), subset=True),
+    "appm-rust-rotate-triple": dict(sh(RUST_STRUCTS), subset=True),
     # Appendix F
     "appf-start": dict(sh("gdb -nx ./003-02-maximum < /dev/null"),
                        setup=BROKEN_MAXIMUM, subset=True),

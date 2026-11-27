@@ -396,6 +396,11 @@ done
 # ----- Chapter 12 -----
 expect 012-01-allocate-many 0
 
+# ----- Appendix M -----
+expect 0AM-01-sum8 36
+expect_output 0AM-02-structs \
+  "swap_pair: 2 1"$'\n'"rotate_triple: 2 3 1" ./0AM-02-structs-bin
+
 # ----- Appendix A -----
 # Run the GTK 4 example in a virtual X server: click the button, answer
 # No (Escape: it keeps running), click again and answer Yes (Return: it

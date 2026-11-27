@@ -1,0 +1,202 @@
+# The System V Calling Sequence {#appendix-m-the-system-v-calling-sequence}
+
+This appendix was added in this edition.
+[Chapter 4](04-all-about-functions.qmd#assembly-language-functions-using-the-system-v-calling-convention)
+explains the calling convention with integers and pointers only, which
+is all this book\'s programs need. This appendix gives the rest of the
+rules that Linux, the C library, Rust\'s `extern "C"` functions and
+every compiler for x86-64 follow: where each kind of parameter goes,
+how structures travel, how values come back, and what a function must
+leave as it found it. They come from the
+[System V ABI for x86-64][AM-ABI], which has every detail.
+
+The Call, Step by Step {#the-call-step-by-step}
+----------------------
+
+The caller:
+
+1.  Puts the parameters where they belong (see the next section):
+    registers first, and the ones that don\'t fit in registers on the
+    stack, pushed from the last one to the first, 8 bytes each (or a
+    multiple of 8).
+
+2.  Makes sure that _%rsp_ is a multiple of 16 when `call` runs. The
+    `call` pushes the 8-byte return address, so *at the first
+    instruction of a function, _%rsp_ + 8 is a multiple of 16*.
+
+3.  For a function with a variable number of parameters (like
+    `printf`), puts in _%al_ how many vector registers carry parameters
+    (0 to 8).
+
+4.  Runs `call`.
+
+The function (the *callee*):
+
+5.  Usually saves _%rbp_ and makes it the base of its stack frame, and
+    moves _%rsp_ down to make room for its local variables, keeping it
+    a multiple of 16 if it calls other functions.
+
+6.  Saves every callee-saved register it uses (see
+    [Saved Registers and State](#saved-registers-and-state)).
+
+7.  Does its work, puts the return value in its place, restores what it
+    saved, and runs `ret`.
+
+Then the caller removes the parameters it pushed, if any (`addq` to
+_%rsp_), and finds the return value.
+
+Parameters {#parameters}
+----------
+
+Each parameter is put in a *class* by its type, and each class has its
+own registers:
+
+| Class | Types | Registers, in order |
+|-------|-------|---------------------|
+| INTEGER | Integers of every size, pointers, `bool`, `char` | _%rdi_, _%rsi_, _%rdx_, _%rcx_, _%r8_, _%r9_ |
+| SSE | `float`, `double` (and vector types) | _%xmm0_ to _%xmm7_ |
+| MEMORY | Structures bigger than 16 bytes, `long double` | None: on the stack |
+
+The two lists are counted separately: in `f(int a, double b, int c)`,
+`a` goes in _%rdi_, `b` in _%xmm0_ and `c` in _%rsi_. When a list runs
+out, the parameters left go on the stack.
+
+This program calls a function with eight integer parameters, so the
+last two travel on the stack:
+
+```{.gnuassembler .numberLines include=resource/asm/0AM-01-sum8.s}
+```
+
+It returns 36. In gdb, at the first instruction of `sum8`, the stack
+holds the return address, then the 7th parameter and the 8th:
+
+```{.text check=appm-gdb-stack-parameters}
+(gdb) break sum8
+(gdb) run
+(gdb) x/3gx $rsp
+0x7ffcc2d5b648: 0x0000000000401033      0x0000000000000007
+0x7ffcc2d5b658: 0x0000000000000008
+(gdb) print (long)$rsp % 16
+$1 = 8
+```
+
+_%rsp_ + 8 is a multiple of 16, as the rule says. After `pushq %rbp`
+and `movq %rsp, %rbp`, the parameters are at `16(%rbp)` and `24(%rbp)`.
+
+Structures {#structures}
+----------
+
+A structure of up to 16 bytes is cut into pieces of 8 bytes, called
+*eightbytes*, and each piece is classified on its own: if it holds only
+floating-point fields it is SSE, otherwise INTEGER. Each piece then
+goes in the next register of its class, as if it were a parameter of
+its own. If the registers aren\'t enough for all the pieces, the whole
+structure goes on the stack. A structure bigger than 16 bytes always
+goes on the stack: the caller copies it there.
+
+This Rust program has one structure of each size, with
+`#[repr(C)]` so that Rust lays them out as C would, and functions
+declared `extern "C"` so that they follow this convention:
+
+```{.rust .numberLines include=resource/asm/0AM-02-structs.rs}
+```
+
+`rustc --edition 2024 -C opt-level=2 --emit asm 0AM-02-structs.rs`
+writes `0AM-02-structs.s`. The 16-byte `Pair` comes in two registers
+and goes back in two:
+
+```{.text check=appm-rust-swap-pair}
+swap_pair:
+        movq    %rsi, %rax
+        movq    %rdi, %rdx
+        retq
+```
+
+The 24-byte `Triple` is on the stack, above the return address
+(`8(%rsp)` to `31(%rsp)`). To return it, the caller gives the function
+the address of a place for the result as a hidden first parameter, in
+_%rdi_, and the function returns that same address in _%rax_:
+
+```{.text check=appm-rust-rotate-triple}
+rotate_triple:
+        movq    %rdi, %rax
+        movups  16(%rsp), %xmm0
+        movq    8(%rsp), %rcx
+        movups  %xmm0, (%rdi)
+        movq    %rcx, 16(%rdi)
+        retq
+```
+
+(`movups` copies 16 bytes at once through _%xmm0_: the fields `b` and
+`c` go to the first 16 bytes of the result, and `a` to its last 8.)
+
+Return Values {#return-values}
+-------------
+
+| Return type | Where |
+|-------------|-------|
+| INTEGER, up to 8 bytes | _%rax_ |
+| INTEGER, 9 to 16 bytes (a structure of two eightbytes) | _%rax_, then _%rdx_ |
+| SSE | _%xmm0_, then _%xmm1_ |
+| A structure with an INTEGER and an SSE eightbyte | _%rax_ and _%xmm0_ |
+| MEMORY | In memory chosen by the caller, whose address arrives in _%rdi_; the function returns that address in _%rax_ |
+
+Saved Registers and State {#saved-registers-and-state}
+-------------------------
+
+A function must return with these as they were when it was called:
+
+-   The registers _%rbx_, _%rbp_, _%rsp_ and _%r12_ to _%r15_.
+
+-   The direction flag, DF, which must be 0 when a function is called
+    and when it returns.
+
+-   The control bits of _MXCSR_ and the control word of the x87 unit
+    (how floating-point numbers are rounded).
+
+Every other register, including all the _%xmm_ registers and the other
+flags, may be changed by the function. See
+[Appendix L](appendix-l-registers-and-flags.qmd#general-purpose-registers)
+for a table of every register.
+
+The Red Zone {#the-red-zone}
+------------
+
+The 128 bytes below _%rsp_ are the *red zone*: Linux promises that
+nothing else (a signal handler, for example) will write there. A
+function that calls no other function can keep its local variables
+there without moving _%rsp_ at all, and compilers do it to save two
+instructions. The kernel itself can\'t rely on it, so it is compiled
+without a red zone. The programs in this book always move _%rsp_, which
+is never wrong.
+
+The Frame Pointer {#frame-pointer-in-the-abi}
+-----------------
+
+The convention doesn\'t require _%rbp_ to point to the stack frame: it
+is a callee-saved register like the others, and optimized code often
+uses it for something else. Debuggers and profilers find their way up
+the stack with tables that the compiler writes in the `.eh_frame`
+section instead. See
+[Chapter 12](12-optimization.qmd#chapter-12-optimization) for what the
+frame pointer costs and what it gives.
+
+System Calls Are Different {#system-calls-are-different}
+--------------------------
+
+The `syscall` instruction follows its own convention, which is close to
+the one for functions but not the same:
+
+-   The number of the call goes in _%rax_.
+
+-   The parameters go in _%rdi_, _%rsi_, _%rdx_, _%r10_ (not _%rcx_),
+    _%r8_ and _%r9_. There are never more than six, and never on the
+    stack.
+
+-   The result comes back in _%rax_. A value from -4095 to -1 is an
+    error number, negated.
+
+-   `syscall` itself overwrites _%rcx_ and _%r11_; the kernel keeps
+    every other register.
+
+[AM-ABI]: https://gitlab.com/x86-psABIs/x86-64-ABI
