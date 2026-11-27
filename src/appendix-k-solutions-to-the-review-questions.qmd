@@ -36,6 +36,15 @@ Chapter 2. Computer Architecture {#chapter-2.-computer-architecture}
     instruction would need to carry full memory addresses for all of its
     operands, which makes instructions larger.
 
+-   **Name three differences between a register and a memory
+    location.** Any three of these: a register is inside the CPU and
+    memory is outside it; there are 16 registers for numbers and
+    billions of memory locations; a register holds 8 bytes and a memory
+    location 1; an instruction names a register, while it reaches memory
+    through an address, which the program can compute (a register has no
+    address, so there are no pointers to registers); most instructions
+    can use at most one memory operand; registers are much faster.
+
 -   **How do you represent numbers larger than 255?** By using several
     bytes together. On x86-64, eight bytes form a word, which can hold
     unsigned values up to 18446744073709551615. Larger numbers use

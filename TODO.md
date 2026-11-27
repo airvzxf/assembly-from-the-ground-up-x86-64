@@ -58,7 +58,8 @@
 - [ ] General.
   - [ ] Dominique suggests I have an appendix of registers. Maybe in the Instructions appendix?
   - [ ] Need to find places that need more filling out.  Reviews, definitely.
-  - [ ] Go back through and make sure that registers and memory are both fully described and fully distinguished.
+  - [x] Go back through and make sure that registers and memory are both fully described and fully distinguished.
+    - Added "Registers and Memory" to Chapter 2: a comparison table, its consequences and a review question.
   - [ ] Instructions needs some more beef from reference books.
   - [ ] Appendices.
     - [ ] A full description of the calling sequence for UNIX.
