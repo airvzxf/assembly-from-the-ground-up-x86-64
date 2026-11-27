@@ -185,13 +185,17 @@ to our program, it just notes in the program where to look. You can see
 those notes with `readelf -d`, which prints the *dynamic section* of
 the file. Its first line says:
 
-     0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+```{.text check=ch08-readelf-needed}
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+```
 
 The file that `ld` found was `libc.so`, but the note says `libc.so.6`.
 On Ubuntu 24.04, `libc.so` is not a library but a small text file, a
 script for the linker, which names the real library:
 
-    GROUP ( /lib/x86_64-linux-gnu/libc.so.6 /usr/lib/x86_64-linux-gnu/libc_nonshared.a  AS_NEEDED ( /lib64/ld-linux-x86-64.so.2 ) )
+```{.text check=ch08-libc-script}
+GROUP ( /lib/x86_64-linux-gnu/libc.so.6 /usr/lib/x86_64-linux-gnu/libc_nonshared.a  AS_NEEDED ( /lib64/ld-linux-x86-64.so.2 ) )
+```
 
 The `.6` is the version of the library\'s interface. If the C library
 ever changed in a way that broke old programs, it would be called
@@ -231,9 +235,11 @@ ldd ./008-01-hello-world-lib
 
 On Ubuntu 24.04 it reports:
 
-    linux-vdso.so.1 (0x00007fe52a56a000)
-    libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fe52a200000)
-    /lib64/ld-linux-x86-64.so.2 (0x00007fe52a56c000)
+```{.text check=ch08-ldd-hello}
+linux-vdso.so.1 (0x00007fe52a56a000)
+libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fe52a200000)
+/lib64/ld-linux-x86-64.so.2 (0x00007fe52a56c000)
+```
 
 The numbers in parentheses are the addresses where each library was
 loaded, and they change every time you run it, because Linux loads
@@ -279,7 +285,9 @@ What happens if you break them? We tried it with `008-02-printf-example`
 program still worked when _%al_ was 0. With _%al_ set to 1, it crashed
 with a segmentation fault. gdb shows the instruction that failed:
 
-    => 0x7ff826260136 <printf+54>:  movaps %xmm0,-0x80(%rbp)
+```{.text check=ch08-printf-alignment}
+=> 0x7ff826260136 <printf+54>:  movaps %xmm0,-0x80(%rbp)
+```
 
 When _%al_ is not 0, `printf` starts by saving the vector registers on
 its stack with `movaps`, an instruction that moves 16 bytes and requires
@@ -362,7 +370,9 @@ ld -o 008-02-printf-example 008-02-printf-example.o \
 Then run the program with `./008-02-printf-example`, and it should say
 this:
 
-    Hi! Jonathan is the person number #3.
+```{.text check=ch08-printf-example}
+Hi! Jonathan is the person number #3.
+```
 
 The parameters go in _%rdi_, _%rsi_, _%rdx_ and _%rcx_, in the same
 order as in the prototype: the format string first. If there were more
@@ -571,17 +581,19 @@ for exactly that: a call to the PLT entry of `printf`.
 `008-02-printf-example` (with `--no-show-raw-insn`, which hides the
 bytes of each instruction):
 
-    0000000000401010 <printf@plt>:
-      401010:   jmp    *0x1fea(%rip)        # 403000 <printf@GLIBC_2.2.5>
-      401016:   push   $0x0
-      40101b:   jmp    401000 <printf@plt-0x10>
+```{.text check=ch08-objdump-plt}
+0000000000401010 <printf@plt>:
+  401010:   jmp    *0x1fea(%rip)        # 403000 <printf@GLIBC_2.2.5>
+  401016:   push   $0x0
+  40101b:   jmp    401000 <printf@plt-0x10>
 
-    ...
+...
 
-    0000000000401030 <_start>:
-      401030:   lea    0x1fd9(%rip),%rdi        # 403010 <first_string>
-      ...
-      401053:   call   401010 <printf@plt>
+0000000000401030 <_start>:
+  401030:   lea    0x1fd9(%rip),%rdi        # 403010 <first_string>
+  ...
+  401053:   call   401010 <printf@plt>
+```
 
 The `call` goes to `printf@plt`, and its first instruction jumps to the
 address stored at `403000`, the GOT slot of `printf`. Notice that this
@@ -599,7 +611,7 @@ straight to `printf`. This is called *lazy binding*.[^8-5]
 objdump -R 008-02-printf-example
 ```
 
-```
+```{.text check=ch08-objdump-r-printf}
 008-02-printf-example:     file format elf64-x86-64
 
 DYNAMIC RELOCATION RECORDS
@@ -659,7 +671,9 @@ functions in the file named `librecord.so`. The program doesn\'t need
 Now the `008-03-write-records` program is built, but it will not run.
 If we try it, we will get this error (and the exit status 127):
 
-    ./008-03-write-records: error while loading shared libraries: librecord.so: cannot open shared object file: No such file or directory
+```{.text check=ch08-no-librecord}
+./008-03-write-records: error while loading shared libraries: librecord.so: cannot open shared object file: No such file or directory
+```
 
 This is because, by default, the dynamic linker only searches the
 system directories, and whatever directories are listed in
@@ -692,8 +706,10 @@ LD_LIBRARY_PATH=. ldd ./008-03-write-records
 
 It will report back something like:
 
-    linux-vdso.so.1 (0x00007f53f7fcf000)
-    librecord.so => ./librecord.so (0x00007f53f7fc4000)
+```{.text check=ch08-ldd-records}
+linux-vdso.so.1 (0x00007f53f7fcf000)
+librecord.so => ./librecord.so (0x00007f53f7fc4000)
+```
 
 The C library doesn\'t appear: neither the program nor `librecord.so`
 use it. And this is the `objdump -R` result:
@@ -702,7 +718,7 @@ use it. And this is the `objdump -R` result:
 objdump -R ./008-03-write-records
 ```
 
-```
+```{.text check=ch08-objdump-r-records}
 ./008-03-write-records:     file format elf64-x86-64
 
 DYNAMIC RELOCATION RECORDS
@@ -744,8 +760,10 @@ ld -shared -o absolute.so 003-03-maximum-absolute.o
 
 `ld` refuses:
 
-    ld: 003-03-maximum-absolute.o: relocation R_X86_64_32S against `.data' can not be used when making a shared object; recompile with -fPIC
-    ld: failed to set dynamic section sizes: bad value
+```{.text check=ch08-shared-absolute}
+ld: 003-03-maximum-absolute.o: relocation R_X86_64_32S against `.data' can not be used when making a shared object; recompile with -fPIC
+ld: failed to set dynamic section sizes: bad value
+```
 
 `-fPIC` is the option that tells a C compiler to generate
 position-independent code; in assembly, it is our job.
@@ -761,9 +779,11 @@ The variable is reached relative to _%rip_, and it works. But try
 adding the line `.globl calls`, which makes the variable visible to
 other files, and link the library again:
 
-    ld: global.o: warning: relocation against `calls' in read-only section `.text'
-    ld: global.o: relocation R_X86_64_PC32 against symbol `calls' can not be used when making a shared object; recompile with -fPIC
-    ld: final link failed: bad value
+```{.text check=ch08-shared-global}
+ld: global.o: warning: relocation against `calls' in read-only section `.text'
+ld: global.o: relocation R_X86_64_PC32 against symbol `calls' can not be used when making a shared object; recompile with -fPIC
+ld: final link failed: bad value
+```
 
 The address is still relative to _%rip_, so what is wrong? A global name
 in a shared library can be *replaced*: if the program, or a library
@@ -816,7 +836,7 @@ ld -shared -o libbook.so 006-01-count-chars.o 008-04-call-count.o
 
 `objdump -T` shows the functions that the library offers:
 
-```
+```{.text check=ch08-objdump-t-libbook}
 libbook.so:     file format elf64-x86-64
 
 DYNAMIC SYMBOL TABLE:
@@ -851,20 +871,24 @@ LD_LIBRARY_PATH=. ./008-05-use-library
 
 With Rust 1.100.0 on Ubuntu 24.04 it prints:
 
-    count_chars("hello world") = 11
-    call_count() = 1
-    call_count() = 2
-    call_count() = 3
+```{.text check=ch08-use-library-rust}
+count_chars("hello world") = 11
+call_count() = 1
+call_count() = 2
+call_count() = 3
+```
 
 The value of `calls` stayed in the library between the calls. `ldd`
 shows that the Rust program uses our library and the C library, like
 almost every Linux program:
 
-    linux-vdso.so.1 (0x00007ff3bd0d9000)
-    libbook.so => ./libbook.so (0x00007ff3bd077000)
-    libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007ff3bd046000)
-    libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007ff3bce00000)
-    /lib64/ld-linux-x86-64.so.2 (0x00007ff3bd0db000)
+```{.text check=ch08-ldd-rust}
+linux-vdso.so.1 (0x00007ff3bd0d9000)
+libbook.so => ./libbook.so (0x00007ff3bd077000)
+libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007ff3bd046000)
+libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007ff3bce00000)
+/lib64/ld-linux-x86-64.so.2 (0x00007ff3bd0db000)
+```
 
 `rustc` builds PIE programs, so this is the PIE program we promised.
 The `rustc` command uses the system\'s C compiler (`cc`) to link, so it

@@ -10,7 +10,8 @@ material. This file records the decisions and tracks the work, one block
 
 - Every example program is assembled, linked and run by
   `src/resource/asm/make.bash` and `src/resource/asm/test.bash` before it
-  enters the book.
+  enters the book. Every output that the book shows from running
+  something is checked by `scripts/check-outputs.py`.
 - The text stays under the GFDL and the code under the AGPL-3.0. Keep the
   attribution to Jonathan Bartlett, the copyright page and the Document
   History (Appendix G).

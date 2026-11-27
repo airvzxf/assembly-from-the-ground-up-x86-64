@@ -353,7 +353,7 @@ python3 -m dis 011-02-maximum.py
 This is the part for the function `maximum`, with Python 3.12 (the
 numbers on the left are the lines of the program):
 
-```
+```{.text check=ch11-dis-maximum}
  16           2 LOAD_FAST                0 (items)
               4 LOAD_CONST               1 (0)
               6 BINARY_SUBSCR

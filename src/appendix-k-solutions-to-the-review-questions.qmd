@@ -105,8 +105,8 @@ Chapter 2. Computer Architecture {#chapter-2.-computer-architecture}
     9123478 + 20 × 1 = **9123498**.
 
 -   **Instruction-pointer-relative addressing, next instruction at
-    4198407, offset 8233:** 4198407 + 8233 = **4206640**. In
-    hexadecimal these numbers are `0x401007`, `0x2029` and `0x403030`:
+    4198407, offset 4089:** 4198407 + 4089 = **4202496**. In
+    hexadecimal these numbers are `0x401007`, `0xff9` and `0x402000`:
     they are the numbers `objdump` shows for the first instruction of
     `003-02-maximum` in Chapter 3.
 
@@ -336,9 +336,9 @@ this differ from `leaq _start(%rip), %rax`?** `movq _start(%rip), %rax`
 reads memory: it loads the eight bytes stored *at* the address `_start`,
 which are the machine code of the first instructions. In
 `003-02-maximum`, the program starts with the bytes
-`48 8d 1d 29 20 00 00` (`leaq data_items(%rip), %rbx`) and `48 c7 ...`
+`48 8d 1d f9 0f 00 00` (`leaq data_items(%rip), %rbx`) and `48 c7 ...`
 (the next instruction). x86-64 stores the first byte in the lowest part
-of the register, so _%rax_ would get `0x48000020291d8d48`. You can check
+of the register, so _%rax_ would get `0x4800000ff91d8d48`. You can check
 it in gdb with `x/gx _start`. `leaq _start(%rip), %rax` doesn\'t read
 memory: it loads the address `_start` itself, which is `0x401000` in
 that program when it is linked with `ld` as in Chapter 3.
@@ -676,7 +676,7 @@ the assembler, as the distance between the labels `text` and
     This is what `strace` shows when `005-01-toupper` gets an input
     file that doesn\'t exist (Ubuntu 24.04, `strace` 6.8):
 
-    ```
+    ```{.text check=appk-strace-missing}
     execve("./005-01-toupper", ["./005-01-toupper", "missing.txt", "output2.txt"], 0x7fff156b1b60 /* 7 vars */) = 0
     openat(AT_FDCWD, "missing.txt", O_RDONLY) = -1 ENOENT (No such file or directory)
     openat(AT_FDCWD, "output2.txt", O_WRONLY|O_CREAT|O_TRUNC, 0666) = 3
@@ -792,7 +792,7 @@ functions, and its helper `print_string` saves _%rbx_ for its caller:
 
 It prints:
 
-```
+```{.text check=appk-records}
 Fredrick: 555-0100
 Marilyn: 555-0199
 ```
@@ -1076,10 +1076,12 @@ python3 0AK-08-05-factorial.py
 
 It prints:
 
-    5! = 120
-    10! = 3628800
-    20! = 2432902008176640000
-    21! = -4249290049419214848
+```{.text check=appk-factorial-python}
+5! = 120
+10! = 3628800
+20! = 2432902008176640000
+21! = -4249290049419214848
+```
 
 20! is the biggest factorial that fits in 64 bits. 21! is too big:
 `imulq` keeps only the lower 64 bits of the result, and Python shows
@@ -1397,7 +1399,7 @@ links the `factorial` function of Chapter 8\'s solution,
 
 It prints:
 
-```
+```{.text check=appk-print-numbers}
 120
 3628800
 2432902008176640000
@@ -1427,7 +1429,7 @@ and passes two `double`s to `printf`, so _%al_ is 2:
 
 It prints:
 
-```
+```{.text check=appk-celsius}
 -40.0 F = -40.0 C
 32.0 F = 0.0 C
 98.6 F = 37.0 C

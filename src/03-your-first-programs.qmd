@@ -985,17 +985,18 @@ because the code and the data move together. So the instruction stores
 that distance, and the processor adds it to _%rip_, which holds the
 address of the next instruction, while it runs. You can see it with
 `objdump -d 003-02-maximum`, which *disassembles* the program (turns
-the machine code back into assembly language). On my computer, the first
-instructions look like this:[^3-6]
+the machine code back into assembly language). On Ubuntu 24.04 (the
+container that builds this book), the first instructions look like
+this:[^3-6]
 
-```
+```{.text check=ch03-objdump-maximum}
 0000000000401000 <_start>:
-  401000:  48 8d 1d 29 20 00 00  lea  0x2029(%rip),%rbx  # 403030 <data_items>
+  401000:  48 8d 1d f9 0f 00 00  lea  0xff9(%rip),%rbx  # 402000 <data_items>
   401007:  48 c7 c1 00 00 00 00  mov  $0x0,%rcx
 ```
 
 The next instruction starts at address `0x401007`, and `0x401007` plus
-the offset `0x2029` is `0x403030`, the address of `data_items`. The
+the offset `0xff9` is `0x402000`, the address of `data_items`. The
 addresses on your computer may be different, but the sum always points
 to `data_items`.
 
@@ -1023,7 +1024,7 @@ to `data_items`.
 >
 > and `ld` refuses:
 >
-> ```
+> ```{.text check=ch03-pie-absolute}
 > ld: 003-03-maximum-absolute.o: relocation R_X86_64_32S against `.data'
 > can not be used when making a PIE object; recompile with -fPIE
 > ```
@@ -1203,7 +1204,7 @@ Review {#review-1}
     The eight new registers that came with 64 bits were simply numbered:
     _%r8_ to _%r15_.
 
-[^3-6]: You may be wondering what `0x2029` means. The number is written
+[^3-6]: You may be wondering what `0xff9` means. The number is written
     in hexadecimal. In hexadecimal, a single digit can hold 16 values
     instead of the normal 10. This is done by utilizing the letters `a`
     through `f` in addition to the regular digits. `a` represents 10,
