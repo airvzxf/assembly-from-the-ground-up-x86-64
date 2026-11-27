@@ -54,8 +54,9 @@ WORK = "/tmp/w"  # The directory the book's captures were made in.
 COMMON = [
     # Addresses near the top of the user address space (stack,
     # libraries, vdso, mmap) change with ASLR, the environment and the
-    # kernel.
-    (r"\b(0x(?:0000)?)?7f[0-9a-f]{10}\b", r"\g<1><7f>"),
+    # kernel. ASLR moves the mmap area down by up to 2^40 bytes, so they
+    # can start with 7e as well as 7f: any 12 digits that start with 7.
+    (r"\b(0x(?:0000)?)?7[0-9a-f]{11}\b", r"\g<1><aslr>"),
 ]
 ENVP = (r"0x[0-9a-f]+ /\* \d+ vars \*/", "<envp>")
 BRK = (r"\b0x[0-9a-f]{6,8}\b", "<brk>")
