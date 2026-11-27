@@ -15,3 +15,6 @@ testout.dat
 # Pandoc generated files in the source directory
 src/ProgrammingGroundUp.*
 .wrangler/
+
+# Python bytecode
+__pycache__/
