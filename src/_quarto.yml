@@ -52,6 +52,7 @@ book:
     - appendix-j-updated-by-airvzxf.qmd
     - appendix-k-solutions-to-the-review-questions.qmd
     - appendix-l-registers-and-flags.qmd
+    - appendix-m-the-system-v-calling-sequence.qmd
 
 lang: en-US
 rights: >-
