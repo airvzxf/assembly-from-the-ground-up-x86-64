@@ -631,6 +631,18 @@ Chapter 5. Dealing with Files {#chapter-5.-dealing-with-files}
     `16(%rsp)`, `24(%rsp)`, \... the addresses of the arguments (the
     `argv` list). Each one is a null-terminated string.
 
+-   **What does `strace` show? Why does it work for a program written
+    in any language?** It runs the program and prints every system call
+    the program makes, with its parameters and the value the kernel
+    returned. A program in any language, compiled or interpreted, can
+    only open files, read, write or end by asking Linux with system
+    calls, so `strace` sees all of that without the source code.
+
+-   **Why does the first file that `005-01-toupper` opens get the file
+    descriptor 3?** Linux gives the lowest number that isn\'t in use,
+    and 0, 1 and 2 (`STDIN`, `STDOUT` and `STDERR`) are already open
+    when the program starts.
+
 ### Use the Concepts {#use-the-concepts-14}
 
 **Write the message of `005-00-hello-world` to `STDERR`.** Only the
@@ -990,6 +1002,25 @@ status 1.
 **Add error checking to one other program.** See
 `0AK-05-04-toupper-checked.s` in the Chapter 5 solutions.
 
+**Run `007-01-add-year` without `test.dat` under `strace`.** `-o
+trace.txt` writes the trace to a file, so it doesn\'t mix with the
+program\'s own output. The file holds:
+
+```{.text check=appk-strace-add-year-missing}
+execve("./007-01-add-year", ["./007-01-add-year"], 0x7ffcb5340930 /* 8 vars */) = 0
+openat(AT_FDCWD, "test.dat", O_RDONLY)  = -1 ENOENT (No such file or directory)
+write(2, "0001: ", 6)                   = 6
+write(2, "Can't Open Input File.", 22)  = 22
+write(2, "\n", 1)                       = 1
+exit(1)                                 = ?
++++ exited with 1 +++
+```
+
+`openat` fails with `ENOENT` (`-2` in _%rax_), the program sees the
+negative number and calls `error_exit`, which writes the error code,
+the message and a newline to file descriptor 2, `STDERR`, and ends with
+the status 1. Nothing else runs: the program stops at its first error.
+
 ### Going Further {#going-further-16}
 
 -   **What should you do if your error-reporting function fails?**
@@ -1281,6 +1312,15 @@ Chapter 9. Intermediate Memory Topics {#chapter-9.-intermediate-memory-topics-1}
     `movaps` require 16-byte alignment, and the caller may use them on
     the memory it gets.
 
+-   **What are the two parts of CET, and what does each one protect?**
+    The *shadow stack* keeps a second copy of every return address,
+    where the program can\'t write; `ret` compares the two and stops
+    the program if they differ, so a buffer overflow can\'t send `ret`
+    somewhere else. *Indirect branch tracking* requires that every
+    indirect `call` or `jmp` lands on an `endbr64` instruction, so an
+    attacker can\'t jump into the middle of a function. Both are only
+    turned on for programs whose ELF notes say they support them.
+
 ### Use the Concepts {#use-the-concepts-18}
 
 **Make the memory manager initialize itself** and **break up regions
@@ -1324,6 +1364,14 @@ buffer of `005-01-toupper`: call `allocate` with `BUFFER_SIZE` at the
 start, keep the returned address in a callee-saved register (such as
 _%rbx_) or a local variable, use it instead of
 `leaq BUFFER_DATA(%rip)`, and call `deallocate` at the end.
+
+**Run `009-01-memory-layout` three times.** The first four lines, the
+code, the data and the `.bss` of the program, are the same every time:
+the program was linked to run at 0x400000, and it isn\'t a PIE. The
+heap, the anonymous region and `[vvar]` and `[vdso]` above it, and the
+stack change in every run: ASLR places them at random addresses.
+`[vsyscall]` doesn\'t move: it is an old interface for very old
+programs, which the kernel keeps at a fixed address.
 
 ### Going Further {#going-further-18}
 
@@ -1550,6 +1598,21 @@ Chapter 11. High-Level Languages {#chapter-11.-high-level-languages}
     and C# work the same way, but their virtual machines also compile
     the most used parts into real machine code while the program runs
     (*just-in-time* compilation).
+
+-   **What changes in the assembly language of `maximum` when `rustc`
+    optimizes it?** Without optimization, every variable lives on the
+    stack and the function calls separate functions to make the slice
+    and for each step of the loop. With `-C opt-level=2`, the variables
+    live in registers, those functions are inlined, there is no `%rbp`
+    frame, a `cmovg` replaces the jump around a `movq`, and the loop is
+    unrolled to handle eight items per iteration. The check for an
+    empty list stays: it is Rust\'s safety.
+
+-   **What does `python3 -m dis` show, and what runs it?** The bytecode
+    of each function: the instructions of Python\'s virtual machine,
+    with the line of the source each one comes from. No processor runs
+    them directly: `python3`, a compiled program, reads them one by one
+    and does what each one says.
 
 ### Use the Concepts {#use-the-concepts-20}
 

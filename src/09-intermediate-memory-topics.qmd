@@ -1244,6 +1244,8 @@ Review {#review-7}
 
 -   Why does our memory manager use 16-byte headers?
 
+-   What are the two parts of CET, and what does each one protect?
+
 ### Use the Concepts {#use-the-concepts-7}
 
 -   Modify the memory manager so that it calls `allocate_init`
@@ -1256,6 +1258,9 @@ Review {#review-7}
 
 -   Modify one of your programs that uses buffers to use the memory
     manager to get buffer memory rather than using the `.bss`.
+
+-   Run `009-01-memory-layout` three times and compare the lines. Which
+    regions change from one run to the next, and which don\'t? Why?
 
 ### Going Further {#going-further-7}
 

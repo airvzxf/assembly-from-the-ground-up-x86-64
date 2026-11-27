@@ -579,6 +579,12 @@ Review {#review-3}
 -   Where does a program find its command-line arguments when it
     starts?
 
+-   What does `strace` show? Why does it work for a program written in
+    any language?
+
+-   Why does the first file that `005-01-toupper` opens get the file
+    descriptor 3?
+
 ### Use the Concepts {#use-the-concepts-3}
 
 -   Change `005-00-hello-world` so that it writes its message to
