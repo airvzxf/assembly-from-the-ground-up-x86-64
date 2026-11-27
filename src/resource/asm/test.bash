@@ -397,46 +397,79 @@ expect 012-01-allocate-many 0
 # ----- Appendix A -----
 # Run the GTK 4 example in a virtual X server: click the button, answer
 # No (Escape: it keeps running), click again and answer Yes (Return: it
-# ends with status 0).
+# ends with status 0). Each step waits for the window it needs instead
+# of a fixed time: the first GTK start in a new container compiles the
+# Mesa shaders (empty ~/.cache) and can take several seconds to show
+# the dialog.
 gui_test() {
-  local name="$1" pid status=0
+  local name="$1" status=0
   shift
   "$@" 2>"${TMP_DIR}/gui.err" &
-  pid=$!
-  if gui_click && xdotool key Escape && sleep 1 && kill -0 "${pid}" \
-     && gui_click && xdotool key Return && sleep 1 \
-     && ! kill -0 "${pid}" 2>/dev/null; then
-    wait "${pid}" || status=$?
+  GUI_PID=$!
+  if wait_for 30 gui_window_visible \
+     && gui_answer Escape && wait_for 10 gui_dialog_closed \
+     && kill -0 "${GUI_PID}" \
+     && gui_answer Return && wait_for 10 gui_exited; then
+    wait "${GUI_PID}" || status=$?
     if [[ "${status}" == 0 ]] && ! grep -q CRITICAL "${TMP_DIR}/gui.err"
     then
       pass "${name}: No, then Yes, status 0"
       return
     fi
   fi
-  kill "${pid}" 2>/dev/null || true
+  kill "${GUI_PID}" 2>/dev/null || true
+  wait "${GUI_PID}" 2>/dev/null || true
   fail "${name}: the dialog didn't work"
 }
-# gui_click: click in the middle of the window, on the button.
-gui_click() {
-  local window="" i X Y WIDTH HEIGHT SCREEN WINDOW
-  for i in $(seq 50); do
-    window="$(xdotool search --name '^GTK Example Program$' 2>/dev/null \
-              | head -1)" && [[ -n "${window}" ]] && break
-    sleep 0.2
+# wait_for <seconds> <command...>: run the command every 0.1 s until it
+# succeeds; return 1 if it still fails after that many seconds.
+wait_for() {
+  local tries=$(($1 * 10))
+  shift
+  until "$@"; do
+    ((--tries > 0)) || return 1
+    sleep 0.1
   done
-  [[ -n "${window}" ]] || return 1
-  eval "$(xdotool getwindowgeometry --shell "${window}")"
-  xdotool mousemove $((X + WIDTH / 2)) $((Y + HEIGHT / 2)) click 1
-  sleep 1
 }
+# gui_answer <key>: click in the middle of the window, on the button,
+# wait until the dialog has the keyboard focus and press the key.
+gui_answer() {
+  # shellcheck disable=SC2034 # SCREEN and WINDOW: set by --shell
+  local geometry X Y WIDTH HEIGHT SCREEN WINDOW
+  geometry="$(xdotool getwindowgeometry --shell "${GUI_WINDOW}")" \
+    || return 1
+  eval "${geometry}"
+  xdotool mousemove $((X + WIDTH / 2)) $((Y + HEIGHT / 2)) click 1
+  wait_for 30 gui_dialog_focused && xdotool key "$1"
+}
+gui_window_visible() {
+  GUI_WINDOW="$(xdotool search --all --onlyvisible --pid "${GUI_PID}" \
+                --name '^GTK Example Program$' 2>/dev/null | head -1)"
+  [[ -n "${GUI_WINDOW}" ]]
+}
+# The dialog is a window of the same program, other than the main one.
+gui_dialog_focused() {
+  local focus
+  focus="$(xdotool getwindowfocus 2>/dev/null)" \
+    && [[ "${focus}" != "${GUI_WINDOW}" ]] \
+    && [[ "$(xdotool getwindowpid "${focus}" 2>/dev/null)" \
+          == "${GUI_PID}" ]]
+}
+# Without a window manager the focus goes to the root window, not back
+# to the main window, when the dialog closes.
+gui_dialog_closed() { ! gui_dialog_focused; }
+gui_exited() { ! kill -0 "${GUI_PID}" 2>/dev/null; }
 if command -v Xvfb >/dev/null && command -v xdotool >/dev/null; then
   Xvfb :97 -screen 0 1024x768x24 >/dev/null 2>&1 &
   XVFB_PID=$!
   trap 'kill "${XVFB_PID}" 2>/dev/null; rm -rf "${TMP_DIR}"' EXIT
-  sleep 1
   export DISPLAY=:97 GDK_BACKEND=x11
-  gui_test 0AA-01-gtk-example ./0AA-01-gtk-example-bin
-  gui_test 0AA-01-gtk-example.py python3 0AA-01-gtk-example.py
+  if wait_for 10 xdotool getdisplaygeometry >/dev/null 2>&1; then
+    gui_test 0AA-01-gtk-example ./0AA-01-gtk-example-bin
+    gui_test 0AA-01-gtk-example.py python3 0AA-01-gtk-example.py
+  else
+    fail "0AA-01-gtk-example: Xvfb didn't start"
+  fi
 else
   fail "0AA-01-gtk-example: Xvfb and xdotool are needed"
 fi
