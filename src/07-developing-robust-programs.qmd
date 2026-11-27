@@ -277,7 +277,7 @@ calls actually complete properly. Linux returns its status code in
 _%rax_, so we need to check and see if there is an error. This new version
 is called `007-01-add-year.s`:
 
-```{.gnuassembler .numberLines include=resource/asm/007-01-add-year.s startLine=29 endLine=62}
+```{.gnuassembler .numberLines snippet=007-01-add-year-no-open-file}
 ```
 
 So, after calling the system call, we check and see if we have an error

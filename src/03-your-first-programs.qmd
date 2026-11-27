@@ -120,7 +120,7 @@ the following in your comments:
 
 After the comments, the next line says:
 
-```{.gnuassembler .numberLines include=resource/asm/003-01-exit.s startLine=15 endLine=15}
+```{.gnuassembler .numberLines snippet=003-01-exit-section-note-gnu}
 ```
 
 Anything starting with a period isn\'t directly translated into a
@@ -152,7 +152,7 @@ starts with this line, and yours should too.
 
 The next line:
 
-```{.gnuassembler .numberLines include=resource/asm/003-01-exit.s startLine=17 endLine=17}
+```{.gnuassembler .numberLines snippet=003-01-exit-section-data}
 ```
 
 starts the data section, where you list any memory
@@ -162,7 +162,7 @@ program you write in the future will have data.
 
 Right after this you have:
 
-```{.gnuassembler .numberLines include=resource/asm/003-01-exit.s startLine=19 endLine=19}
+```{.gnuassembler .numberLines snippet=003-01-exit-section-text}
 ```
 
 `.text` which starts the text section. The text section of a
@@ -170,7 +170,7 @@ program is where the program instructions live.
 
 The next instruction is:
 
-```{.gnuassembler .numberLines include=resource/asm/003-01-exit.s startLine=20 endLine=20}
+```{.gnuassembler .numberLines snippet=003-01-exit-globl-start}
 ```
 
 
@@ -196,7 +196,7 @@ know where to begin running your program*.
 
 The next line:
 
-```{.gnuassembler .numberLines include=resource/asm/003-01-exit.s startLine=22 endLine=22}
+```{.gnuassembler .numberLines snippet=003-01-exit-start}
 ```
 
 
@@ -212,7 +212,7 @@ the symbol automatically gets the new value.
 Now we get into actual computer instructions. The first such instruction
 is this:
 
-```{.gnuassembler .numberLines include=resource/asm/003-01-exit.s startLine=23 endLine=25}
+```{.gnuassembler .numberLines snippet=003-01-exit-movq-60-rax}
 ```
 
 
@@ -301,7 +301,7 @@ loaded in _%rdi_. This value is then returned to the system. This
 is the value you retrieved when you typed `echo $?`. So, we load _%rdi_
 with `0` by typing the following:
 
-```{.gnuassembler .numberLines include=resource/asm/003-01-exit.s startLine=27 endLine=31}
+```{.gnuassembler .numberLines snippet=003-01-exit-movq-0-rdi}
 ```
 
 Now, loading registers with these numbers doesn\'t do anything
@@ -320,7 +320,7 @@ calls and what is required to be in each register, see
 
 The next instruction is the \"magic\" one. It looks like this:
 
-```{.gnuassembler .numberLines include=resource/asm/003-01-exit.s startLine=33 endLine=34}
+```{.gnuassembler .numberLines snippet=003-01-exit-syscall-this-wakes}
 ```
 
 The `syscall` instruction stops the normal program flow and transfers
@@ -519,7 +519,7 @@ wonderful!). You may also notice that in this program we actually have
 something in the data section. These lines are the data
 section:
 
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=19 endLine=21}
+```{.gnuassembler .numberLines snippet=003-02-maximum-data-items}
 ```
 
 Let\'s look at this. `data_items` is a label that refers to the
@@ -642,7 +642,7 @@ then the third (data item number 2), and so on. The data item number is
 the *index* of `data_items`. You\'ll notice that the first
 instruction we give to the computer is:
 
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=27 endLine=28}
+```{.gnuassembler .numberLines snippet=003-02-maximum-leaq-data-items}
 ```
 
 `leaq` stands for *load effective address*. Instead of reading memory,
@@ -657,14 +657,14 @@ address of `label` in a register.
 
 The next instruction is:
 
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=29 endLine=30}
+```{.gnuassembler .numberLines snippet=003-02-maximum-movq-0-rcx}
 ```
 
 Since we are using `%rcx` as our index, and we want to start looking at
 the first item, we load `%rcx` with 0. Now, the next instruction is
 tricky, but crucial to what we\'re doing. It says:
 
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=31 endLine=32}
+```{.gnuassembler .numberLines snippet=003-02-maximum-movq-rbx-rcx}
 ```
 
 Now to understand this line, you need to keep several things in mind:
@@ -701,7 +701,7 @@ For more information about this, see [Addressing Modes](#addressing-modes).
 
 Let\'s look at the next line:
 
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=33 endLine=34}
+```{.gnuassembler .numberLines snippet=003-02-maximum-movq-rax-rdi}
 ```
 
 We have the first item to look at stored in `%rax`. Since it is the
@@ -740,7 +740,7 @@ Okay, so now let\'s go to the code. We have the beginning of the loop
 marked with `_start_loop`. That is so we know where to go back to at the
 end of our loop. Then we have these instructions:
 
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=37 endLine=38}
+```{.gnuassembler .numberLines snippet=003-02-maximum-cmpq-0-rax}
 ```
 
 The `cmpq` instruction compares the two values. Here, we are
@@ -790,7 +790,7 @@ and we go to `_loop_exit`.[^3-13]
 If the last loaded element was not zero, we go on to the next
 instructions:
 
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=39 endLine=40}
+```{.gnuassembler .numberLines snippet=003-02-maximum-incq-rcx-increment}
 ```
 
 If you remember from our previous discussion, _%rcx_ contains the
@@ -800,7 +800,7 @@ beforehand. However, since we already incremented _%rcx_, _%rax_ is getting
 the next value from the list. Now _%rax_ has the next value to be tested.
 So, let\'s test it!
 
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=41 endLine=43}
+```{.gnuassembler .numberLines snippet=003-02-maximum-cmpq-rdi-rax}
 ```
 
 Here we compare our current value, stored in _%rax_ to our biggest value so
@@ -809,7 +809,7 @@ value so far, we don\'t care about it, so we just jump back to the
 beginning of the loop. Otherwise, we need to record that value as the
 largest one:
 
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=44 endLine=46}
+```{.gnuassembler .numberLines snippet=003-02-maximum-movq-rax-rdi-2}
 ```
 
 which moves the current value into _%rdi_, which we are using to store the
@@ -826,7 +826,7 @@ status there since we are using _%rdi_ as our largest number, so all we
 have to do is load _%rax_ with the number 60 and call the kernel to exit.
 Like this:
 
-```{.gnuassembler .numberLines include=resource/asm/003-02-maximum.s startLine=48 endLine=53}
+```{.gnuassembler .numberLines snippet=003-02-maximum-loop-exit}
 ```
 
 Okay, that was a lot of work and explanation, especially for such a

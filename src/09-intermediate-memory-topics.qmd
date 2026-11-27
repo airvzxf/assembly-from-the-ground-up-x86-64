@@ -625,7 +625,7 @@ simply return the current break, the first address after the program\'s
 data. `009-01-memory-layout` does exactly that: it asks for the current
 break, adds 4096 to it and asks Linux to move the break there:
 
-```{.gnuassembler .numberLines include=resource/asm/009-01-memory-layout.s startLine=27 endLine=33}
+```{.gnuassembler .numberLines snippet=009-01-memory-layout-movq-sys-brk}
 ```
 
 The second facility is the `mmap` system call, number 9. Instead of
@@ -647,7 +647,7 @@ file into memory, so that reading the memory reads the file. For
 anonymous memory, `fd` is -1 and `offset` is 0. Remember that the
 fourth parameter of a system call goes in _%r10_ and not in _%rcx_:
 
-```{.gnuassembler .numberLines include=resource/asm/009-01-memory-layout.s startLine=35 endLine=42}
+```{.gnuassembler .numberLines snippet=009-01-memory-layout-movq-sys-mmap}
 ```
 
 `mmap` returns the address of the new region in _%rax_, or a negative
@@ -723,7 +723,7 @@ Okay, now let\'s look at the code.
 
 At the beginning of the program, we have two locations set up:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-alloc.s startLine=39 endLine=45}
+```{.gnuassembler .numberLines snippet=009-02-alloc-heap-begin}
 ```
 
 Remember, the section of memory being managed is commonly referred to as
@@ -743,7 +743,7 @@ lets us know both whether or not this region is big enough for an
 allocation request, as well as the location of the next memory region.
 The following constants describe this record:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-alloc.s startLine=47 endLine=57}
+```{.gnuassembler .numberLines snippet=009-02-alloc-equ-header-size}
 ```
 
 This says that the header is 16 bytes total, the available flag is
@@ -768,7 +768,7 @@ The values that we will use for our `available` field are either 0 for
 unavailable, or 1 for available. To make this easier to read, we have
 the following definitions:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-alloc.s startLine=59 endLine=72}
+```{.gnuassembler .numberLines snippet=009-02-alloc-equ-unavailable}
 ```
 
 The system call numbers come from `006-01-linux.s`, like in the other
@@ -781,7 +781,7 @@ and `current_break` variables we discussed earlier. So, if you remember
 the discussion earlier, the current break can be found using the
 `brk` system call with 0. The function starts like this:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-alloc.s startLine=88 endLine=96}
+```{.gnuassembler .numberLines snippet=009-02-alloc-allocate-init}
 ```
 
 After `syscall`, _%rax_ holds the current break, the first address after
@@ -791,7 +791,7 @@ whose lowest 4 bits are 0 and all the others 1; Chapter 10 explains
 how). Then we move that value to the `heap_begin` and `current_break`
 locations. Then we leave the function. The code looks like this:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-alloc.s startLine=98 endLine=113}
+```{.gnuassembler .numberLines snippet=009-02-alloc-addq-15-rax}
 ```
 
 The heap consists of the memory between `heap_begin` and
@@ -827,7 +827,7 @@ comments so you\'ll know which register holds which value.
 Now that you\'ve looked back through the code, let\'s examine it one
 line at a time. We start off like this:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-alloc.s startLine=154 endLine=169}
+```{.gnuassembler .numberLines snippet=009-02-alloc-allocate}
 ```
 
 This part initializes all of our registers. The first two lines are
@@ -848,7 +848,7 @@ to examine memory regions until we either find an open memory region or
 determine that we need more memory. Our first instructions check to see
 if we need more memory:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-alloc.s startLine=171 endLine=175}
+```{.gnuassembler .numberLines snippet=009-02-alloc-alloc-loop-begin}
 ```
 
 _%rax_ holds the current memory region being examined and _%rsi_ holds
@@ -857,7 +857,7 @@ be examined is past the end of the heap, it means we need more memory
 to allocate a region of this size. Let\'s skip down to `move_break` and
 see what happens there:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-alloc.s startLine=229 endLine=251}
+```{.gnuassembler .numberLines snippet=009-02-alloc-move-break}
 ```
 
 When we reach this point in the code, _%rax_ (and _%rsi_) hold where we
@@ -868,7 +868,7 @@ break to be, the current break plus the header size and the region
 size, with another `leaq`, and call the `brk` system call. After that
 we check for errors:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-alloc.s startLine=253 endLine=260}
+```{.gnuassembler .numberLines snippet=009-02-alloc-under-normal-conditions}
 ```
 
 If there were no errors, we mark the memory as unavailable, record the
@@ -876,7 +876,7 @@ size of the memory, store the new program break, and make sure _%rax_
 points to the start of usable memory (which is *after* the header).
 Then we return the pointer to the allocated memory:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-alloc.s startLine=262 endLine=280}
+```{.gnuassembler .numberLines snippet=009-02-alloc-set-this-memory}
 ```
 
 The `error` code just returns 0 in _%rax_, so we won\'t discuss it.
@@ -885,7 +885,7 @@ Let\'s go back look at the rest of the loop. What happens if the current
 memory being looked at isn\'t past the end of the heap? Well, let\'s
 look.
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-alloc.s startLine=177 endLine=184}
+```{.gnuassembler .numberLines snippet=009-02-alloc-movq-hdr-size}
 ```
 
 This first grabs the size of the memory region and puts it in _%r8_.
@@ -899,7 +899,7 @@ Let\'s say that the space was available, and so we keep going. Then we
 check to see if this space is big enough to hold the requested amount of
 memory. The size of this region is being held in _%r8_, so we do this:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-alloc.s startLine=186 endLine=190}
+```{.gnuassembler .numberLines snippet=009-02-alloc-cmpq-r8-rdx}
 ```
 
 If the requested size is less than or equal to the current region\'s
@@ -910,7 +910,7 @@ doesn\'t matter if the current region is larger than requested, because
 the extra space will just be unused. So, let\'s jump down to
 `allocate_here` and see what happens:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-alloc.s startLine=211 endLine=227}
+```{.gnuassembler .numberLines snippet=009-02-alloc-allocate-here}
 ```
 
 It marks the memory as being unavailable. Then it moves the pointer
@@ -928,7 +928,7 @@ Remember that _%r8_ is holding the size of the current memory region,
 and `HEADER_SIZE` is the symbol for the size of the memory region\'s
 header. So this code will move us to the next memory region:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-alloc.s startLine=192 endLine=209}
+```{.gnuassembler .numberLines snippet=009-02-alloc-next-location}
 ```
 
 And now the function runs another loop.
@@ -957,7 +957,7 @@ That\'s because it doesn\'t have to do any searching at all. It can just
 mark the current memory region as `AVAILABLE`, and `allocate` will find
 it next time it is called. So we have:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-alloc.s startLine=316 endLine=328}
+```{.gnuassembler .numberLines snippet=009-02-alloc-deallocate}
 ```
 
 In this function, we don\'t have to save _%rbp_ or _%rsp_ since we\'re
@@ -1047,7 +1047,7 @@ buffer using our memory manager. The new program is called
 The first change we need to make is in the declaration. Currently it
 looks like this:
 
-```{.gnuassembler .numberLines include=resource/asm/006-01-read-records.s startLine=10 endLine=11}
+```{.gnuassembler .numberLines snippet=006-01-read-records-section-bss}
 ```
 
 It would be a misnomer to keep the same name, since we are switching it
@@ -1055,14 +1055,14 @@ from being an actual buffer to being a pointer to a buffer. In addition,
 it now only needs to be 8 bytes big (enough to hold a pointer). The new
 declaration will stay in the `.data` section and look like this:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-read-records.s startLine=10 endLine=11}
+```{.gnuassembler .numberLines snippet=009-02-read-records-record-buffer-ptr}
 ```
 
 Our next change is we need to initialize our memory manager immediately
 after we start our program. Therefore, right after the stack is set up,
 the following call needs to be added:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-read-records.s startLine=32 endLine=32}
+```{.gnuassembler .numberLines snippet=009-02-read-records-call-allocate-init}
 ```
 
 After that, the memory manager is ready to start servicing memory
@@ -1071,7 +1071,7 @@ records that we are reading. Therefore, we will call `allocate` to
 allocate this memory, and then save the pointer it returns into
 `record_buffer_ptr`. Like this:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-read-records.s startLine=34 endLine=36}
+```{.gnuassembler .numberLines snippet=009-02-read-records-movq-record-size}
 ```
 
 Now, when we make the call to `read_record`, it is expecting a pointer
@@ -1081,12 +1081,12 @@ in _%rsi_. In the old code, the pointer was the address of
 itself. Therefore, we must read the value in `record_buffer_ptr` with
 `movq`. We need to remove this line:
 
-```{.gnuassembler .numberLines include=resource/asm/006-01-read-records.s startLine=53 endLine=53}
+```{.gnuassembler .numberLines snippet=006-01-read-records-leaq-record-buffer-2}
 ```
 
 And put this line in its place:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-read-records.s startLine=59 endLine=59}
+```{.gnuassembler .numberLines snippet=009-02-read-records-movq-record-buffer}
 ```
 
 This is the difference between `leaq` and `movq` with the same
@@ -1103,22 +1103,22 @@ that value, we will need to move the pointer into a register, and then
 add `RECORD_FIRSTNAME` to it to get the pointer. So where we have the
 following code:
 
-```{.gnuassembler .numberLines include=resource/asm/006-01-read-records.s startLine=66 endLine=66}
+```{.gnuassembler .numberLines snippet=006-01-read-records-leaq-record-buffer}
 ```
 
 We need to replace it with this:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-read-records.s startLine=72 endLine=73}
+```{.gnuassembler .numberLines snippet=009-02-read-records-movq-record-buffer-2}
 ```
 
 Similarly, we need to change the line that says
 
-```{.gnuassembler .numberLines include=resource/asm/006-01-read-records.s startLine=71 endLine=71}
+```{.gnuassembler .numberLines snippet=006-01-read-records-leaq-record-buffer-3}
 ```
 
 so that it reads like this:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-read-records.s startLine=78 endLine=79}
+```{.gnuassembler .numberLines snippet=009-02-read-records-movq-record-buffer-3}
 ```
 
 Finally, one change that we need to make is to deallocate the memory
@@ -1126,7 +1126,7 @@ once we are done with it (in this program it\'s not necessary, but it\'s
 a good practice anyway). To do that, we just send `record_buffer_ptr` to
 the `deallocate` function right before exiting:
 
-```{.gnuassembler .numberLines include=resource/asm/009-02-read-records.s startLine=89 endLine=90}
+```{.gnuassembler .numberLines snippet=009-02-read-records-movq-record-buffer-4}
 ```
 
 Now you can build your program with the following commands:

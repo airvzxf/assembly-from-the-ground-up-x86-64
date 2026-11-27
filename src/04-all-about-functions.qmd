@@ -506,7 +506,7 @@ which registers, and what will be in _%rax_ at the end.
 
 We then have the following line:
 
-```{.gnuassembler .numberLines include=resource/asm/004-01-power.s startLine=59 endLine=59}
+```{.gnuassembler .numberLines snippet=004-01-power-type-power}
 ```
 
 This tells the linker that the symbol `power` should
@@ -516,7 +516,7 @@ practice.
 
 After that, we define the value of the `power` label:
 
-```{.gnuassembler .numberLines include=resource/asm/004-01-power.s startLine=61 endLine=61}
+```{.gnuassembler .numberLines snippet=004-01-power-power}
 ```
 
 As mentioned previously, this defines the symbol `power` to be the
@@ -528,7 +528,7 @@ return, while the `jmp` does not.
 
 Next, we have our instructions to set up our function:
 
-```{.gnuassembler .numberLines include=resource/asm/004-01-power.s startLine=62 endLine=68}
+```{.gnuassembler .numberLines snippet=004-01-power-pushq-rbp-save}
 ```
 
 We only need one local variable (8 bytes), but we reserve 16 to keep
@@ -631,7 +631,7 @@ test it out yourself with a calculator: 4 \* 3 \* 2 \* 1 = 24.
 I\'m guessing you didn\'t understand the whole code listing. Let\'s go
 through it a line at a time to see what is happening.
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=22 endLine=28}
+```{.gnuassembler .numberLines snippet=004-02-factorial-start}
 ```
 
 Okay, this program is intended to compute the factorial of the number 4.
@@ -646,7 +646,7 @@ The `call` instruction then makes the function call.
 
 Next we have these lines:
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=30 endLine=35}
+```{.gnuassembler .numberLines snippet=004-02-factorial-movq-rax-rdi}
 ```
 
 This takes place after `factorial` has finished and computed the
@@ -681,7 +681,7 @@ implemented.
 
 Before the function starts, we have this directive:
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=42 endLine=43}
+```{.gnuassembler .numberLines snippet=004-02-factorial-factorial}
 ```
 
 The `.type` directive tells the linker that `factorial` is a
@@ -693,7 +693,7 @@ next instruction. That\'s how `call` knew where to go when we said
 
 The first real instructions of the function are:
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=44 endLine=54}
+```{.gnuassembler .numberLines snippet=004-02-factorial-pushq-rbp-standard}
 ```
 
 As shown in the previous program, this creates the stack frame for this
@@ -702,7 +702,7 @@ you should start every function.
 
 The next instructions are these:
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=56 endLine=60}
+```{.gnuassembler .numberLines snippet=004-02-factorial-movq-rdi-rax}
 ```
 
 This copies the first parameter of the function, which arrived in
@@ -724,7 +724,7 @@ will: it puts its own parameter there before calling itself again). So
 we save it in our local variable, which lives in our own stack frame,
 where no other call can touch it:
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=62 endLine=64}
+```{.gnuassembler .numberLines snippet=004-02-factorial-movq-rdi-8}
 ```
 
 This is exactly why recursive functions need local variables. Every
@@ -735,7 +735,7 @@ call to `factorial` has its own stack frame, so every call has its own
 Then we decrease _%rdi_ by one, which leaves our parameter minus one in
 the register of the first parameter, and we call `factorial` again!
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=65 endLine=67}
+```{.gnuassembler .numberLines snippet=004-02-factorial-decq-rdi-decrease}
 ```
 
 `decq` stands for decrement. It subtracts 1 from the given register
@@ -751,7 +751,7 @@ function. If you remember our previous discussion, the result of
 functions are left in _%rax_. So, we need to multiply `-8(%rbp)` with
 _%rax_. This is done with this instruction:
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=68 endLine=74}
+```{.gnuassembler .numberLines snippet=004-02-factorial-imulq-8-rbp}
 ```
 
 This also stores the result in _%rax_, which is exactly where we want the
@@ -761,12 +761,12 @@ start of the function we pushed _%rbp_, and moved _%rsp_ into _%rbp_ to create
 the current stack frame. Now we reverse the operation to destroy the
 current stack frame and reactivate the last one:
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=76 endLine=81}
+```{.gnuassembler .numberLines snippet=004-02-factorial-end-factorial}
 ```
 
 Now we\'re already to return, so we issue the following command
 
-```{.gnuassembler .numberLines include=resource/asm/004-02-factorial.s startLine=82 endLine=84}
+```{.gnuassembler .numberLines snippet=004-02-factorial-ret-return-from}
 ```
 
 This pops the top value off of the stack, and then jumps to it. If you
