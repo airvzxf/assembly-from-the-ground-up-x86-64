@@ -70,8 +70,9 @@
   - [x] Chapter 2. Data Accessing Methods.
     - [x] This would be a good section for diagrams.
       - Added a text diagram for each addressing mode.
-  - [ ] Chapter 3. Your First Programs.
-    - [ ] Dominique suggests an extended example of this: Anything strange your program does and why it does it.
+  - [x] Chapter 3. Your First Programs.
+    - [x] Dominique suggests an extended example of this: Anything strange your program does and why it does it.
+      - Added "When a Program Does Something Strange": four changes to the first two programs, run, with their real results explained.
   - [ ] Chapter 4. All About Functions Dealing with Complexity
     - [ ] Dominique says "This part can be confusing until one gets to the sample illustration code and then it makes sense."
   - [ ] Chapter 5. Dealing with Files

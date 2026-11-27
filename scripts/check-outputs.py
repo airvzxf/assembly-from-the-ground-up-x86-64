@@ -119,6 +119,8 @@ def gdb(program, *prelude, args=""):
     return {"gdb": program, "prelude": list(prelude), "args": args}
 
 
+MAXIMUM = ("as -o 003-02-maximum.o 003-02-maximum.s"
+           " && ld -o 003-02-maximum 003-02-maximum.o && ./003-02-maximum")
 # Appendix F debugs a 003-02-maximum without its `incq %rcx` line.
 BROKEN_MAXIMUM = (
     "sed -i '/incq  *%rcx/d' 003-02-maximum.s"
@@ -154,6 +156,26 @@ CHECKS = {
     "ch03-pie-absolute": dict(
         sh("ld -pie --no-dynamic-linker -o maximum-pie"
            " 003-03-maximum-absolute.o"), joined=True),
+    # Chapter 3: the programs of "When a Program Does Something
+    # Strange", each with one change.
+    "ch03-strange-300": sh(
+        "sed -i 's/quad 3, 67, 34, 222,/quad 3, 67, 34, 300,/'"
+        f" 003-02-maximum.s && {MAXIMUM}; echo $?"),
+    "ch03-strange-no-dollar": dict(sh(
+        "sed -i 's/movq \\$60, %rax/movq 60, %rax/' 003-01-exit.s"
+        " && as -o 003-01-exit.o 003-01-exit.s"
+        " && ld -o 003-01-exit 003-01-exit.o && ./003-01-exit; echo $?"),
+        partial=True),
+    "ch03-strange-no-end": sh(
+        "sed -i 's/11, 125, 0$/11, 125/' 003-02-maximum.s"
+        f" && {MAXIMUM}; echo $?"),
+    "ch03-strange-next-data": sh(
+        "sed -i 's/11, 125, 0$/11, 125\\n            .quad 255/'"
+        f" 003-02-maximum.s && {MAXIMUM}; echo $?"),
+    "ch03-strange-no-globl": sh(
+        "sed -i '/globl _start/d' 003-01-exit.s"
+        " && as -o 003-01-exit.o 003-01-exit.s"
+        " && ld -o 003-01-exit 003-01-exit.o"),
     # Chapter 5
     "ch05-strace-toupper": dict(
         sh("printf 'Hey diddle diddle,\\nthe cat and the fiddle.\\n'"
@@ -272,6 +294,9 @@ CHECKS = {
         subs=[ENVP]),
     "appk-records": sh("./0AK-06-01-write-records"
                        " && ./0AK-06-01-read-records"),
+    "appk-maximum-1000": sh(
+        "sed -i 's/quad 3, 67,/quad 1000, 67,/' 003-02-maximum.s"
+        f" && {MAXIMUM}; echo $?"),
     "appk-hexdump-third-age": dict(
         sh("./006-01-write-records && hexdump -C test.dat"), subset=True),
     "appk-factorial-python": sh("python3 0AK-08-05-factorial.py"),

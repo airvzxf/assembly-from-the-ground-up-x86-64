@@ -840,6 +840,104 @@ You might also grab a piece of paper, and go through the program
 step-by-step, recording every change to every register, so you can see
 more clearly what is going on.
 
+When a Program Does Something Strange {#when-a-program-does-something-strange}
+-------------------------------------
+
+The computer does exactly what the program says, so when a program does
+something strange, there is always a reason. Finding it is a big part of
+programming in assembly language. Let\'s break our two programs on
+purpose and see what happens. Make each change in a copy of the file,
+then assemble, link and run it as before.
+
+**A number greater than 255.** Change the list of `003-02-maximum` so
+that 300 is the largest number:
+
+```{.gnuassembler}
+.quad 3, 67, 34, 300, 45, 22, 11, 125, 0
+```
+
+```{.bash}
+./003-02-maximum
+echo $?
+```
+
+```{.text check=ch03-strange-300}
+44
+```
+
+The program found 300, but the exit status only keeps the lowest byte
+of _%rdi_, and 300 doesn\'t fit in a byte: 300 - 256 = 44. The program
+is right; the way we look at its result is too small.
+[Chapter 10](10-counting-like-a-computer.qmd#chapter-10-counting-like-a-computer)
+explains how numbers are stored in bytes, and why keeping the lowest
+byte gives the remainder of dividing by 256.
+
+**Forgetting the dollar sign.** In `003-01-exit`, change `movq $60,
+%rax` to `movq 60, %rax`. It still assembles, because it is a valid
+instruction, but it now means "load the number stored at address 60":
+
+```{.bash}
+./003-01-exit
+echo $?
+```
+
+```{.text check=ch03-strange-no-dollar}
+Segmentation fault
+139
+```
+
+(Your shell may add `(core dumped)`.) Nothing is stored at address 60:
+Linux doesn\'t give any program the lowest addresses of memory, exactly
+to catch mistakes like this one. When the program tries to read there,
+the processor stops it, and Linux ends the program with the signal
+*segmentation fault* (number 11). The shell reports it as the status
+128 + 11 = 139. A segmentation fault almost always means that the program
+used a number as an address that isn\'t one.
+
+**Forgetting the 0 at the end of the list.** Remove the last number of
+`data_items` in `003-02-maximum`:
+
+```{.gnuassembler}
+.quad 3, 67, 34, 222, 45, 22, 11, 125
+```
+
+```{.text check=ch03-strange-no-end}
+222
+```
+
+It still works, which is the strangest result of all. The loop doesn\'t
+know where the list ends: it keeps reading the next 8 bytes after
+`125`. Linux gives memory to a program in pages of 4096 bytes, and the
+rest of the page after `data_items` is filled with zeros, so the loop
+finds a 0 right after the list, by luck. Add another number after the
+list, as a program with more data would have:
+
+```{.gnuassembler}
+.quad 3, 67, 34, 222, 45, 22, 11, 125
+.quad 255
+```
+
+```{.text check=ch03-strange-next-data}
+255
+```
+
+Now the "largest number" is 255, which isn\'t in the list at all. A
+program that runs past the end of its data doesn\'t always crash; it
+often just gives wrong answers, which is worse.
+
+**Forgetting `.globl _start`.** Remove that line from `003-01-exit.s`
+and link it again:
+
+```{.text check=ch03-strange-no-globl}
+ld: warning: cannot find entry symbol _start; defaulting to 0000000000401000
+```
+
+`ld` didn\'t find where the program starts, so it guessed: the
+beginning of the code. The program still works, because `_start` is
+the first instruction anyway. If it weren\'t, the program would start
+in the middle of something else. Never ignore a warning from `ld`; the
+scripts of this book make every warning an error (`ld --fatal-warnings`).
+
 Addressing Modes {#addressing-modes}
 ----------------
 
@@ -1157,6 +1255,9 @@ Review {#review-1}
     `leaq _start(%rip), %rax`?
 
 ### Going Further {#going-further-1}
+
+-   Change the first number of `data_items` in `003-02-maximum` to 1000
+    and run the program. What exit status do you get, and why?
 
 -   Modify the first program to leave off the `syscall` instruction line.
     Assemble, link, and execute the new program. What error message do
