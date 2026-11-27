@@ -276,6 +276,19 @@ rust64 0AM-02-structs 0AM-02-structs.rs -C opt-level=2
 assemble64 0AO-01-strlen
 link64_shared libstrlen.so 0AO-01-strlen.o
 
+# ----- Appendix P -----
+# The AArch64 examples are built with the AArch64 binutils (the checks of
+# assemble64 are for x86-64); test.bash runs them with qemu-aarch64.
+for program in 0AP-01-exit-aarch64 0AP-02-maximum-aarch64; do
+  echo "Assembling (AArch64): ${program}"
+  aarch64-linux-gnu-as -g -o "${program}.o" "${program}.s"
+  readelf -SW "${program}.o" | grep -q '\.note\.GNU-stack' \
+    || fail_build "${program}.s has no .note.GNU-stack section"
+  aarch64-linux-gnu-ld --fatal-warnings -o "${program}-bin" "${program}.o"
+  readelf -h "${program}-bin" | grep -q 'Machine: *AArch64' \
+    || fail_build "${program}-bin is not an AArch64 file"
+done
+
 # ----- Appendix A -----
 # The GTK 4 example is linked by gcc, which adds the C start-up code that
 # calls `main`, and gets the libraries from pkg-config.

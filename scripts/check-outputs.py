@@ -291,6 +291,10 @@ CHECKS = {
     # Appendix O (the times of 0AO-03-strlen-time.py change in every
     # run, so they aren't checked).
     "appo-strlen-test": sh("python3 0AO-02-strlen-test.py"),
+    # Appendix P
+    "appp-objdump-maximum": dict(
+        sh("aarch64-linux-gnu-objdump -d 0AP-02-maximum-aarch64"),
+        subset=True),
     # Appendix F
     "appf-start": dict(sh("gdb -nx ./003-02-maximum < /dev/null"),
                        setup=BROKEN_MAXIMUM, subset=True),

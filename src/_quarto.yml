@@ -55,6 +55,7 @@ book:
     - appendix-m-the-system-v-calling-sequence.qmd
     - appendix-n-the-fetch-execute-cycle.qmd
     - appendix-o-optimized-versions.qmd
+    - appendix-p-comparing-with-aarch64.qmd
 
 lang: en-US
 rights: >-
