@@ -76,10 +76,13 @@
   - [x] Chapter 4. All About Functions Dealing with Complexity
     - [x] Dominique says "This part can be confusing until one gets to the sample illustration code and then it makes sense."
       - The calling-convention section now starts with the whole call (caller, prologue, epilogue) in one listing, and "The Rule" box was rewritten.
-  - [ ] Chapter 5. Dealing with Files
-    - [ ] Do I need to introduce flowcharting or reference it here?
-    - [ ] Needs to be re-sectionalized and reviewed
-    - [ ] Probably need to start with a "hello world" program
+  - [x] Chapter 5. Dealing with Files
+    - [x] Do I need to introduce flowcharting or reference it here?
+      - No: the book plans programs with lists of steps (Chapter 3, "Planning the Program"), which is enough for programs of this size.
+    - [x] Needs to be re-sectionalized and reviewed
+      - The explanation of `005-01-toupper` is now its own section, "How the Program Works", with four subsections.
+    - [x] Probably need to start with a "hello world" program
+      - The chapter now starts with `005-00-hello-world`, which writes to `STDOUT` with the `write` system call.
   - [x] Chapter 6. Reading and Writing Simple Records
     - [x] Need to add info on how to use a hexdump to read the values
       - Added the section "Looking at the Bytes of a File" (`hexdump -C test.dat`) and a review question.

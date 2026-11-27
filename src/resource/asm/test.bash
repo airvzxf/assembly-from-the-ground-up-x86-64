@@ -86,6 +86,8 @@ expect 0AK-04-03-factorial-loop 120
 expect 0AK-04-04-power-stack 33
 
 # ----- Chapter 5 -----
+expect_output 005-00-hello-world "Hello, World!" ./005-00-hello-world-bin
+expect 005-00-hello-world 0
 # 005-01-toupper with a file bigger than its 500-byte buffer: its own
 # source code, compared with the result of `tr`.
 ./005-01-toupper-bin 005-01-toupper.s "${TMP_DIR}/toupper.txt"

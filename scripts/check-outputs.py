@@ -177,6 +177,7 @@ CHECKS = {
         " && as -o 003-01-exit.o 003-01-exit.s"
         " && ld -o 003-01-exit 003-01-exit.o"),
     # Chapter 5
+    "ch05-hello-world": sh("./005-00-hello-world"),
     "ch05-strace-toupper": dict(
         sh("printf 'Hey diddle diddle,\\nthe cat and the fiddle.\\n'"
            " > input.txt; strace ./005-01-toupper input.txt output.txt"),
@@ -297,6 +298,10 @@ CHECKS = {
     "appk-maximum-1000": sh(
         "sed -i 's/quad 3, 67,/quad 1000, 67,/' 003-02-maximum.s"
         f" && {MAXIMUM}; echo $?"),
+    "appk-hello-stderr": sh(
+        "sed -i 's/movq  \\$1, %rdi /movq  $2, %rdi /' 005-00-hello-world.s"
+        " && as -o h.o 005-00-hello-world.s && ld -o 005-00-hello-world h.o"
+        " && ./005-00-hello-world > /dev/null"),
     "appk-hexdump-third-age": dict(
         sh("./006-01-write-records && hexdump -C test.dat"), subset=True),
     "appk-factorial-python": sh("python3 0AK-08-05-factorial.py"),
