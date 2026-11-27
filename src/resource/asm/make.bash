@@ -272,6 +272,10 @@ assemble64 0AM-01-sum8
 link64 0AM-01-sum8 0AM-01-sum8.o
 rust64 0AM-02-structs 0AM-02-structs.rs -C opt-level=2
 
+# ----- Appendix O -----
+assemble64 0AO-01-strlen
+link64_shared libstrlen.so 0AO-01-strlen.o
+
 # ----- Appendix A -----
 # The GTK 4 example is linked by gcc, which adds the C start-up code that
 # calls `main`, and gets the libraries from pkg-config.

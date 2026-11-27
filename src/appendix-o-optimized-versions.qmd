@@ -1,0 +1,139 @@
+# Optimized Versions of a Function {#appendix-o-optimized-versions-of-a-function}
+
+This appendix was added in this edition, following a suggestion that
+Dominique made to the original author: show several versions of the
+same code, from the simplest to the fastest, and what each change buys.
+The function is the one every program that handles text needs, the
+length of a null-terminated string, which
+[Chapter 6](06-reading-and-writing-simple-records.qmd#chapter-6-reading-and-writing-simple-records)
+writes as `count_chars` and the C library calls `strlen`. Read
+[Chapter 12](12-optimization.qmd#chapter-12-optimization) first.
+
+The Four Versions {#the-four-versions}
+-----------------
+
+All four are in one file, built as a shared library, `libstrlen.so`
+(see
+[Chapter 8](08-sharing-functions-with-code-libraries.qmd#chapter-8-sharing-functions-with-code-libraries)),
+so that Python can test and time them:
+
+```{.gnuassembler .numberLines include=resource/asm/0AO-01-strlen.s}
+```
+
+-   **Version 1** is `count_chars`: a stack frame, an index in _%rcx_,
+    and a loop of five instructions per byte, with two jumps.
+
+-   **Version 2** removes what the function doesn\'t need. It calls no
+    other function, so it doesn\'t need a stack frame. A pointer
+    replaces the index, and the length is computed once, at the end.
+    Moving the test to the end of the loop leaves three instructions and
+    one jump per byte.
+
+-   **Version 3** replaces the whole loop with one instruction,
+    `repne scasb` (see
+    [String Instructions](appendix-b-common-x86-instructions.qmd#string-instructions)).
+
+-   **Version 4** changes the method instead of the instructions: it
+    looks at 16 bytes at a time with SSE2. `pcmpeqb` compares the 16
+    bytes of _%xmm1_ with the 16 zeros of _%xmm0_ at once, `pmovmskb`
+    turns the 16 results into 16 bits of _%edx_, and `bsf` finds the
+    first 1 among them. Its reads are always *aligned*: they start at a
+    multiple of 16, so a read never crosses from one page of memory
+    into the next one, which might not exist (Linux gives memory in
+    pages of 4096 bytes, see
+    [Chapter 9](09-intermediate-memory-topics.qmd#chapter-9.-intermediate-memory-topics)).
+    That is why the first block can start before the string: the
+    function shifts out the bits of the bytes that come before it.
+
+Testing Them {#testing-them}
+------------
+
+A faster function that gives a wrong answer is worthless, and the fast
+versions are the easiest to get wrong: version 4 has special cases for
+the first block, for every position of the string inside a block, and
+for a zero in the first or a later block. This Python program calls
+the four versions with every length from 0 to 100 and some longer
+ones, each starting at the 16 positions of a block, and compares them
+with Python\'s own `len()`:
+
+```{.python .numberLines include=resource/asm/0AO-02-strlen-test.py}
+```
+
+`test.bash` runs it every time the examples are tested:
+
+```{.text check=appo-strlen-test}
+errors: 0
+```
+
+Timing Them {#timing-them}
+-----------
+
+This program times each version, and the `strlen` of the C library, on
+a string of one million bytes:
+
+```{.python .numberLines include=resource/asm/0AO-03-strlen-time.py}
+```
+
+Times change from run to run and from processor to processor, so
+these are the fastest and the slowest of five runs, in nanoseconds per
+byte, measured in the container that builds this book on an Intel Core
+i7-7820HK (from 2017):
+
+| Version | ns per byte | Compared with version 1 |
+|---------|-------------|-------------------------|
+| 1. `count_chars` | 0.28--0.31 | 1 |
+| 2. Fewer instructions | 0.33--0.35 | A little slower |
+| 3. `repne scasb` | 0.52--0.54 | About 1.8 times slower |
+| 4. SSE2, 16 bytes at a time | 0.029--0.034 | About 9 times faster |
+| C library | 0.016--0.018 | About 17 times faster |
+
+What the Numbers Say {#what-the-numbers-say}
+--------------------
+
+-   **Fewer instructions are not always faster.** Version 2 runs three
+    instructions per byte instead of five, and on this processor it is
+    a little *slower*. Both loops handle one byte per iteration, and the
+    processor already runs the instructions of an iteration in parallel
+    (see
+    [Appendix N](appendix-n-the-fetch-execute-cycle.qmd#what-a-modern-processor-really-does)),
+    so removing some of them doesn\'t help, and the way a particular
+    processor feeds a small loop decides the rest. Another processor may
+    rank them the other way. That is why you measure instead of
+    guessing.
+
+-   **One instruction is not one step.** `repne scasb` looks like the
+    shortest program, but the processor runs it as a loop of its own,
+    which on most current processors is slow. String instructions are
+    fast for copying and filling big blocks (`rep movsb`, `rep stosb`),
+    not for searching.
+
+-   **The big gain comes from the method.** Version 4 is about 9 times
+    faster because it handles 16 bytes per iteration instead of one. No
+    rearranging of the byte-at-a-time loop can get close.
+
+-   **The library is faster still.** The C library\'s `strlen` checks
+    which instructions the processor has when the program starts (with
+    `cpuid`, see
+    [Other Instructions](appendix-b-common-x86-instructions.qmd#other-instructions))
+    and uses the widest ones, here AVX2, 32 bytes at a time, with more
+    tricks than fit in this appendix. Use the library\'s functions unless
+    you have measured a reason not to.
+
+Exercises {#exercises-o}
+---------
+
+-   Version 4 always starts with an aligned block. Write a version that
+    reads 16 bytes with `movdqu` (which doesn\'t need alignment) from
+    the start of the string. Why can it crash when the string ends
+    near the end of a page? (The C library reads unaligned too, but
+    first checks whether the read would reach the next page:
+    `objdump -d` of its `strlen` shows `and $0xfff` and
+    `cmp $0xfe0` before the first read.)
+
+-   Change version 2 to read 8 bytes at a time into a register and find
+    a zero byte among them. (Search for \"determine if a word has a zero
+    byte\" for the classic trick with `0x0101010101010101` and
+    `0x8080808080808080`.) Add it to the test before timing it.
+
+-   Run `0AO-03-strlen-time.py` on your computer. Do the versions rank
+    the same way?
