@@ -330,7 +330,7 @@ This section begins with a list of constants that we will use The reason
 these are put here rather than at the top is that they only deal with
 this one function. We have these definitions:
 
-```{.gnuassembler .numberLines include=resource/asm/005-01-toupper.s startLine=223 endLine=233}
+```{.gnuassembler .numberLines snippet=005-01-toupper-equ-lowercase-a}
 ```
 
 The first two simply define the letters that are the boundaries of what
@@ -358,7 +358,7 @@ Next comes the label `convert_to_upper`. This is the entry point of the
 function. The first two lines are our standard function lines to save
 the stack pointer. The next line:
 
-```{.gnuassembler .numberLines include=resource/asm/005-01-toupper.s startLine=242 endLine=242}
+```{.gnuassembler .numberLines snippet=005-01-toupper-movq-0-rcx}
 ```
 
 loads zero into _%rcx_. What we are going to do is iterate through
@@ -366,7 +366,7 @@ each byte of the buffer by loading from the location _%rdi_ + _%rcx_,
 incrementing _%rcx_, and repeating until _%rcx_ is equal to the buffer
 length stored in _%rsi_. The lines:
 
-```{.gnuassembler .numberLines include=resource/asm/005-01-toupper.s startLine=244 endLine=247}
+```{.gnuassembler .numberLines snippet=005-01-toupper-cmpq-0-rsi}
 ```
 
 They are just a sanity check to make sure that no one gave us a buffer of zero
@@ -379,7 +379,7 @@ and have a reliable exit plan if it happens.
 Now we start our loop. First, it moves a byte into _%al_, the lowest
 byte of _%rax_. The code for this is:
 
-```{.gnuassembler .numberLines include=resource/asm/005-01-toupper.s startLine=250 endLine=251}
+```{.gnuassembler .numberLines snippet=005-01-toupper-get-the-current}
 ```
 
 It is using an indexed indirect addressing mode. It says to start at

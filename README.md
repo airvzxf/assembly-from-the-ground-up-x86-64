@@ -16,6 +16,8 @@ podman run --rm -v "$PWD:/data:Z" pgu-book -c 'bash src/make.bash'
 podman run --rm -v "$PWD:/data:Z" pgu-book -c 'bash src/resource/asm/make.bash && bash src/resource/asm/test.bash'
 ```
 
+A code block shows a part of an example source with `snippet=<name>` instead of line numbers; `src/resource/asm/snippets.lua` gives each name a file and the text of its first and last line, so a snippet follows its code when the file changes, and the build fails if the text is not found.
+
 The container also has the tools of the examples: Rust (pinned like Quarto), GTK 4 and PyGObject for Appendix A, and Xvfb and xdotool to test the GUI example without a screen.
 
 The output is in `release/latest/`: the PDF, the ePUB, `resource.zip` with the example programs, and `site/`, the website. To preview the website while you write, run `quarto preview` in `src/`.

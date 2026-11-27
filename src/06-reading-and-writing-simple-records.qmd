@@ -130,7 +130,7 @@ of the system calls used, see
 
 You may have noticed the lines:
 
-```{.gnuassembler .numberLines include=resource/asm/006-01-write-records.s startLine=3 endLine=4}
+```{.gnuassembler .numberLines snippet=006-01-write-records-include-006-01}
 ```
 
 These statements cause the given files to basically be pasted
@@ -156,7 +156,7 @@ record, which the assembler can compute because both labels are in the
 same section. If it is not `RECORD_SIZE`, the assembler stops with the
 message, before a wrong file can ever be written:
 
-```{.gnuassembler .numberLines include=resource/asm/006-01-write-records.s startLine=81 endLine=89}
+```{.gnuassembler .numberLines snippet=006-01-write-records-if-record2-record1}
 ```
 
 To build the application, run the commands:
@@ -255,7 +255,7 @@ As you can see, this program opens the file and then runs a loop of
 reading, checking for the end of file, and writing the firstname. The
 one construct that might be new is the line that says:
 
-```{.gnuassembler .numberLines include=resource/asm/006-01-read-records.s startLine=66 endLine=66}
+```{.gnuassembler .numberLines snippet=006-01-read-records-leaq-record-buffer}
 ```
 
 It looks like we are combining an add instruction with a `leaq`

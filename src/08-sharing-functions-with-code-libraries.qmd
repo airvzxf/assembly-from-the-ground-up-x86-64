@@ -327,7 +327,7 @@ that `printf` promises not to change them. If you look back at our
 `008-01-hello-world-lib` program, you will notice that the function
 call looked like this:
 
-```{.gnuassembler .numberLines include=resource/asm/008-01-hello-world-lib.s startLine=15 endLine=17}
+```{.gnuassembler .numberLines snippet=008-01-hello-world-lib-leaq-helloworld-rip}
 ```
 
 So, we passed the address of the `helloworld` string in _%rdi_, rather
