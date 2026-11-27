@@ -137,7 +137,8 @@ link64 004-01-power 004-01-power.o
 link64 004-02-factorial 004-02-factorial.o
 
 # ----- Chapter 5 -----
-assemble64 005-01-toupper
+assemble64 005-00-hello-world 005-01-toupper
+link64 005-00-hello-world 005-00-hello-world.o
 link64 005-01-toupper 005-01-toupper.o
 
 # ----- Chapters 6 and 7 -----

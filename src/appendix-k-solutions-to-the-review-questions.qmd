@@ -633,7 +633,24 @@ Chapter 5. Dealing with Files {#chapter-5.-dealing-with-files}
 
 ### Use the Concepts {#use-the-concepts-14}
 
-All these programs use the `convert_to_upper` function of
+**Write the message of `005-00-hello-world` to `STDERR`.** Only the
+file descriptor changes: `movq $2, %rdi` instead of `movq $1, %rdi`.
+The message still appears with `> /dev/null`:
+
+```{.bash}
+./005-00-hello-world > /dev/null
+```
+
+```{.text check=appk-hello-stderr}
+Hello, World!
+```
+
+`>` only redirects file descriptor 1, and the message now goes to file
+descriptor 2, which is still the screen. That is why error messages go
+to `STDERR`: you see them even when the output goes to a file. To throw
+them away too, add `2> /dev/null`.
+
+The other programs of this section use the `convert_to_upper` function of
 `005-01-toupper`, moved to its own file, `0AK-05-00-convert-to-upper.s`,
 so each one can link it:
 

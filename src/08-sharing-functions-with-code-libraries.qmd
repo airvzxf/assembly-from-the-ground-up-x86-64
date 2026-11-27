@@ -77,7 +77,9 @@ Using a Shared Library {#using-a-shared-library}
 ----------------------
 
 The program we will examine here is simple - it writes the characters
-`hello world` to the screen and exits. The regular program,
+`hello world` to the screen and exits, like the first program of
+[Chapter 5](05-dealing-with-files.qmd#hello-world), but with the names
+of `006-01-linux.s`. The regular program,
 `008-01-hello-world-nolib.s`, looks like this:
 
 ```{.gnuassembler .numberLines include=resource/asm/008-01-hello-world-nolib.s}

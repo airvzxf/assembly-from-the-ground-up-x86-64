@@ -6,6 +6,51 @@ are the things that have been put on disk. Data which is stored in files
 is called *persistent* data, because it persists in files
 that remain on the disk even when the program isn\'t running.
 
+Hello, World! {#hello-world}
+-------------
+
+Before we open files of our own, let\'s write to a file that every
+program already has open: the screen. So far our programs could only
+answer with an exit status. The first program in a new language
+traditionally prints the words *Hello, World!*, and that is what this
+one does:
+
+```{.gnuassembler .numberLines include=resource/asm/005-00-hello-world.s}
+```
+
+Assemble, link and run it as usual:
+
+```{.bash}
+as -g -o 005-00-hello-world.o 005-00-hello-world.s
+ld -o 005-00-hello-world 005-00-hello-world.o
+./005-00-hello-world
+```
+
+```{.text check=ch05-hello-world}
+Hello, World!
+```
+
+The work is done by one system call, `write`, number 1. It takes three
+parameters: in _%rdi_, *where* to write; in _%rsi_, the address of the
+bytes to write; and in _%rdx_, how many bytes to write. It returns in
+_%rax_ the number of bytes it wrote.
+
+The *where* is the number 1. It is a *file descriptor*, the number of
+an open file, and file descriptor 1 is the *standard output*, which is
+usually the screen. Linux opens it for every program before the program
+starts. Most of this chapter is about these numbers: how a program gets
+one for a file of its own, and what it can do with it.
+
+The message is in the `.data` section, like the list of
+`003-02-maximum`, but `write` doesn\'t look for an end marker: it needs
+the length. Counting the characters by hand is easy to get wrong, so we
+let the assembler count. The label `message_end` is the address right
+after the last character, so `message_end - message` is the length, 14
+bytes (the `\n` at the end is one byte, the newline character). The
+directive `.equ` gives that number a name, `MESSAGE_LENGTH`, and
+`movq $MESSAGE_LENGTH, %rdx` puts it in _%rdx_. If you change the
+message, the length changes with it.
+
 The UNIX File Concept {#the-unix-file-concept}
 ---------------------
 
@@ -216,8 +261,8 @@ working program.[^5-4]
 
 You may have been thinking that you will never remember all of these
 numbers being thrown at you - the system call numbers, the flags, etc.
-In this program we will also introduce a new directive,
-`.equ` which should help out. `.equ` allows you to assign names to
+The directive `.equ`, which named the length of the message in
+[Hello, World!](#hello-world), helps here too: it assigns names to
 numbers. For example, if you did `.equ SYS_READ, 0`, any
 time after that you wrote `SYS_READ`, the assembler would substitute
 `0` for that. So now, you can write:
@@ -300,7 +345,12 @@ both files and exit. `strace` even translates our numbers back into
 names: `-100` is `AT_FDCWD`, and the flags `01101` are
 `O_WRONLY|O_CREAT|O_TRUNC`.
 
-Let\'s examine how the program works.
+How the Program Works {#how-the-program-works}
+---------------------
+
+Now let\'s examine the code, one part at a time.
+
+### Constants and Buffers {#constants-and-buffers}
 
 The first section of the program is marked `CONSTANTS`. In programming,
 a constant is a value that is assigned when a program assembles
@@ -321,6 +371,8 @@ this constant rather than typing out the number 500 whenever we need to
 use the size of the buffer, if it later changes, we only need to modify
 this value, rather than having to go through the entire program and
 changing all of the values individually.
+
+### The Conversion Function {#the-conversion-function}
 
 Instead of going on to the `_start` section of the program, go to the
 end where we define the `convert_to_upper` function. This is the part
@@ -404,6 +456,8 @@ so it\'s easy to see where the parts of the program are. Notice that the
 function only uses caller-saved registers (_%rax_, _%rcx_, _%rdi_ and
 _%rsi_), so it doesn\'t need to save any register for its caller.
 
+### Opening the Files {#opening-the-files}
+
 Now we know how the conversion process works. Now we need to figure out
 how to get the data in and out of the files.
 
@@ -468,6 +522,8 @@ The same is then done for the output file, except that it is created
 with a write-only, create-if-doesn\'t-exist, truncate-if-does-exist
 mode. Its file descriptor is stored as well.
 
+### The Read-Write Loop {#the-read-write-loop}
+
 Now we get to the main part - the read/write loop. Basically, we will
 read fixed-size chunks of data from the input file, call our conversion
 function on it, and write it back to the output file. Although we are
@@ -524,6 +580,11 @@ Review {#review-3}
     starts?
 
 ### Use the Concepts {#use-the-concepts-3}
+
+-   Change `005-00-hello-world` so that it writes its message to
+    `STDERR`. Run it with `> /dev/null` at the end of the command, which
+    sends the standard output to nowhere. Does the message still
+    appear? Why?
 
 -   Modify the `005-01-toupper` program so that it reads from `STDIN` and
     writes to `STDOUT` instead of using the files on the command-line.
