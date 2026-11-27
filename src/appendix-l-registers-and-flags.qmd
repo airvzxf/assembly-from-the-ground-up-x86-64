@@ -1,0 +1,208 @@
+# Registers and Flags {#appendix-l-registers-and-flags}
+
+This appendix was added in this edition. It collects in one place what
+the book says about each register of x86-64 as it meets them: which
+registers there are, what the calling convention and the system calls
+use each one for, and what every bit of the flags register means. For
+the instructions themselves, see
+[Appendix B](appendix-b-common-x86-instructions.qmd#appendix-b-common-x86-instructions);
+for the difference between registers and memory, see
+[Registers and Memory](02-computer-architecture.qmd#registers-and-memory).
+
+General-Purpose Registers {#general-purpose-registers}
+-------------------------
+
+x86-64 has sixteen 8-byte registers for numbers and addresses. Each one
+also has names for its lower 4, 2 and 1 bytes (see
+[Sizes of Data and Parts of Registers](03-your-first-programs.qmd#sizes-of-data-and-parts-of-registers));
+remember that writing the 4-byte part clears the upper 4 bytes.
+
+| 8 bytes | 4 | 2 | 1 |
+|---------|-----------|-----------|-----------|
+| _%rax_ | _%eax_ | _%ax_ | _%al_, _%ah_ |
+| _%rbx_ | _%ebx_ | _%bx_ | _%bl_, _%bh_ |
+| _%rcx_ | _%ecx_ | _%cx_ | _%cl_, _%ch_ |
+| _%rdx_ | _%edx_ | _%dx_ | _%dl_, _%dh_ |
+| _%rsi_ | _%esi_ | _%si_ | _%sil_ |
+| _%rdi_ | _%edi_ | _%di_ | _%dil_ |
+| _%rbp_ | _%ebp_ | _%bp_ | _%bpl_ |
+| _%rsp_ | _%esp_ | _%sp_ | _%spl_ |
+| _%r8_--_%r15_ | _%r8d_--_%r15d_ | _%r8w_--_%r15w_ | _%r8b_--_%r15b_ |
+
+The processor treats most of them the same, but the System V calling
+convention
+([Chapter 4](04-all-about-functions.qmd#assembly-language-functions-using-the-system-v-calling-convention))
+and the Linux system calls
+([Chapter 3](03-your-first-programs.qmd#outline-of-an-assembly-language-program))
+give each one a job, and a few instructions use some of them without
+naming them:
+
+| Register | In a function call | In a system call | Used by instructions |
+|----------|--------------------|------------------|----------------------|
+| _%rax_ | Return value; before calling a function with a variable number of parameters (like `printf`), _%al_ = how many vector registers carry parameters | Number of the call, then the result | `mul`, `div`: one operand and the result |
+| _%rbx_ | Callee-saved | Kept | |
+| _%rcx_ | 4th parameter | Overwritten (the return address) | Shift count in _%cl_; `rep` count |
+| _%rdx_ | 3rd parameter; second half of a 16-byte return value | 3rd parameter | `mul`, `div`: the upper half |
+| _%rsi_ | 2nd parameter | 2nd parameter | Source of the string instructions |
+| _%rdi_ | 1st parameter | 1st parameter | Destination of the string instructions |
+| _%rbp_ | Callee-saved; the base of the stack frame | Kept | |
+| _%rsp_ | The top of the stack; a multiple of 16 at every `call` | Kept | `push`, `pop`, `call`, `ret` |
+| _%r8_ | 5th parameter | 5th parameter | |
+| _%r9_ | 6th parameter | 6th parameter | |
+| _%r10_ | Caller-saved | 4th parameter | |
+| _%r11_ | Caller-saved | Overwritten (the flags) | |
+| _%r12_--_%r15_ | Callee-saved | Kept | |
+
+*Callee-saved* registers (_%rbx_, _%rbp_, _%rsp_ and _%r12_ to
+_%r15_) have the same value after a call as before it: a function that
+uses one saves it first and restores it before returning. All the
+others are *caller-saved*: a call may change them, so a caller that
+needs their values keeps them somewhere else first. The kernel keeps
+every register across a system call except _%rax_ (the result), _%rcx_
+and _%r11_.
+
+The Instruction Pointer {#the-instruction-pointer}
+-----------------------
+
+_%rip_ holds the address of the next instruction. No instruction writes
+it directly: jumps, `call` and `ret` change it. It can be read in one
+way, as the base of instruction-pointer-relative addressing:
+`leaq data(%rip), %rbx` (see
+[Addressing Relative to the Instruction Pointer](03-your-first-programs.qmd#addressing-relative-to-the-instruction-pointer)).
+
+The Flags Register {#the-flags-register}
+------------------
+
+_%rflags_ is 8 bytes long, but only its lowest bits are used. Most
+arithmetic and logic instructions set the *status flags* according to
+their result, and the conditional jumps, `set`*cc* and `cmov`*cc* read
+them. gdb calls the register `eflags` and lists the flags that are 1.
+
+| Bit | Flag | Name | It is 1 when |
+|-----|------|------|--------------|
+| 0 | CF | Carry | An unsigned result didn\'t fit: a carry out of the top bit in an addition, or a borrow in a subtraction (the first number was smaller) |
+| 1 | | | Always 1 |
+| 2 | PF | Parity | The lowest byte of the result has an even number of 1 bits |
+| 4 | AF | Auxiliary carry | There was a carry or borrow out of the lowest 4 bits (used for decimal arithmetic) |
+| 6 | ZF | Zero | The result is 0 |
+| 7 | SF | Sign | The top bit of the result is 1 (negative, as a signed number) |
+| 8 | TF | Trap | The processor stops after every instruction (debuggers use it to step) |
+| 9 | IF | Interrupt enable | The processor accepts interrupts; always 1 in a user program |
+| 10 | DF | Direction | String instructions go downwards in memory; the calling convention requires 0 at every call and return |
+| 11 | OF | Overflow | A signed result didn\'t fit |
+
+The flags are only as recent as the last instruction that changed them,
+and many instructions don\'t:
+
+-   `add`, `sub`, `cmp`, `neg`, `adc` and `sbb` set all six status
+    flags (CF, PF, AF, ZF, SF and OF).
+
+-   `inc` and `dec` set them all except CF.
+
+-   `and`, `or`, `xor` and `test` clear CF and OF, and set ZF, SF and
+    PF from the result.
+
+-   The shifts put the last bit shifted out in CF.
+
+-   `imul` and `mul` set CF and OF when the result doesn\'t fit in the
+    destination; after them, and after `div`, the other flags are
+    undefined.
+
+-   `mov`, `lea`, `push`, `pop`, `jmp`, `call`, `ret`, `set`*cc* and
+    `cmov`*cc* don\'t change any flag.
+
+This is the comparison `cmpq %rdi, %rax` of `003-02-maximum` in gdb,
+when the current number (34) is smaller than the largest so far (67),
+and then `cmpq $0, %rax` at the end of the list:
+
+```{.text check=appl-gdb-flags}
+(gdb) break 42 if $rax < $rdi
+(gdb) run
+42          jle _start_loop         # Jump to loop beginning if
+(gdb) info registers rax rdi eflags
+rax            0x22                34
+rdi            0x43                67
+eflags         0x293               [ CF AF SF IF ]
+(gdb) delete
+(gdb) break 38 if $rax == 0
+(gdb) continue
+38          je _loop_exit           # hit the end.
+(gdb) info registers rax eflags
+rax            0x0                 0
+eflags         0x246               [ PF ZF IF ]
+```
+
+34 - 67 is negative, so SF is 1; as unsigned numbers 34 is smaller, so
+the subtraction needed a borrow and CF is 1; and the lowest digits, 2
+and 3 (34 is `0x22` and 67 is `0x43`), needed one too, so AF is 1. The
+result, -33, fits in a signed number, so OF is 0, and SF ≠ OF makes
+`jle` jump. In the second comparison 0 - 0 is 0, so ZF is 1 and `je`
+jumps; 0 has an even number of 1 bits (none), so PF is 1. The numbers
+`0x293` and `0x246` are the bits themselves: `0x246` is bits 1, 2, 6
+and 9.
+
+Conditional Jumps {#conditional-jumps}
+-----------------
+
+After `cmpq %rbx, %rax`, which computes _%rax_ - _%rbx_ and keeps only
+the flags, each conditional jump tests these flags. The same condition
+codes work with `set`*cc* (store 1 or 0 in a byte) and `cmov`*cc* (move
+only if the condition is true).
+
+| Jump | Jumps if _%rax_ ... _%rbx_ | Flags |
+|------|----------------------------|-------|
+| `je`, `jz` | equal | ZF = 1 |
+| `jne`, `jnz` | not equal | ZF = 0 |
+| `jg`, `jnle` | greater (signed) | ZF = 0 and SF = OF |
+| `jge`, `jnl` | greater or equal (signed) | SF = OF |
+| `jl`, `jnge` | less (signed) | SF ≠ OF |
+| `jle`, `jng` | less or equal (signed) | ZF = 1 or SF ≠ OF |
+| `ja`, `jnbe` | above (unsigned) | CF = 0 and ZF = 0 |
+| `jae`, `jnb`, `jnc` | above or equal (unsigned) | CF = 0 |
+| `jb`, `jnae`, `jc` | below (unsigned) | CF = 1 |
+| `jbe`, `jna` | below or equal (unsigned) | CF = 1 or ZF = 1 |
+| `js`, `jns` | the result is negative, or not | SF = 1, SF = 0 |
+| `jo`, `jno` | a signed overflow, or not | OF = 1, OF = 0 |
+| `jp`, `jnp` | even parity, or odd | PF = 1, PF = 0 |
+
+Use *greater* and *less* for signed numbers, and *above* and *below* for
+unsigned numbers and addresses: as unsigned numbers, -1 is the largest
+of all.
+
+Other Registers {#other-registers}
+---------------
+
+-   **Vector registers.** _%xmm0_ to _%xmm15_ are 16 bytes wide, and SSE
+    instructions use them for floating-point numbers (see
+    [Chapter 10](10-counting-like-a-computer.qmd#chapter-10-counting-like-a-computer)).
+    Processors with AVX widen them to 32 bytes (_%ymm0_ to _%ymm15_),
+    and with AVX-512 to 64 bytes (_%zmm0_ to _%zmm31_, with the mask
+    registers _%k0_ to _%k7_). In the calling convention,
+    floating-point parameters go in _%xmm0_ to _%xmm7_, the result comes
+    back in _%xmm0_, and all of them are caller-saved. The register
+    _MXCSR_ chooses how SSE rounds results and records its errors.
+
+-   **x87 registers.** _%st(0)_ to _%st(7)_ hold 10-byte floating-point
+    numbers for the older floating-point instructions. 32-bit programs
+    used them for every `float` and `double`; 64-bit programs only use
+    them for `long double`.
+
+-   **Segment registers.** _%cs_, _%ds_, _%es_, _%ss_, _%fs_ and _%gs_
+    divided memory into segments on older processors. In 64-bit mode
+    only _%fs_ and _%gs_ still matter: each one can add a base address
+    to a memory operand, and Linux uses _%fs_ for the data that is
+    private to each thread. For example, the protection that GCC adds
+    against stack overflows (`-fstack-protector`) keeps its secret value
+    at `%fs:0x28`.
+
+-   **System registers.** The control registers (_%cr0_, _%cr3_, ...),
+    the debug registers and the model-specific registers configure the
+    processor itself. Only the kernel can use them.
+
+For every detail, see Volume 1 of the
+[Intel 64 and IA-32 Architectures Software Developer\'s Manuals][AL-Intel-SDM]
+(Chapter 3, *Basic Execution Environment*), and the
+[System V ABI for x86-64][AL-ABI] for the calling convention.
+
+[AL-Intel-SDM]: https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
+[AL-ABI]: https://gitlab.com/x86-psABIs/x86-64-ABI

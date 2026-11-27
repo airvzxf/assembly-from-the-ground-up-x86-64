@@ -56,7 +56,8 @@
 ### Author notes.
 
 - [ ] General.
-  - [ ] Dominique suggests I have an appendix of registers. Maybe in the Instructions appendix?
+  - [x] Dominique suggests I have an appendix of registers. Maybe in the Instructions appendix?
+    - Added Appendix L. Registers and Flags; Appendix B and Chapter 3 point to it.
   - [ ] Need to find places that need more filling out.  Reviews, definitely.
   - [x] Go back through and make sure that registers and memory are both fully described and fully distinguished.
     - Added "Registers and Memory" to Chapter 2: a comparison table, its consequences and a review question.
@@ -64,7 +65,8 @@
   - [ ] Appendices.
     - [ ] A full description of the calling sequence for UNIX.
     - [ ] A complete examination of the fetch-execute cycle.
-    - [ ] A complete listing of registers and flags.
+    - [x] A complete listing of registers and flags.
+      - Appendix L.
 
 - [ ] Chapters.
   - [x] Chapter 2. Data Accessing Methods.

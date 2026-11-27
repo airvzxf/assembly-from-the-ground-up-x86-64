@@ -272,6 +272,8 @@ CHECKS = {
     "appb-objdump-intel": dict(
         sh("objdump -d --no-show-raw-insn -M intel 003-02-maximum"),
         subset=True),
+    # Appendix L
+    "appl-gdb-flags": gdb("003-02-maximum"),
     # Appendix F
     "appf-start": dict(sh("gdb -nx ./003-02-maximum < /dev/null"),
                        setup=BROKEN_MAXIMUM, subset=True),
