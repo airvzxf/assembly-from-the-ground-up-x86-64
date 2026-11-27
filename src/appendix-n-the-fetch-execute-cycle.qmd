@@ -1,0 +1,197 @@
+# The Fetch-Execute Cycle {#appendix-n-the-fetch-execute-cycle}
+
+This appendix was added in this edition.
+[Chapter 2](02-computer-architecture.qmd#the-cpu) describes the
+fetch-execute cycle in a few paragraphs: the processor reads the
+instruction that _%rip_ points to, works out what it means, does it,
+and moves on. This appendix follows the cycle through the first
+instructions of `003-02-maximum`, byte by byte, and then explains how a
+modern processor manages to do much more than one instruction at a
+time while still looking, to the program, as if it followed the cycle
+exactly.
+
+One Turn of the Cycle {#one-turn-of-the-cycle}
+---------------------
+
+Each instruction goes through these steps:
+
+1.  **Fetch.** Read the bytes at the address in _%rip_. x86-64
+    instructions are 1 to 15 bytes long, so the processor reads a block
+    of bytes and finds out later where the instruction ends.
+
+2.  **Decode.** Work out the operation, its operands and the length of
+    the instruction (see the next section).
+
+3.  **Advance _%rip_.** Add the length of the instruction to _%rip_, so
+    it points to the next one. This happens *before* the instruction
+    runs, which is why an address relative to _%rip_ is relative to the
+    *next* instruction.
+
+4.  **Read the operands.** From registers, from the instruction itself
+    (an immediate value), or from memory, after computing the address
+    with the addressing mode.
+
+5.  **Execute.** The arithmetic and logic unit does the operation, and
+    sets the flags if the instruction changes them.
+
+6.  **Write the result** to a register or to memory.
+
+A jump, a `call` or a `ret` changes _%rip_ in step 5 or 6, replacing
+the value of step 3; that is all a jump is.
+
+gdb shows step 3 at work. `starti` stops before the first instruction;
+each `stepi` runs one, and _%rip_ grows by the length of the instruction
+that ran (7, 7 and then 4 bytes):
+
+```{.text check=appn-gdb-rip}
+(gdb) starti
+(gdb) info registers rip
+rip            0x401000            0x401000 <_start>
+(gdb) x/4i $rip
+=> 0x401000 <_start>:   lea    0xff9(%rip),%rbx        # 0x402000
+   0x401007 <_start+7>: mov    $0x0,%rcx
+   0x40100e <_start+14>:        mov    (%rbx,%rcx,8),%rax
+   0x401012 <_start+18>:        mov    %rax,%rdi
+(gdb) stepi
+(gdb) info registers rip
+rip            0x401007            0x401007 <_start+7>
+(gdb) stepi
+(gdb) info registers rip
+rip            0x40100e            0x40100e <_start+14>
+(gdb) stepi
+(gdb) info registers rip rax
+rip            0x401012            0x401012 <_start+18>
+rax            0x3                 3
+```
+
+After the third instruction, _%rax_ holds 3, the first number of
+`data_items`.
+
+Decoding an Instruction {#decoding-an-instruction}
+-----------------------
+
+These are the bytes of the same four instructions, as `objdump -d
+003-02-maximum` shows them:
+
+```{.text check=appn-objdump-bytes}
+  401000:       48 8d 1d f9 0f 00 00    lea    0xff9(%rip),%rbx        # 402000 <data_items>
+  401007:       48 c7 c1 00 00 00 00    mov    $0x0,%rcx
+  40100e:       48 8b 04 cb             mov    (%rbx,%rcx,8),%rax
+  401012:       48 89 c7                mov    %rax,%rdi
+```
+
+An x86-64 instruction is made of these parts, in this order; only the
+opcode is always there:
+
+| Part | Size | What it says |
+|------|------|--------------|
+| Prefixes | 0 to 4 bytes | Change the instruction: a different operand size, `rep`, `lock`, a segment |
+| REX | 0 or 1 byte, `40` to `4f` | Use 8-byte operands (bit W), and the registers _%r8_ to _%r15_ (bits R, X, B) |
+| Opcode | 1 to 3 bytes | The operation |
+| ModRM | 0 or 1 byte | The operands: *mod* (2 bits), *reg* (3 bits), *r/m* (3 bits) |
+| SIB | 0 or 1 byte | For indexed addressing: *scale* (2 bits), *index* (3 bits), *base* (3 bits) |
+| Displacement | 0, 1 or 4 bytes | The offset of the addressing mode |
+| Immediate | 0, 1, 2, 4 or 8 bytes | A number that is part of the instruction |
+
+The 3-bit register numbers are, in order: 0 _%rax_, 1 _%rcx_, 2 _%rdx_,
+3 _%rbx_, 4 _%rsp_, 5 _%rbp_, 6 _%rsi_ and 7 _%rdi_ (a REX bit adds 8
+for _%r8_ to _%r15_). Now the four instructions:
+
+-   **`48 8d 1d f9 0f 00 00`**, `lea 0xff9(%rip), %rbx`. `48` is a REX
+    byte with only W set (`0100 1000`): the operands are 8 bytes. `8d`
+    is the opcode of `lea`. ModRM `1d` is `00 011 101`: *reg* 3 is
+    _%rbx_, the destination; *mod* 0 with *r/m* 5 means \"relative to
+    _%rip_, with a 4-byte displacement\". The displacement is
+    `f9 0f 00 00`, which is `0x00000ff9` with its lowest byte first.
+
+-   **`48 c7 c1 00 00 00 00`**, `mov $0, %rcx`. Opcode `c7` is \"move
+    an immediate value\". ModRM `c1` is `11 000 001`: *mod* 3 means
+    that *r/m* is a register, 1, _%rcx_; *reg* is 0, which for this
+    opcode is part of the operation, not a register. The 4 bytes after
+    it are the immediate value, 0.
+
+-   **`48 8b 04 cb`**, `mov (%rbx,%rcx,8), %rax`. Opcode `8b` is
+    \"move from *r/m* to *reg*\". ModRM `04` is `00 000 100`: *reg* 0
+    is _%rax_; *r/m* 4 means \"a SIB byte follows\". SIB `cb` is
+    `11 001 011`: *scale* 3 means a multiplier of 2^3^ = 8, *index* 1
+    is _%rcx_ and *base* 3 is _%rbx_.
+
+-   **`48 89 c7`**, `mov %rax, %rdi`. Opcode `89` is \"move from *reg*
+    to *r/m*\". ModRM `c7` is `11 000 111`: *reg* 0 is _%rax_, the
+    source, and *r/m* 7 is _%rdi_, the destination.
+
+The decoder can only know where an instruction ends after reading its
+prefixes, opcode and ModRM, which is one reason x86 decoders are
+complicated. Processors with fixed-size instructions, like ARM\'s
+AArch64 (always 4 bytes), don\'t have that problem. The tables of
+opcodes and every encoding are in Volume 2 of the
+[Intel Software Developer\'s Manuals][AN-Intel-SDM].
+
+What a Modern Processor Really Does {#what-a-modern-processor-really-does}
+-----------------------------------
+
+Done one step at a time, the cycle would leave most of the processor
+idle: the decoder would wait for the arithmetic unit, which would wait
+for memory. Modern processors keep every part busy, but they always
+produce the same results as the simple cycle: registers, memory and
+flags look, to the program, as if each instruction had run alone and in
+order. These are the main techniques, the words that the end of
+[The CPU](02-computer-architecture.qmd#the-cpu) suggests looking up:
+
+-   **Pipelining.** The steps of the cycle are done by different parts
+    of the processor, like stations of an assembly line, so while one
+    instruction executes, the next ones are being decoded and fetched.
+    Current x86-64 processors have pipelines of a dozen or more stages.
+
+-   **Micro-operations.** The decoder translates each x86 instruction
+    into one or more simple internal operations (*micro-ops*). An
+    instruction like `addq %rax, 8(%rbx)` becomes a load, an addition
+    and a store. Decoded micro-ops are kept in a cache, so a loop is
+    decoded only once.
+
+-   **Superscalar execution.** The processor has several arithmetic
+    units, load units and store units, and starts several micro-ops in
+    the same cycle. That is how `perf stat` can report more than one
+    instruction per cycle (see
+    [Chapter 12](12-optimization.qmd#chapter-12-optimization)).
+
+-   **Out-of-order execution.** Micro-ops wait in a buffer until their
+    operands are ready, and run as soon as they are, not in program
+    order. While one instruction waits for memory, later ones that
+    don\'t need its result go ahead. The results are *retired* (made
+    visible) in program order, so the program can\'t tell.
+
+-   **Register renaming.** Each time an instruction writes a register,
+    the processor gives it a fresh physical register, from a pool much
+    bigger than the 16 names. Two instructions that only reuse a name,
+    like two unrelated values in _%rax_, can then run at the same time.
+
+-   **Branch prediction.** The fetch step can\'t wait for a conditional
+    jump to execute before it knows where to fetch next, so it guesses
+    from the history of that jump, and continues *speculatively*. A
+    right guess costs nothing. A wrong one throws away all the work
+    after the jump and starts again from the right address, which
+    costs roughly as many cycles as the pipeline is deep. Loops are
+    easy to predict; jumps on random data are not.
+
+-   **Caches.** Memory is far slower than the processor, so recent
+    instructions and data are kept in small, fast memories on the chip:
+    usually a first level for instructions and another for data, a
+    larger second level, and a third level shared by all the cores.
+    Reading memory in order, as our loops do, is fast because the
+    processor loads whole lines of 64 bytes and fetches the next ones
+    before they are needed.
+
+Speculation has a cost besides wasted work: an instruction that runs
+speculatively and is then thrown away can still leave traces in the
+caches, and the attacks known as *Spectre* and *Meltdown* (2018) read
+secrets from those traces. Processors and kernels now include defenses
+against them, some of which slow programs down.
+
+For a much deeper look, read
+[*Computer Systems: A Programmer\'s Perspective*][AN-CSAPP], by Randal
+E. Bryant and David R. O\'Hallaron, which also uses x86-64 and AT&T
+syntax, and the optimization manuals of Intel and AMD.
+
+[AN-Intel-SDM]: https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
+[AN-CSAPP]: https://csapp.cs.cmu.edu/

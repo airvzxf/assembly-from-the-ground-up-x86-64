@@ -131,7 +131,10 @@ hierarchies, superscalar processors, pipelining, branch prediction,
 out-of-order execution, microcode translation, coprocessors, and other
 optimizations. Don\'t worry if you don\'t know what those words mean,
 you can just use them as Internet search terms if you want to learn more
-about the CPU.
+about the CPU, or read
+[Appendix N](appendix-n-the-fetch-execute-cycle.qmd#appendix-n-the-fetch-execute-cycle),
+which follows the cycle through our first program and explains most
+of them.
 
 Some Terms {#some-terms}
 ----------

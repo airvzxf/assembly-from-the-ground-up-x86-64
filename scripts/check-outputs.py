@@ -280,6 +280,10 @@ CHECKS = {
     "appm-gdb-stack-parameters": gdb("0AM-01-sum8"),
     "appm-rust-swap-pair": dict(sh(RUST_STRUCTS), subset=True),
     "appm-rust-rotate-triple": dict(sh(RUST_STRUCTS), subset=True),
+    # Appendix N
+    "appn-gdb-rip": gdb("003-02-maximum"),
+    "appn-objdump-bytes": dict(sh("objdump -d 003-02-maximum"),
+                               subset=True),
     # Appendix F
     "appf-start": dict(sh("gdb -nx ./003-02-maximum < /dev/null"),
                        setup=BROKEN_MAXIMUM, subset=True),
