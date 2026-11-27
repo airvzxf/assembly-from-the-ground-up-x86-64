@@ -264,6 +264,9 @@ CHECKS = {
     # Chapter 11
     "ch11-dis-maximum": dict(sh("python3 -m dis 011-02-maximum.py"),
                              subset=True),
+    "ch11-rustc-maximum": dict(
+        sh("rustc --edition 2024 -C opt-level=2 --emit asm"
+           " 011-02-maximum.rs && cat 011-02-maximum.s"), subset=True),
     # Chapter 12
     "ch12-gdb-frame-chain": dict(
         gdb("009-02-read-records", "break count_chars", "run",
@@ -318,6 +321,9 @@ CHECKS = {
         "sed -i 's/movq  \\$1, %rdi /movq  $2, %rdi /' 005-00-hello-world.s"
         " && as -o h.o 005-00-hello-world.s && ld -o 005-00-hello-world h.o"
         " && ./005-00-hello-world > /dev/null"),
+    "appk-strace-add-year-missing": dict(
+        sh("rm -f test.dat; strace -o trace.txt ./007-01-add-year"
+           " 2>/dev/null; cat trace.txt"), subs=[ENVP]),
     "appk-hexdump-third-age": dict(
         sh("./006-01-write-records && hexdump -C test.dat"), subset=True),
     "appk-factorial-python": sh("python3 0AK-08-05-factorial.py"),

@@ -55,15 +55,16 @@
 
 ### Author notes.
 
-- [ ] General.
+- [x] General.
   - [x] Dominique suggests I have an appendix of registers. Maybe in the Instructions appendix?
     - Added Appendix L. Registers and Flags; Appendix B and Chapter 3 point to it.
-  - [ ] Need to find places that need more filling out.  Reviews, definitely.
+  - [x] Need to find places that need more filling out.  Reviews, definitely.
+    - New review questions on the x86-64 material (Chapters 2, 3, 5, 6, 7, 9 and 11), answered in Appendix K; the new appendices L to O fill out the rest.
   - [x] Go back through and make sure that registers and memory are both fully described and fully distinguished.
     - Added "Registers and Memory" to Chapter 2: a comparison table, its consequences and a review question.
   - [x] Instructions needs some more beef from reference books.
     - Appendix B now also has `bswap`, `cltq`, `set`*cc*, `xadd`, `cmpxchg`, `lock`, the bit tests and scans, `leave`, the string instructions and a table of other instructions, from the Intel manuals; each one was run in the container.
-  - [ ] Appendices.
+  - [x] Appendices.
     - [x] A full description of the calling sequence for UNIX.
       - Appendix M. The System V Calling Sequence.
     - [x] A complete examination of the fetch-execute cycle.
@@ -71,7 +72,7 @@
     - [x] A complete listing of registers and flags.
       - Appendix L.
 
-- [ ] Chapters.
+- [x] Chapters.
   - [x] Chapter 2. Data Accessing Methods.
     - [x] This would be a good section for diagrams.
       - Added a text diagram for each addressing mode.

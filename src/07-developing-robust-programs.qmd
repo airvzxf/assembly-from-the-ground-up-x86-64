@@ -337,6 +337,11 @@ Review {#review-5}
 -   Add a recovery mechanism for `007-01-add-year.s` that allows it to read
     from STDIN if it cannot open the standard file.
 
+-   Run `007-01-add-year` in a directory without `test.dat`, as
+    `strace -o trace.txt ./007-01-add-year`, and read `trace.txt`.
+    Which system calls does the program make, and where does it write
+    its error message?
+
 ### Going Further {#going-further-5}
 
 -   What, if anything, should you do if your error-reporting function
