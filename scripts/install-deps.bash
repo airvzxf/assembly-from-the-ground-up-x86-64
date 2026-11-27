@@ -8,7 +8,8 @@
 # static.rust-lang.org. Both are verified by SHA-256. GTK 4, PyGObject,
 # Xvfb and xdotool build and test the GUI example of Appendix A; gdb,
 # strace and hexdump (bsdextrautils) run the sessions that the book
-# shows (scripts/check-outputs.py).
+# shows (scripts/check-outputs.py). The AArch64 binutils and qemu-user
+# build and run the AArch64 examples of Appendix P.
 #
 # Usage:
 #   sudo bash scripts/install-deps.bash         System packages (apt),
@@ -48,6 +49,7 @@ if [[ "${USER_MODE}" == 0 ]]; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
   apt-get install -y --no-install-recommends \
+    binutils-aarch64-linux-gnu \
     bsdextrautils \
     build-essential \
     ca-certificates \
@@ -57,6 +59,7 @@ if [[ "${USER_MODE}" == 0 ]]; then
     libgtk-4-dev \
     python3 \
     python3-gi \
+    qemu-user \
     strace \
     xauth \
     xdotool \

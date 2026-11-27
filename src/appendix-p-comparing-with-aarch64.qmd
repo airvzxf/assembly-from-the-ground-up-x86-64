@@ -1,0 +1,170 @@
+# Comparing with AArch64 {#appendix-p-comparing-with-aarch64}
+
+This appendix was added in this edition. x86-64 is not the only
+processor family you will meet. Phones, tablets, the Raspberry Pi,
+Apple\'s computers since 2020 and many servers in the cloud use the
+64-bit ARM architecture, *AArch64* (also called *ARM64*). Linux works
+the same on it: the same system calls, files, ELF programs and tools.
+Seeing our first two programs written for it shows which parts of this
+book are about x86-64 and which parts are about every computer.
+
+Running AArch64 Programs on x86-64 {#running-aarch64-programs-on-x86-64}
+----------------------------------
+
+You don\'t need an ARM computer. On Ubuntu, the package
+`binutils-aarch64-linux-gnu` has `as`, `ld` and `objdump` for AArch64,
+with the prefix `aarch64-linux-gnu-`, and `qemu-user` has
+`qemu-aarch64`, which runs an AArch64 Linux program on x86-64 by
+translating its instructions:
+
+```{.bash}
+sudo apt install binutils-aarch64-linux-gnu qemu-user
+aarch64-linux-gnu-as -g -o 0AP-01-exit-aarch64.o 0AP-01-exit-aarch64.s
+aarch64-linux-gnu-ld -o 0AP-01-exit-aarch64 0AP-01-exit-aarch64.o
+qemu-aarch64 ./0AP-01-exit-aarch64
+echo $?
+```
+
+The First Program {#the-first-program-aarch64}
+-----------------
+
+This is `003-01-exit` for AArch64:
+
+```{.gnuassembler .numberLines include=resource/asm/0AP-01-exit-aarch64.s}
+```
+
+It is the same program with different names:
+
+-   Comments start with `//` (in AArch64 assembly, `#` marks a number).
+
+-   Registers have no `%`. The 64-bit registers are _x0_ to _x30_.
+
+-   The operands are in the other order: the destination comes *first*,
+    as in the Intel syntax of
+    [Appendix B](appendix-b-common-x86-instructions.qmd#differences-in-other-syntaxes-and-terminology).
+    `mov x8, #93` puts 93 in _x8_.
+
+-   The system call number goes in _x8_, the parameters in _x0_ to _x5_,
+    the result comes back in _x0_, and `svc #0` (*supervisor call*)
+    plays the part of `syscall`. The numbers are different too: `exit`
+    is 93 on AArch64 and 60 on x86-64. Linux has one table of numbers
+    per architecture.
+
+Finding a Maximum Value {#finding-a-maximum-value-aarch64}
+-----------------------
+
+This is `003-02-maximum` for AArch64. It returns 222, like the x86-64
+version:
+
+```{.gnuassembler .numberLines include=resource/asm/0AP-02-maximum-aarch64.s}
+```
+
+`aarch64-linux-gnu-objdump -d 0AP-02-maximum-aarch64` shows the
+instructions with their machine code:
+
+```{.text check=appp-objdump-maximum}
+00000000004000e8 <_start>:
+  4000e8:       90000081        adrp    x1, 410000 <done+0xfef0>
+  4000ec:       91046021        add     x1, x1, #0x118
+  4000f0:       d2800002        mov     x2, #0x0                        // #0
+  4000f4:       f9400020        ldr     x0, [x1]
+
+00000000004000f8 <loop>:
+  4000f8:       f8627823        ldr     x3, [x1, x2, lsl #3]
+  4000fc:       b40000a3        cbz     x3, 400110 <done>
+  400100:       eb00007f        cmp     x3, x0
+  400104:       9a80c060        csel    x0, x3, x0, gt
+  400108:       91000442        add     x2, x2, #0x1
+  40010c:       17fffffb        b       4000f8 <loop>
+
+0000000000400110 <done>:
+  400110:       d2800ba8        mov     x8, #0x5d                       // #93
+  400114:       d4000001        svc     #0x0
+```
+
+The differences that matter:
+
+-   **Every instruction is 4 bytes long.** The addresses go up by 4,
+    and the decoder always knows where the next instruction starts,
+    which is simpler and faster than decoding x86-64 (see
+    [Decoding an Instruction](appendix-n-the-fetch-execute-cycle.qmd#decoding-an-instruction)).
+    The price is that a 64-bit address or number doesn\'t fit in one
+    instruction.
+
+-   **That is why the address takes two instructions.** `adrp` puts in
+    _x1_ the address of the 4096-byte page that holds `data_items`,
+    computed relative to the instruction itself, like `%rip`-relative
+    addressing (`410000` here). `add` adds the position of `data_items`
+    inside that page (`:lo12:` means its lowest 12 bits, `0x118`). The
+    program is still position-independent.
+
+-   **Only loads and stores touch memory.** `ldr` (*load register*) and
+    `str` (*store*) move data between memory and registers; `cmp`,
+    `add` and every other operation work only on registers. On x86-64,
+    `cmpq $0, (%rax)` reads memory and compares in one instruction.
+    Architectures built this way are called *load/store* architectures.
+
+-   **The addressing modes are similar.** `[x1, x2, lsl #3]` is
+    _x1_ + _x2_ × 8, the same as `(%rbx,%rcx,8)`: `lsl #3` (*logical
+    shift left* by 3) multiplies by 8.
+
+-   **Some instructions do more.** `cbz` (*compare and branch if zero*)
+    tests a register and jumps without touching the flags. `csel`
+    (*conditional select*) is AArch64\'s `cmov`: it puts _x3_ in _x0_ if
+    the last comparison said *greater* (`gt`), and _x0_ otherwise.
+
+-   **The flags are set only when you ask.** AArch64 has four flags, N
+    (negative), Z (zero), C (carry) and V (overflow), like SF, ZF, CF and
+    OF. `cmp` sets them, but `add` doesn\'t; `adds` does. On x86-64
+    almost every arithmetic instruction changes them.
+
+Registers and the Calling Convention {#registers-and-the-calling-convention-aarch64}
+------------------------------------
+
+| | x86-64 | AArch64 |
+|-|--------|---------|
+| Registers for numbers | 16: _%rax_ ... _%r15_ | 31: _x0_ ... _x30_ |
+| 32-bit halves | _%eax_ ...; writing one clears the upper half | _w0_ ... _w30_; writing one clears the upper half |
+| Zero register | None | _xzr_ (reads as 0, writes are ignored) |
+| Stack pointer | _%rsp_ | _sp_ |
+| Parameters | _%rdi_, _%rsi_, _%rdx_, _%rcx_, _%r8_, _%r9_ | _x0_ to _x7_ |
+| Return value | _%rax_ | _x0_ |
+| Callee-saved | _%rbx_, _%rbp_, _%r12_ to _%r15_ | _x19_ to _x28_, _x29_ |
+| Frame pointer | _%rbp_ | _x29_ |
+| Return address | Pushed on the stack by `call` | Put in _x30_ (the *link register*) by `bl` |
+| Stack alignment | 16 bytes at every `call` | 16 bytes whenever _sp_ is used to reach memory |
+| Byte order | Little-endian | Little-endian (on Linux) |
+
+The biggest difference is the return address. `bl function` (*branch
+with link*) jumps to the function and puts the return address in _x30_,
+not on the stack, and `ret` jumps to the address in _x30_. A function
+that calls nothing never touches the stack. A function that calls
+another one must save _x30_ first, usually together with the frame
+pointer, in the two instructions that start most AArch64 functions:
+
+```{.gnuassembler}
+stp  x29, x30, [sp, #-16]!  // Store the pair at sp - 16,
+                            // and move sp there.
+mov  x29, sp                // The new frame pointer.
+```
+
+which do what `pushq %rbp` and `movq %rsp, %rbp` do, and save the
+return address too. The function ends with `ldp x29, x30, [sp], #16`
+and `ret`.
+
+What Stays the Same {#what-stays-the-same-aarch64}
+-------------------
+
+Almost everything else in this book: memory as numbered bytes,
+registers, the stack, functions and their parameters, system calls,
+file descriptors and buffers, ELF files, sections and symbols, shared
+libraries and position-independent code, `brk` and `mmap`, ASLR,
+two\'s complement, IEEE 754 floating point, gdb, `strace` and `objdump`.
+An assembly language is a set of names for one processor\'s
+instructions; the ideas behind it are the same on every computer. For
+the details of AArch64, see the
+[Arm Architecture Reference Manual for A-profile][AP-ARM-ARM] and the
+[Procedure Call Standard for the Arm 64-bit Architecture][AP-AAPCS64].
+
+[AP-ARM-ARM]: https://developer.arm.com/documentation/ddi0487/latest
+[AP-AAPCS64]: https://github.com/ARM-software/abi-aa/blob/main/aapcs64/aapcs64.rst

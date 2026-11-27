@@ -405,6 +405,20 @@ expect_output 0AM-02-structs \
 expect_output 0AO-02-strlen-test "errors: 0" \
   python3 0AO-02-strlen-test.py
 
+# ----- Appendix P -----
+# expect_aarch64 <program> <exit status>: run it with qemu-aarch64.
+expect_aarch64() {
+  local status=0
+  qemu-aarch64 "./$1-bin" >/dev/null 2>&1 || status=$?
+  if [[ "${status}" == "$2" ]]; then
+    pass "$1: status ${status}"
+  else
+    fail "$1: expected status $2, got ${status}"
+  fi
+}
+expect_aarch64 0AP-01-exit-aarch64 0
+expect_aarch64 0AP-02-maximum-aarch64 222
+
 # ----- Appendix A -----
 # Run the GTK 4 example in a virtual X server: click the button, answer
 # No (Escape: it keeps running), click again and answer Yes (Return: it
