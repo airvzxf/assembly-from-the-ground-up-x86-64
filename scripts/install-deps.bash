@@ -6,8 +6,9 @@
 # comes from its official GitHub release, and Rust (rustc and its standard
 # library, used by the examples of Chapters 8 and 11) from
 # static.rust-lang.org. Both are verified by SHA-256. GTK 4, PyGObject,
-# Xvfb and xdotool build and test the GUI example of Appendix A; gdb and
-# strace run the sessions that the book shows (scripts/check-outputs.py).
+# Xvfb and xdotool build and test the GUI example of Appendix A; gdb,
+# strace and hexdump (bsdextrautils) run the sessions that the book
+# shows (scripts/check-outputs.py).
 #
 # Usage:
 #   sudo bash scripts/install-deps.bash         System packages (apt),
@@ -47,6 +48,7 @@ if [[ "${USER_MODE}" == 0 ]]; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
   apt-get install -y --no-install-recommends \
+    bsdextrautils \
     build-essential \
     ca-certificates \
     curl \
