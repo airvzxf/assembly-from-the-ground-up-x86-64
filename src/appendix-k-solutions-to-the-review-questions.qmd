@@ -354,6 +354,18 @@ that program when it is linked with `ld` as in Chapter 3.
 
 ### Going Further {#going-further-12}
 
+**Change the first number of `data_items` to 1000. What exit status do
+you get, and why?**
+
+```{.text check=appk-maximum-1000}
+232
+```
+
+The program finds 1000, but the exit status keeps only its lowest byte:
+1000 = 3 × 256 + 232. As with 300 in
+[When a Program Does Something Strange](03-your-first-programs.qmd#when-a-program-does-something-strange),
+the answer is right, and only the way we see it is too small.
+
 **Modify the first program to leave off the `syscall` instruction line.
 What error message do you get? Why?**
 
